@@ -35,10 +35,10 @@ class CaviaModel(nn.Module):
         self.context_params = torch.zeros(self.num_context_params).to(self.device)
         self.context_params.requires_grad = True
 
-    def forward(self, x):
+    def forward(self, x, context_params):
 
         # concatenate input with context parameters
-        x = torch.cat((x, self.context_params.expand(x.shape[0], -1)), dim=1)
+        x = torch.cat((x, context_params.expand(x.shape[0], -1)), dim=1)
 
         for k in range(len(self.fc_layers) - 1):
             x = F.relu(self.fc_layers[k](x))

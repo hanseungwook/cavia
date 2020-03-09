@@ -14,6 +14,7 @@ import torch.optim as optim
 import utils
 import tasks_sine, tasks_celebA
 from cavia_model import CaviaModel
+from active_model import Model_Active
 from logger import Logger
 
 
@@ -47,12 +48,18 @@ def run(args, log_interval=5000, rerun=False):
         raise NotImplementedError
 
     # initialise network
-    model = CaviaModel(n_in=task_family_train.num_inputs,
-                       n_out=task_family_train.num_outputs,
-                       num_context_params=args.num_context_params,
-                       n_hidden=args.num_hidden_layers,
-                       device=args.device
-                       ).to(args.device)
+    # model = CaviaModel(n_in=task_family_train.num_inputs,
+    #                    n_out=task_family_train.num_outputs,
+    #                    num_context_params=args.num_context_params,
+    #                    n_hidden=args.num_hidden_layers,
+    #                    device=args.device
+    #                    ).to(args.device)
+    
+    model = Model_Active(n_arch=[1,40,40,1],
+                         n_context=args.num_context_params,
+                         gain_w=1,
+                         gain_b=1,
+                         device=args.device).to(args.device)
 
     # intitialise meta-optimiser
     # (only on shared params - context parameters are *not* registered parameters of the model)
@@ -84,7 +91,7 @@ def run(args, log_interval=5000, rerun=False):
 
             for _ in range(args.num_inner_updates):
                 # forward through model
-                train_outputs = model(train_inputs)
+                train_outputs = model(train_inputs, model.context_params)
 
                 # get targets
                 train_targets = target_functions[t](train_inputs)
@@ -107,7 +114,7 @@ def run(args, log_interval=5000, rerun=False):
             test_inputs = task_family_train.sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
 
             # get outputs after update
-            test_outputs = model(test_inputs)
+            test_outputs = model(test_inputs, model.context_params)
 
             # get the correct targets
             test_targets = target_functions[t](test_inputs)
@@ -172,6 +179,8 @@ def run(args, log_interval=5000, rerun=False):
             # print current results
             logger.print_info(i_iter, start_time)
             start_time = time.time()
+        
+        
 
     return logger
 
@@ -203,7 +212,7 @@ def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradno
         for _ in range(1, num_updates + 1):
 
             # forward pass
-            curr_outputs = model(curr_inputs)
+            curr_outputs = model(curr_inputs, model.context_params)
 
             # compute loss for current task
             task_loss = F.mse_loss(curr_outputs, curr_targets)
@@ -225,7 +234,7 @@ def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradno
 
         # compute true loss on entire input range
         model.eval()
-        losses.append(F.mse_loss(model(input_range), target_function(input_range)).detach().item())
+        losses.append(F.mse_loss(model(input_range, model.context_params), target_function(input_range)).detach().item())
         model.train()
 
     losses_mean = np.mean(losses)
