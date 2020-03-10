@@ -14,8 +14,9 @@ import torch.optim as optim
 import utils
 import tasks_sine, tasks_celebA
 from cavia_model import CaviaModel
-from active_model import Model_Active
+from active_model import Model_Active, Encoder_Decoder, Onehot_Encoder
 from logger import Logger
+import IPython
 
 
 def run(args, log_interval=5000, rerun=False):
@@ -48,18 +49,18 @@ def run(args, log_interval=5000, rerun=False):
         raise NotImplementedError
 
     # initialise network
-    # model = CaviaModel(n_in=task_family_train.num_inputs,
-    #                    n_out=task_family_train.num_outputs,
-    #                    num_context_params=args.num_context_params,
-    #                    n_hidden=args.num_hidden_layers,
-    #                    device=args.device
-    #                    ).to(args.device)
+    model = CaviaModel(n_in=task_family_train.num_inputs,
+                       n_out=task_family_train.num_outputs,
+                       num_context_params=args.num_context_params,
+                       n_hidden=args.num_hidden_layers,
+                       device=args.device
+                       ).to(args.device)
     
-    model = Model_Active(n_arch=[1,40,40,1],
-                         n_context=args.num_context_params,
-                         gain_w=1,
-                         gain_b=1,
-                         device=args.device).to(args.device)
+    # model = Model_Active(n_arch=[1,40,40,1],
+    #                      n_context=args.num_context_params,
+    #                      gain_w=1,
+    #                      gain_b=1,
+    #                      device=args.device).to(args.device)
 
     # intitialise meta-optimiser
     # (only on shared params - context parameters are *not* registered parameters of the model)
@@ -95,6 +96,8 @@ def run(args, log_interval=5000, rerun=False):
 
                 # get targets
                 train_targets = target_functions[t](train_inputs)
+
+                IPython.embed()
 
                 # ------------ update on current task ------------
 
@@ -142,6 +145,122 @@ def run(args, log_interval=5000, rerun=False):
         model.reset_context_params()
 
         # ------------ logging ------------
+
+        if i_iter % log_interval == 0:
+
+            # evaluate on training set
+            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_train,
+                                              num_updates=args.num_inner_updates)
+            logger.train_loss.append(loss_mean)
+            logger.train_conf.append(loss_conf)
+
+            # evaluate on test set
+            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_valid,
+                                              num_updates=args.num_inner_updates)
+            logger.valid_loss.append(loss_mean)
+            logger.valid_conf.append(loss_conf)
+
+            # evaluate on validation set
+            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_test,
+                                              num_updates=args.num_inner_updates)
+            logger.test_loss.append(loss_mean)
+            logger.test_conf.append(loss_conf)
+
+            # save logging results
+            utils.save_obj(logger, path)
+
+            # save best model
+            if logger.valid_loss[-1] == np.min(logger.valid_loss):
+                print('saving best model at iter', i_iter)
+                logger.best_valid_model = copy.deepcopy(model)
+
+            # visualise results
+            if args.task == 'celeba':
+                task_family_train.visualise(task_family_train, task_family_test, copy.deepcopy(logger.best_valid_model),
+                                            args, i_iter)
+
+            # print current results
+            logger.print_info(i_iter, start_time)
+            start_time = time.time()
+        
+        
+
+    return logger
+
+def run_no_inner(args, log_interval=5000, rerun=False):
+    assert not args.maml
+
+    # see if we already ran this experiment
+    code_root = os.path.dirname(os.path.realpath(__file__))
+    if not os.path.isdir('{}/{}_result_files/'.format(code_root, args.task)):
+        os.mkdir('{}/{}_result_files/'.format(code_root, args.task))
+    path = '{}/{}_result_files/'.format(code_root, args.task) + utils.get_path_from_args(args)
+
+    if os.path.exists(path + '.pkl') and not rerun:
+        return utils.load_obj(path)
+
+    start_time = time.time()
+    utils.set_seed(args.seed)
+
+    # --- initialise everything ---
+
+    # get the task family
+    if args.task == 'sine':
+        task_family_train = tasks_sine.RegressionTasksSinusoidal()
+        task_family_valid = tasks_sine.RegressionTasksSinusoidal()
+        task_family_test = tasks_sine.RegressionTasksSinusoidal()
+    elif args.task == 'celeba':
+        task_family_train = tasks_celebA.CelebADataset('train', device=args.device)
+        task_family_valid = tasks_celebA.CelebADataset('valid', device=args.device)
+        task_family_test = tasks_celebA.CelebADataset('test', device=args.device)
+    else:
+        raise NotImplementedError
+    
+    model_decoder = Model_Active(n_arch=[1,40,40,1],
+                         n_context=args.num_context_params,
+                         gain_w=1,
+                         gain_b=1,
+                         device=args.device).to(args.device)
+    
+    model = Encoder_Decoder(model_decoder,
+                            n_context=args.num_context_params,
+                            n_task=1)
+
+
+    # intitialise optimisers
+    outer_optimiser = optim.Adam(model_decoder.parameters(), args.lr_meta)
+    inner_optimiser = optim.SGD(model.encoder.parameters(), args.lr_inner)
+
+    # initialise loggers
+    logger = Logger()
+    logger.best_valid_model = copy.deepcopy(model)
+
+    # --- main training loop ---
+
+    for i_iter in range(args.n_iter):
+
+        # sample tasks
+        # Change tasks per metaupdate?
+        target_functions = task_family_train.sample_tasks(args.tasks_per_metaupdate)
+        train_tasks_onehot = task_family_train.sample_tasks_onehot(num_tasks=1, batch_size=args.k_meta_train)
+
+        train_inputs = task_family_train.sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
+
+        # Depending on tasks per metaupdate
+        train_targets = target_functions[t](train_inputs)
+
+        train_outputs = model(train_inputs, train_tasks_onehot)
+
+        loss = F.mse_loss(train_outputs, train_targets)
+    
+        inner_optimiser.zero_grad()
+        outer_optimiser.zero_grad()
+
+        loss.backward()
+
+        inner_optimiser.step()
+        outer_optimiser.step()
+        
 
         if i_iter % log_interval == 0:
 

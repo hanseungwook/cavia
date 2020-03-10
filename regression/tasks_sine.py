@@ -53,6 +53,16 @@ class RegressionTasksSinusoidal:
         else:
             return target_functions
 
+    def sample_tasks_onehot(self, num_tasks, batch_size):
+        q_all = []
+        for i in range(num_tasks):
+            q = torch.zeros(batch_size, num_tasks)
+            q[:, i] = 1.0
+            q_all.append(q)
+        q_all = torch.cat(q_all)
+
+        return q_all
+
     def sample_datapoints(self, batch_size):
         """
         Sample random input/output pairs (e.g. for training an orcale)

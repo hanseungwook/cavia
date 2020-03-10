@@ -28,6 +28,7 @@ def parse_args():
 
     parser.add_argument('--maml', action='store_true', default=False, help='run MAML')
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--logger_save_file', type=str, default='./loggers/logger', help='Directory to save logger')
 
     # commands specific to the CelebA image completion task
     parser.add_argument('--use_ordered_pixels', action='store_true', default=False)
