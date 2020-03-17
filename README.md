@@ -6,6 +6,18 @@ Luisa M Zintgraf, Kyriacos Shiarlis, Vitaly Kurin, Katja Hofmann, Shimon Whiteso
 
 I used Python 3.7 and PyTorch 1.0.1 for these experiments.
 
+## Run
+To avoid any conflict, and to keep this project self-contained, please install virtual environment with [`virtualenv`](http://docs.python-guide.org/en/l    atest/dev/virtualenvs/):
+```
+pip3.6 install --upgrade virtualenv
+```
+
+## Run
+To start training:
+```
+./_train.sh
+```
+
 ### Regression
 
 - Running experiments:
