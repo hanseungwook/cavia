@@ -4,19 +4,17 @@ Regression experiment using CAVIA
 import copy
 import os
 import time
-
 import numpy as np
 import scipy.stats as st
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-
 import utils
-import tasks_sine, tasks_celebA
+import tasks_sine
+import tasks_celebA
 from cavia_model import CaviaModel
-from active_model import Model_Active, Encoder_Decoder, Onehot_Encoder
+from active_model import Model_Active, Encoder_Decoder
 from logger import Logger
-import IPython
 
 
 def run(args, log_interval=5000, rerun=False):
@@ -96,8 +94,6 @@ def run(args, log_interval=5000, rerun=False):
 
                 # get targets
                 train_targets = target_functions[t](train_inputs)
-
-                IPython.embed()
 
                 # ------------ update on current task ------------
 
@@ -183,9 +179,8 @@ def run(args, log_interval=5000, rerun=False):
             logger.print_info(i_iter, start_time)
             start_time = time.time()
         
-        
-
     return logger
+
 
 def run_no_inner(args, log_interval=5000, rerun=False):
     assert not args.maml
@@ -216,16 +211,13 @@ def run_no_inner(args, log_interval=5000, rerun=False):
     else:
         raise NotImplementedError
     
-    model_decoder = Model_Active(n_arch=[1,40,40,1],
-                         n_context=args.num_context_params,
-                         gain_w=1,
-                         gain_b=1,
-                         device=args.device).to(args.device)
+    model_decoder = Model_Active(
+        n_arch=[1, 40, 40, 1],
+        n_context=args.num_context_params,
+        gain_w=1, gain_b=1,
+        device=args.device).to(args.device)
     
-    model = Encoder_Decoder(model_decoder,
-                            n_context=args.num_context_params,
-                            n_task=1)
-
+    model = Encoder_Decoder(model_decoder, n_context=args.num_context_params, n_task=1)
 
     # intitialise optimisers
     outer_optimiser = optim.Adam(model_decoder.parameters(), args.lr_meta)
@@ -261,9 +253,7 @@ def run_no_inner(args, log_interval=5000, rerun=False):
         inner_optimiser.step()
         outer_optimiser.step()
         
-
         if i_iter % log_interval == 0:
-
             # evaluate on training set
             loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_train,
                                               num_updates=args.num_inner_updates)
@@ -299,8 +289,6 @@ def run_no_inner(args, log_interval=5000, rerun=False):
             logger.print_info(i_iter, start_time)
             start_time = time.time()
         
-        
-
     return logger
 
 
