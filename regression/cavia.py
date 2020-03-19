@@ -16,7 +16,6 @@ import tasks_sine, tasks_celebA
 from cavia_model import CaviaModel
 from active_model import Model_Active, Encoder_Decoder, Onehot_Encoder
 from logger import Logger
-import IPython
 
 
 def run(args, log_interval=5000, rerun=False):
@@ -49,19 +48,20 @@ def run(args, log_interval=5000, rerun=False):
         raise NotImplementedError
 
     # initialise network
-    model = CaviaModel(n_in=task_family_train.num_inputs,
-                       n_out=task_family_train.num_outputs,
-                       num_context_params=args.num_context_params,
-                       n_hidden=args.num_hidden_layers,
-                       device=args.device
-                       ).to(args.device)
+    if args.blackbox:
+            model = Model_Active(n_arch=[1,40,40,1],
+                         n_context=args.num_context_params,
+                         gain_w=1,
+                         gain_b=1,
+                         device=args.device).to(args.device)
+    else:
+        model = CaviaModel(n_in=task_family_train.num_inputs,
+                        n_out=task_family_train.num_outputs,
+                        num_context_params=args.num_context_params,
+                        n_hidden=args.num_hidden_layers,
+                        device=args.device
+                        ).to(args.device)
     
-    # model = Model_Active(n_arch=[1,40,40,1],
-    #                      n_context=args.num_context_params,
-    #                      gain_w=1,
-    #                      gain_b=1,
-    #                      device=args.device).to(args.device)
-
     # intitialise meta-optimiser
     # (only on shared params - context parameters are *not* registered parameters of the model)
     meta_optimiser = optim.Adam(model.parameters(), args.lr_meta)
@@ -96,8 +96,6 @@ def run(args, log_interval=5000, rerun=False):
 
                 # get targets
                 train_targets = target_functions[t](train_inputs)
-
-                IPython.embed()
 
                 # ------------ update on current task ------------
 
@@ -302,6 +300,66 @@ def run_no_inner(args, log_interval=5000, rerun=False):
         
 
     return logger
+
+
+def eval_1hot(args, model, task_family, num_updates, n_tasks=100, return_gradnorm=False):
+    # get the task family
+    input_range = task_family.get_input_range().to(args.device)
+
+    # logging
+    losses = []
+    gradnorms = []
+
+    # --- inner loop ---
+
+    for t in range(n_tasks):
+
+        # sample a task
+        target_function = task_family.sample_task()
+
+        # reset context parameters
+        model.reset_context_params()
+
+        # get data for current task
+        curr_inputs = task_family.sample_inputs(args.k_shot_eval, args.use_ordered_pixels).to(args.device)
+        curr_targets = target_function(curr_inputs)
+
+        # ------------ update on current task ------------
+
+        for _ in range(1, num_updates + 1):
+
+            # forward pass
+            curr_outputs = model(curr_inputs, model.context_params)
+
+            # compute loss for current task
+            task_loss = F.mse_loss(curr_outputs, curr_targets)
+
+            # compute gradient wrt context params
+            task_gradients = \
+                torch.autograd.grad(task_loss, model.context_params, create_graph=not args.first_order)[0]
+
+            # update context params
+            if args.first_order:
+                model.context_params = model.context_params - args.lr_inner * task_gradients.detach()
+            else:
+                model.context_params = model.context_params - args.lr_inner * task_gradients
+
+            # keep track of gradient norms
+            gradnorms.append(task_gradients[0].norm().item())
+
+        # ------------ logging ------------
+
+        # compute true loss on entire input range
+        model.eval()
+        losses.append(F.mse_loss(model(input_range, model.context_params), target_function(input_range)).detach().item())
+        model.train()
+
+    losses_mean = np.mean(losses)
+    losses_conf = st.t.interval(0.95, len(losses) - 1, loc=losses_mean, scale=st.sem(losses))
+    if not return_gradnorm:
+        return losses_mean, np.mean(np.abs(losses_conf - losses_mean))
+    else:
+        return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
 
 
 def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradnorm=False):
