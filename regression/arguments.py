@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument('--first_order', action='store_true', default=False, help='run first-order version')
 
     parser.add_argument('--maml', action='store_true', default=False, help='run MAML')
-    parser.add_argument('--model_type', action='store_true', default='CAVIA')
+    parser.add_argument('--model_type', type=str, default='ACTIVE', help='model type: ACTIVE or CAVIA')
     # parser.add_argument('--blackbox', action='store_true', default=False, help='run black box (our) approach')
 
     parser.add_argument('--seed', type=int, default=42)

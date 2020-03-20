@@ -62,7 +62,7 @@ class Linear_Active(nn.Module):
 
 
 class Model_Active(nn.Module):
-    def __init__(self, n_arch, n_context, gain_w, gain_b, nonlin=nn.ReLU(), passive=True, device=None): 
+    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
         super().__init__()
         if device:
             self.device = device

@@ -21,7 +21,7 @@ from logger import Logger
 ############ Check for any bugs ###############
 
 
-def initial_setting(args):
+def initial_setting(args, rerun):
     assert not args.maml
 
     # see if we already ran this experiment
@@ -34,8 +34,8 @@ def initial_setting(args):
         return utils.load_obj(path)
 
     utils.set_seed(args.seed)
-
-    return start_time
+    
+    return path
 
 
 
@@ -73,35 +73,31 @@ def get_model_decoder( args, task_family_train ):
     return model_decoder
 
 
-def update_logger(logger, path, args, model, eval_fnc, task_family):
+def update_logger(logger, path, args, model, eval_fnc, task_family, i_iter, start_time):
 
-    def logger_helper(logger, args, model, eval_fnc, task):
-        loss_mean, loss_conf = eval_fnc(args, copy.deepcopy(model), task_family=task,	
-                                            num_updates=args.num_inner_updates)	
-        logger.train_loss.append(loss_mean)	
-        logger.train_conf.append(loss_conf)	
-        return logger	
+    def logger_helper(logger, args, model, eval_fnc, task_family, task_type):
+        loss_mean, loss_conf = eval_fnc(args, copy.deepcopy(model), task_family=task_family[task_type],  num_updates=args.num_inner_updates)
+        getattr(logger, task_type+'_loss').append(loss_mean)
+        getattr(logger, task_type+'_conf').append(loss_conf)
+        return logger
 
-    # evaluate on training set	
-    logger = logger_helper(logger, args, model,  eval_fnc, task = task_family['train'])
-    # evaluate on test set	
-    logger = logger_helper(logger, args, model,  eval_fnc, task = task_family['valid'])
-    # evaluate on validation set	
-    logger = logger_helper(logger, args, model,  eval_fnc, task = task_family['test'])
+    # evaluate on training set
+    logger = logger_helper(logger, args, model,  eval_fnc, task_family, task_type = 'train')
+    logger = logger_helper(logger, args, model,  eval_fnc, task_family, task_type = 'test')
+    logger = logger_helper(logger, args, model,  eval_fnc, task_family, task_type = 'valid')
 
-    # save logging results	
-    utils.save_obj(logger, path)	
-    # save best model	
-    if logger.valid_loss[-1] == np.min(logger.valid_loss):	
-        print('saving best model at iter', i_iter)	
-        logger.best_valid_model = copy.deepcopy(model)	
+    # save logging results
+    utils.save_obj(logger, path)
+    # save best model
+    if logger.valid_loss[-1] == np.min(logger.valid_loss):
+        print('saving best model at iter', i_iter)
+        logger.best_valid_model = copy.deepcopy(model)
     # visualise results	
-    if args.task == 'celeba':	
-        task_family['train'].visualise(task_family['train'], task_family['test'], copy.deepcopy(logger.best_valid_model),	
-                                    args, i_iter)	
-    # print current results	
-    logger.print_info(i_iter, start_time)	
-    start_time = time.time()	
+    if args.task == 'celeba':
+        task_family['train'].visualise(task_family['train'], task_family['test'], copy.deepcopy(logger.best_valid_model), args, i_iter)
+    # print current results
+    logger.print_info(i_iter, start_time)
+    start_time = time.time()
     return logger, start_time
 
 
@@ -116,31 +112,31 @@ def eval_model (model, context, inputs, target_fnc):
 
 def inner_loop_step(args, model, task_family, target_fnc, meta_gradient):
 
-            # get data for current task
-            train_inputs = task_family['train'].sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
-            # reset private network weights
-            context = model.reset_context()
+    # get data for current task
+    train_inputs = task_family['train'].sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
+    # reset private network weights
+    context = model.reset_context()
 
-            for _ in range(args.num_inner_updates):
+    for _ in range(args.num_inner_updates):
 
-                # ------------ update context_params on current task ------------
-                # gradient wrt context params for current task
-                task_loss = eval_model (model, context, train_inputs, target_fnc)
-                task_gradients =  torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
-                # update context params (this will set up the computation graph correctly)
-                context = context - args.lr_inner * task_gradients
+        # ------------ update context_params on current task ------------
+        # gradient wrt context params for current task
+        task_loss = eval_model (model, context, train_inputs, target_fnc)
+        task_gradients =  torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
+        # update context params (this will set up the computation graph correctly)
+        context = context - args.lr_inner * task_gradients
 
-            # ------------ compute meta-gradient on test loss of current task ------------
+    # ------------ compute meta-gradient on test loss of current task ------------
 
-            ### SHOULDn't THIS USE task_family['test'] instead?? ####
-            test_inputs = task_family['train'].sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
-            loss_meta = eval_model (model, context, test_inputs, target_fnc)
-            # compute gradient + save for current task
-            task_grad = torch.autograd.grad(loss_meta, model.parameters())
+    ### SHOULDn't THIS USE task_family['test'] instead?? ####
+    test_inputs = task_family['train'].sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
+    loss_meta = eval_model (model, context, test_inputs, target_fnc)
+    # compute gradient + save for current task
+    task_grad = torch.autograd.grad(loss_meta, model.parameters())
 
-            # clip the gradient
-            for i in range(len(task_grad)):
-                meta_gradient[i] += task_grad[i].detach().clamp_(-10, 10)
+    # clip the gradient
+    for i in range(len(task_grad)):
+        meta_gradient[i] += task_grad[i].detach().clamp_(-10, 10)
 
     return meta_gradient
 
@@ -153,7 +149,7 @@ def inner_loop_step(args, model, task_family, target_fnc, meta_gradient):
 
 def run(args, log_interval=5000, rerun=False):
 
-    initial_setting(args)
+    path = initial_setting(args, rerun)
     
     # initialise 
     task_family = get_task_family(args.task)
@@ -189,7 +185,7 @@ def run(args, log_interval=5000, rerun=False):
 
         # ------------ logging ------------
         if i_iter % log_interval == 0:
-            logger, start_time = update_logger(logger, path, args, model, eval_cavia, task_family)
+            logger, start_time = update_logger(logger, path, args, model, eval_cavia, task_family, i_iter, start_time)
 
     return logger
 
