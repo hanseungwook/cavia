@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
 from torch.nn import init
+import IPython
 
 
 class Active_Weight(nn.Module):
@@ -42,8 +43,19 @@ class Active_Weight(nn.Module):
             init.uniform_(bias, -bound, bound)
             
     def forward(self, context):
-        weight = F.linear(context, self.w_active, self.w_passive).view(self.n_output, self.n_input)
-        bias = F.linear(context, self.b_active, self.b_passive).view(self.n_output)
+        # print(self.n_output)
+        # print(self.n_input)
+        # print(context.shape)
+        # print(self.w_active.shape)
+        # print(self.w_passive.shape)
+        batch_size = context.shape[0]
+        if batch_size > 1:
+            weight = F.linear(context, self.w_active, self.w_passive).view(batch_size, self.n_output, self.n_input)
+            bias = F.linear(context, self.b_active, self.b_passive).view(batch_size, self.n_output)
+        else: 
+            weight = F.linear(context, self.w_active, self.w_passive).view(self.n_output, self.n_input)
+            bias = F.linear(context, self.b_active, self.b_passive).view(self.n_output)
+        
         return weight, bias
 
 
@@ -54,10 +66,13 @@ class Linear_Active(nn.Module):
         
     def forward(self, x, context):
         weight, bias = self.active_weight(context)
-        # print('x shape: {}'.format(x.shape))
-        # print('weight shape: {}'.format(weight.shape))
-        # x = torch.einsum('bs,as->ba', x, weight) + bias
-        x = F.linear(x, weight, bias)
+        batch_size = context.shape[0]
+        
+        if batch_size > 1:
+            x = torch.einsum('bs,bas->ba', x, weight) + bias
+        else:
+            x = F.linear(x, weight, bias)
+        
         return x
 
 
