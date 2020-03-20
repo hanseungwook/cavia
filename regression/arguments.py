@@ -22,12 +22,15 @@ def parse_args():
     parser.add_argument('--num_inner_updates', type=int, default=1, help='number of inner-loop updates (during training)')
 
     parser.add_argument('--num_context_params', type=int, default=5, help='number of context parameters (added at first layer)')
-    parser.add_argument('--num_hidden_layers', type=int, nargs='+', default=[40, 40])
+    parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1])
+    # parser.add_argument('--num_hidden_layers', type=int, nargs='+', default=[40, 40])
 
     parser.add_argument('--first_order', action='store_true', default=False, help='run first-order version')
 
     parser.add_argument('--maml', action='store_true', default=False, help='run MAML')
-    parser.add_argument('--blackbox', action='store_true', default=False, help='run black box (our) approach')
+    parser.add_argument('--model_type', action='store_true', default='CAVIA')
+    # parser.add_argument('--blackbox', action='store_true', default=False, help='run black box (our) approach')
+
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--logger_save_file', type=str, default='./loggers/logger', help='Directory to save logger')
     parser.add_argument('--log_interval', type=int, default=100, help='Log interval')

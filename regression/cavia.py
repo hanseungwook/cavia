@@ -13,12 +13,15 @@ import torch.optim as optim
 
 import utils
 import tasks_sine, tasks_celebA
-from cavia_model import CaviaModel
-from active_model import Model_Active, Encoder_Decoder, Onehot_Encoder
+from models import CaviaModel, Model_Active, Encoder_Decoder, Onehot_Encoder
 from logger import Logger
 
 
-def run(args, log_interval=5000, rerun=False):
+############ should rename the file... it's not just cavia anymore ##############
+############ Check for any bugs ###############
+
+
+def initial_setting(args):
     assert not args.maml
 
     # see if we already ran this experiment
@@ -30,208 +33,256 @@ def run(args, log_interval=5000, rerun=False):
     if os.path.exists(path + '.pkl') and not rerun:
         return utils.load_obj(path)
 
-    start_time = time.time()
     utils.set_seed(args.seed)
 
-    # --- initialise everything ---
+    return start_time
 
-    # get the task family
-    if args.task == 'sine':
-        task_family_train = tasks_sine.RegressionTasksSinusoidal()
-        task_family_valid = tasks_sine.RegressionTasksSinusoidal()
-        task_family_test = tasks_sine.RegressionTasksSinusoidal()
-    elif args.task == 'celeba':
-        task_family_train = tasks_celebA.CelebADataset('train', device=args.device)
-        task_family_valid = tasks_celebA.CelebADataset('valid', device=args.device)
-        task_family_test = tasks_celebA.CelebADataset('test', device=args.device)
+
+
+def get_task_family(task):
+    task_family = {}
+    if task == 'sine':
+        task_family['train'] = tasks_sine.RegressionTasksSinusoidal()
+        task_family['valid'] = tasks_sine.RegressionTasksSinusoidal()
+        task_family['test'] = tasks_sine.RegressionTasksSinusoidal()
+    elif task == 'celeba':
+        task_family['train'] = tasks_celebA.CelebADataset('train', device=args.device)
+        task_family['valid'] = tasks_celebA.CelebADataset('valid', device=args.device)
+        task_family['test'] = tasks_celebA.CelebADataset('test', device=args.device)
     else:
         raise NotImplementedError
+    return task_family
 
-    # initialise network
-    if args.blackbox:
-            model = Model_Active(n_arch=[1,40,40,1],
-                         n_context=args.num_context_params,
-                         gain_w=1,
-                         gain_b=1,
-                         device=args.device).to(args.device)
-    else:
-        model = CaviaModel(n_in=task_family_train.num_inputs,
-                        n_out=task_family_train.num_outputs,
-                        num_context_params=args.num_context_params,
-                        n_hidden=args.num_hidden_layers,
-                        device=args.device
-                        ).to(args.device)
+
+def get_model_decoder( args, task_family_train ):
+    n_arch = args.architecture
+
+    assert  n_arch[0] == task_family_train.num_inputs 
+    assert  n_arch[-1] == task_family_train.num_outputs 
+
+    n_context = args.num_context_params
+
+    if args.model_type == 'CAVIA':
+        MODEL = CaviaModel
+        n_arch[0] +=  n_context
+    elif args.model_type == 'ACTIVE':
+        MODEL = Model_Active
+        
+
+    model_decoder = MODEL(n_arch=n_arch,  n_context=n_context,  device=args.device).to(args.device)
+    return model_decoder
+
+
+def update_logger(logger, path, args, model, eval_fnc, task_family):
+
+    def logger_helper(logger, args, model, eval_fnc, task):
+        loss_mean, loss_conf = eval_fnc(args, copy.deepcopy(model), task_family=task,	
+                                            num_updates=args.num_inner_updates)	
+        logger.train_loss.append(loss_mean)	
+        logger.train_conf.append(loss_conf)	
+        return logger	
+
+    # evaluate on training set	
+    logger = logger_helper(logger, args, model,  eval_fnc, task = task_family['train'])
+    # evaluate on test set	
+    logger = logger_helper(logger, args, model,  eval_fnc, task = task_family['valid'])
+    # evaluate on validation set	
+    logger = logger_helper(logger, args, model,  eval_fnc, task = task_family['test'])
+
+    # save logging results	
+    utils.save_obj(logger, path)	
+    # save best model	
+    if logger.valid_loss[-1] == np.min(logger.valid_loss):	
+        print('saving best model at iter', i_iter)	
+        logger.best_valid_model = copy.deepcopy(model)	
+    # visualise results	
+    if args.task == 'celeba':	
+        task_family['train'].visualise(task_family['train'], task_family['test'], copy.deepcopy(logger.best_valid_model),	
+                                    args, i_iter)	
+    # print current results	
+    logger.print_info(i_iter, start_time)	
+    start_time = time.time()	
+    return logger, start_time
+
+
+
+
+def eval_model (model, context, inputs, target_fnc):
+    outputs = model(inputs, context)
+    targets = target_fnc(inputs)
+    return F.mse_loss(outputs, targets)
+
+
+
+def inner_loop_step(args, model, task_family, target_fnc, meta_gradient):
+
+            # get data for current task
+            train_inputs = task_family['train'].sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
+            # reset private network weights
+            context = model.reset_context()
+
+            for _ in range(args.num_inner_updates):
+
+                # ------------ update context_params on current task ------------
+                # gradient wrt context params for current task
+                task_loss = eval_model (model, context, train_inputs, target_fnc)
+                task_gradients =  torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
+                # update context params (this will set up the computation graph correctly)
+                context = context - args.lr_inner * task_gradients
+
+            # ------------ compute meta-gradient on test loss of current task ------------
+
+            ### SHOULDn't THIS USE task_family['test'] instead?? ####
+            test_inputs = task_family['train'].sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
+            loss_meta = eval_model (model, context, test_inputs, target_fnc)
+            # compute gradient + save for current task
+            task_grad = torch.autograd.grad(loss_meta, model.parameters())
+
+            # clip the gradient
+            for i in range(len(task_grad)):
+                meta_gradient[i] += task_grad[i].detach().clamp_(-10, 10)
+
+    return meta_gradient
+
+
+
+
+#########################################
+
+
+
+def run(args, log_interval=5000, rerun=False):
+
+    initial_setting(args)
     
-    # intitialise meta-optimiser
-    # (only on shared params - context parameters are *not* registered parameters of the model)
+    # initialise 
+    task_family = get_task_family(args.task)
+    model = get_model_decoder( args, task_family['train'] )
     meta_optimiser = optim.Adam(model.parameters(), args.lr_meta)
-
-    # initialise loggers
     logger = Logger()
     logger.best_valid_model = copy.deepcopy(model)
 
+    start_time = time.time()
     # --- main training loop ---
 
     for i_iter in range(args.n_iter):
 
-        # initialise meta-gradient
-        meta_gradient = [0 for _ in range(len(model.state_dict()))]
-
         # sample tasks
-        target_functions = task_family_train.sample_tasks(args.tasks_per_metaupdate)
+        target_functions = task_family['train'].sample_tasks(args.tasks_per_metaupdate)
+        meta_gradient = [0 for _ in range(len(model.state_dict()))]     
 
         # --- inner loop ---
-
         for t in range(args.tasks_per_metaupdate):
-
-            # reset private network weights
-            model.reset_context_params()
-
-            # get data for current task
-            train_inputs = task_family_train.sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
-
-            for _ in range(args.num_inner_updates):
-                # forward through model
-                train_outputs = model(train_inputs, model.context_params)
-
-                # get targets
-                train_targets = target_functions[t](train_inputs)
-
-                # ------------ update on current task ------------
-
-                # compute loss for current task
-                task_loss = F.mse_loss(train_outputs, train_targets)
-
-                # compute gradient wrt context params
-                task_gradients = \
-                    torch.autograd.grad(task_loss, model.context_params, create_graph=not args.first_order)[0]
-
-                # update context params (this will set up the computation graph correctly)
-                model.context_params = model.context_params - args.lr_inner * task_gradients
-
-            # ------------ compute meta-gradient on test loss of current task ------------
-
-            # get test data
-            test_inputs = task_family_train.sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
-
-            # get outputs after update
-            test_outputs = model(test_inputs, model.context_params)
-
-            # get the correct targets
-            test_targets = target_functions[t](test_inputs)
-
-            # compute loss after updating context (will backprop through inner loop)
-            loss_meta = F.mse_loss(test_outputs, test_targets)
-
-            # compute gradient + save for current task
-            task_grad = torch.autograd.grad(loss_meta, model.parameters())
-
-            for i in range(len(task_grad)):
-                # clip the gradient
-                meta_gradient[i] += task_grad[i].detach().clamp_(-10, 10)
+            target_fnc = target_functions[t]
+            meta_gradient = inner_loop_step(args, model, task_family, target_fnc, meta_gradient)
 
         # ------------ meta update ------------
 
-        # assign meta-gradient
         for i, param in enumerate(model.parameters()):
             param.grad = meta_gradient[i] / args.tasks_per_metaupdate
 
         # do update step on shared model
         meta_optimiser.step()
 
-        # reset context params
-        model.reset_context_params()
+        # # reset context params
+        # model.reset_context_params()
 
         # ------------ logging ------------
-
         if i_iter % log_interval == 0:
-
-            # evaluate on training set
-            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_train,
-                                              num_updates=args.num_inner_updates)
-            logger.train_loss.append(loss_mean)
-            logger.train_conf.append(loss_conf)
-
-            # evaluate on test set
-            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_valid,
-                                              num_updates=args.num_inner_updates)
-            logger.valid_loss.append(loss_mean)
-            logger.valid_conf.append(loss_conf)
-
-            # evaluate on validation set
-            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_test,
-                                              num_updates=args.num_inner_updates)
-            logger.test_loss.append(loss_mean)
-            logger.test_conf.append(loss_conf)
-
-            # save logging results
-            utils.save_obj(logger, path)
-
-            # save best model
-            if logger.valid_loss[-1] == np.min(logger.valid_loss):
-                print('saving best model at iter', i_iter)
-                logger.best_valid_model = copy.deepcopy(model)
-
-            # visualise results
-            if args.task == 'celeba':
-                task_family_train.visualise(task_family_train, task_family_test, copy.deepcopy(logger.best_valid_model),
-                                            args, i_iter)
-
-            # print current results
-            logger.print_info(i_iter, start_time)
-            start_time = time.time()
-        
-        
+            logger, start_time = update_logger(logger, path, args, model, eval_cavia, task_family)
 
     return logger
 
-def run_no_inner(args, log_interval=5000, rerun=False):
-    assert not args.maml
 
-    # see if we already ran this experiment
-    code_root = os.path.dirname(os.path.realpath(__file__))
-    if not os.path.isdir('{}/{}_result_files/'.format(code_root, args.task)):
-        os.mkdir('{}/{}_result_files/'.format(code_root, args.task))
-    path = '{}/{}_result_files/'.format(code_root, args.task) + utils.get_path_from_args(args)
 
-    if os.path.exists(path + '.pkl') and not rerun:
-        return utils.load_obj(path)
 
-    start_time = time.time()
-    utils.set_seed(args.seed)
 
-    # --- initialise everything ---
 
+def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradnorm=False):
     # get the task family
-    if args.task == 'sine':
-        task_family_train = tasks_sine.RegressionTasksSinusoidal()
-        task_family_valid = tasks_sine.RegressionTasksSinusoidal()
-        task_family_test = tasks_sine.RegressionTasksSinusoidal()
-    elif args.task == 'celeba':
-        task_family_train = tasks_celebA.CelebADataset('train', device=args.device)
-        task_family_valid = tasks_celebA.CelebADataset('valid', device=args.device)
-        task_family_test = tasks_celebA.CelebADataset('test', device=args.device)
-    else:
-        raise NotImplementedError
-    
-    model_decoder = Model_Active(n_arch=[1,40,40,1],
-                         n_context=args.num_context_params,
-                         gain_w=1,
-                         gain_b=1,
-                         device=args.device).to(args.device)
-    
-    model = Encoder_Decoder(model_decoder,
-                            n_context=args.num_context_params,
-                            n_task=1)
+    input_range = task_family.get_input_range().to(args.device)
 
+    # logging
+    losses = []
+    gradnorms = []
+
+    # --- inner loop ---
+
+    for t in range(n_tasks):
+
+        # sample a task
+        target_function = task_family.sample_task()
+
+        # reset context parameters
+        context = model.reset_context()
+
+        # get data for current task
+        curr_inputs = task_family.sample_inputs(args.k_shot_eval, args.use_ordered_pixels).to(args.device)
+        curr_targets = target_function(curr_inputs)
+
+        # ------------ update on current task ------------
+
+        for _ in range(1, num_updates + 1):
+
+            # forward pass
+            curr_outputs = model(curr_inputs, context)
+
+            # compute loss for current task
+            task_loss = F.mse_loss(curr_outputs, curr_targets)
+
+            # compute gradient wrt context params
+            task_gradients = \
+                torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
+
+            # update context params
+            if args.first_order:
+                context = context - args.lr_inner * task_gradients.detach()
+            else:
+                context = context - args.lr_inner * task_gradients
+
+            # keep track of gradient norms
+            gradnorms.append(task_gradients[0].norm().item())
+
+        # ------------ logging ------------
+
+        # compute true loss on entire input range
+        model.eval()
+        losses.append(F.mse_loss(model(input_range, context), target_function(input_range)).detach().item())
+        model.train()
+
+    losses_mean = np.mean(losses)
+    losses_conf = st.t.interval(0.95, len(losses) - 1, loc=losses_mean, scale=st.sem(losses))
+    if not return_gradnorm:
+        return losses_mean, np.mean(np.abs(losses_conf - losses_mean))
+    else:
+        return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
+
+
+
+
+
+def run_no_inner(args, log_interval=5000, rerun=False):
+    initial_setting(args)
+
+    task_family = get_task_family(args.task)
+
+    model_decoder = get_model_decoder( args, task_family['train'] )
+    model = Encoder_Decoder(model_decoder,  n_context=args.num_context_params,  n_task=1)
+
+    # initialise loggers
+    logger = Logger()
+    logger.best_valid_model = copy.deepcopy(model)
 
     # intitialise optimisers
-    outer_optimiser = optim.Adam(model_decoder.parameters(), args.lr_meta)
+    outer_optimiser = optim.Adam(model.decoder.parameters(), args.lr_meta)
     inner_optimiser = optim.SGD(model.encoder.parameters(), args.lr_inner)
 
     # initialise loggers
     logger = Logger()
     logger.best_valid_model = copy.deepcopy(model)
+
+
+    start_time = time.time()
 
     # --- main training loop ---
 
@@ -261,45 +312,17 @@ def run_no_inner(args, log_interval=5000, rerun=False):
         
 
         if i_iter % log_interval == 0:
-
-            # evaluate on training set
-            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_train,
-                                              num_updates=args.num_inner_updates)
-            logger.train_loss.append(loss_mean)
-            logger.train_conf.append(loss_conf)
-
-            # evaluate on test set
-            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_valid,
-                                              num_updates=args.num_inner_updates)
-            logger.valid_loss.append(loss_mean)
-            logger.valid_conf.append(loss_conf)
-
-            # evaluate on validation set
-            loss_mean, loss_conf = eval_cavia(args, copy.deepcopy(model), task_family=task_family_test,
-                                              num_updates=args.num_inner_updates)
-            logger.test_loss.append(loss_mean)
-            logger.test_conf.append(loss_conf)
-
-            # save logging results
-            utils.save_obj(logger, path)
-
-            # save best model
-            if logger.valid_loss[-1] == np.min(logger.valid_loss):
-                print('saving best model at iter', i_iter)
-                logger.best_valid_model = copy.deepcopy(model)
-
-            # visualise results
-            if args.task == 'celeba':
-                task_family_train.visualise(task_family_train, task_family_test, copy.deepcopy(logger.best_valid_model),
-                                            args, i_iter)
-
-            # print current results
-            logger.print_info(i_iter, start_time)
-            start_time = time.time()
+            logger, start_time = update_logger(logger, path, args, model, eval_1hot, task_family)
+    return 
         
         
 
     return logger
+
+
+
+
+
 
 
 def eval_1hot(args, model, task_family, num_updates, n_tasks=100, return_gradnorm=False):
@@ -317,8 +340,8 @@ def eval_1hot(args, model, task_family, num_updates, n_tasks=100, return_gradnor
         # sample a task
         target_function = task_family.sample_task()
 
-        # reset context parameters
-        model.reset_context_params()
+        # reset context parameters to zero 
+        context = model.reset_context()
 
         # get data for current task
         curr_inputs = task_family.sample_inputs(args.k_shot_eval, args.use_ordered_pixels).to(args.device)
@@ -329,20 +352,19 @@ def eval_1hot(args, model, task_family, num_updates, n_tasks=100, return_gradnor
         for _ in range(1, num_updates + 1):
 
             # forward pass
-            curr_outputs = model(curr_inputs, model.context_params)
+            curr_outputs = model(curr_inputs, context)
 
             # compute loss for current task
             task_loss = F.mse_loss(curr_outputs, curr_targets)
 
             # compute gradient wrt context params
-            task_gradients = \
-                torch.autograd.grad(task_loss, model.context_params, create_graph=not args.first_order)[0]
+            task_gradients =   torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
 
             # update context params
             if args.first_order:
-                model.context_params = model.context_params - args.lr_inner * task_gradients.detach()
+                context = context - args.lr_inner * task_gradients.detach()
             else:
-                model.context_params = model.context_params - args.lr_inner * task_gradients
+                context = context - args.lr_inner * task_gradients
 
             # keep track of gradient norms
             gradnorms.append(task_gradients[0].norm().item())
@@ -351,7 +373,7 @@ def eval_1hot(args, model, task_family, num_updates, n_tasks=100, return_gradnor
 
         # compute true loss on entire input range
         model.eval()
-        losses.append(F.mse_loss(model(input_range, model.context_params), target_function(input_range)).detach().item())
+        losses.append(F.mse_loss(model(input_range, context), target_function(input_range)).detach().item())
         model.train()
 
     losses_mean = np.mean(losses)
@@ -361,62 +383,3 @@ def eval_1hot(args, model, task_family, num_updates, n_tasks=100, return_gradnor
     else:
         return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
 
-
-def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradnorm=False):
-    # get the task family
-    input_range = task_family.get_input_range().to(args.device)
-
-    # logging
-    losses = []
-    gradnorms = []
-
-    # --- inner loop ---
-
-    for t in range(n_tasks):
-
-        # sample a task
-        target_function = task_family.sample_task()
-
-        # reset context parameters
-        model.reset_context_params()
-
-        # get data for current task
-        curr_inputs = task_family.sample_inputs(args.k_shot_eval, args.use_ordered_pixels).to(args.device)
-        curr_targets = target_function(curr_inputs)
-
-        # ------------ update on current task ------------
-
-        for _ in range(1, num_updates + 1):
-
-            # forward pass
-            curr_outputs = model(curr_inputs, model.context_params)
-
-            # compute loss for current task
-            task_loss = F.mse_loss(curr_outputs, curr_targets)
-
-            # compute gradient wrt context params
-            task_gradients = \
-                torch.autograd.grad(task_loss, model.context_params, create_graph=not args.first_order)[0]
-
-            # update context params
-            if args.first_order:
-                model.context_params = model.context_params - args.lr_inner * task_gradients.detach()
-            else:
-                model.context_params = model.context_params - args.lr_inner * task_gradients
-
-            # keep track of gradient norms
-            gradnorms.append(task_gradients[0].norm().item())
-
-        # ------------ logging ------------
-
-        # compute true loss on entire input range
-        model.eval()
-        losses.append(F.mse_loss(model(input_range, model.context_params), target_function(input_range)).detach().item())
-        model.train()
-
-    losses_mean = np.mean(losses)
-    losses_conf = st.t.interval(0.95, len(losses) - 1, loc=losses_mean, scale=st.sem(losses))
-    if not return_gradnorm:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean))
-    else:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
