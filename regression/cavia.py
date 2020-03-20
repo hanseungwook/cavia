@@ -131,17 +131,7 @@ def get_meta_gradient(args, model, task_family, target_fnc):
     context = model.reset_context()
     # inner-loop update of context
     for _ in range(args.num_inner_updates):
-<<<<<<< HEAD
-
-        # ------------ update context_params on current task ------------
-        # gradient wrt context params for current task
-        task_loss = eval_model(model, context, train_inputs, target_fnc)
-        task_gradients =  torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
-        # update context params (this will set up the computation graph correctly)
-        context = context - args.lr_inner * task_gradients
-=======
         context = inner_update_step(args, model, context, train_inputs, target_fnc)
->>>>>>> 44fbc88f679e8289fa3add66bd825749723538fe
 
     # ------------ compute meta-gradient on test loss of current task ------------
     loss_meta = eval_model (model, context, test_inputs, target_fnc)
@@ -243,14 +233,11 @@ def run_no_inner(args, log_interval=5000, rerun=False):
             inner_optimiser.step()
             outer_optimiser.step()
 
-<<<<<<< HEAD
         if i_iter % log_interval == 0:
             logger, start_time = update_logger(logger, path, args, model, eval_1hot, task_family, i_iter, start_time)        
 
     return logger
 
-=======
->>>>>>> 44fbc88f679e8289fa3add66bd825749723538fe
 def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradnorm=False):
     # get the task family
     input_range = task_family.get_input_range().to(args.device)
