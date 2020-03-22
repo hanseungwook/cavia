@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
 from torch.nn import init
+import IPython
 
 
 class Active_Weight(nn.Module):
@@ -42,8 +43,19 @@ class Active_Weight(nn.Module):
             init.uniform_(bias, -bound, bound)
             
     def forward(self, context):
-        weight = F.linear(context, self.w_active, self.w_passive).view(self.n_output, self.n_input)
-        bias = F.linear(context, self.b_active, self.b_passive).view(self.n_output)
+        # print(self.n_output)
+        # print(self.n_input)
+        # print(context.shape)
+        # print(self.w_active.shape)
+        # print(self.w_passive.shape)
+        batch_size = context.shape[0]
+        if batch_size > 1:
+            weight = F.linear(context, self.w_active, self.w_passive).view(batch_size, self.n_output, self.n_input)
+            bias = F.linear(context, self.b_active, self.b_passive).view(batch_size, self.n_output)
+        else: 
+            weight = F.linear(context, self.w_active, self.w_passive).view(self.n_output, self.n_input)
+            bias = F.linear(context, self.b_active, self.b_passive).view(self.n_output)
+        
         return weight, bias
 
 
@@ -54,15 +66,18 @@ class Linear_Active(nn.Module):
         
     def forward(self, x, context):
         weight, bias = self.active_weight(context)
-        # print('x shape: {}'.format(x.shape))
-        # print('weight shape: {}'.format(weight.shape))
-        # x = torch.einsum('bs,as->ba', x, weight) + bias
-        x = F.linear(x, weight, bias)
+        batch_size = context.shape[0]
+        
+        if batch_size > 1:
+            x = torch.einsum('bs,bas->ba', x, weight) + bias
+        else:
+            x = F.linear(x, weight, bias)
+        
         return x
 
 
 class Model_Active(nn.Module):
-    def __init__(self, n_arch, n_context, gain_w, gain_b, nonlin=nn.ReLU(), passive=True, device=None): 
+    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
         super().__init__()
         if device:
             self.device = device
@@ -71,10 +86,9 @@ class Model_Active(nn.Module):
 
         self.nonlin = nonlin
         self.depth = len(n_arch) - 1
-        self.context_params = None
         self.n_context = n_context
-        self.reset_context_params()
-        # self.n_task = n_task
+        # self.context_params = None
+        # self.reset_context_params()
         
         module_list = []
         for i in range(self.depth):
@@ -82,10 +96,12 @@ class Model_Active(nn.Module):
                 Linear_Active(n_arch[i], n_arch[i + 1], n_context, gain_w, gain_b, passive))
 
         self.module_list = nn.ModuleList(module_list)
-    
-    def reset_context_params(self):
-        self.context_params = torch.zeros([1, self.n_context]).to(self.device)
-        self.context_params.requires_grad = True
+
+    def reset_context(self):
+        context = torch.zeros([1, self.n_context]).to(self.device)
+        context.requires_grad = True
+        return context
+
         
     def forward(self, x, context):
         for i, module in enumerate(self.module_list):
@@ -147,3 +163,46 @@ class Encoder_Decoder(nn.Module):
 #         for i_task in range(self.n_task):
 #             for i_context in range(self.n_context):
 #                 self.context[i_task, i_context].data.fill_(0)
+
+
+
+
+class CaviaModel(nn.Module):
+    """
+    Feed-forward neural network with context parameters.
+    """
+
+    def __init__(self,
+                 n_arch,
+                 n_context,
+                 device
+                 ):
+        super(CaviaModel, self).__init__()
+
+        self.device = device
+
+        # fully connected layers
+        self.fc_layers = nn.ModuleList()
+        for k in range(len(n_arch) - 1):
+            self.fc_layers.append(nn.Linear(n_arch[k], n_arch[k + 1]))
+
+        # context parameters (note that these are *not* registered parameters of the model!)
+        self.n_context = n_context
+        # self.context_params = None
+        # self.reset_context_params()
+
+    def reset_context(self):
+        context = torch.zeros(self.n_context).to(self.device)
+        context.requires_grad = True
+        return context
+
+    def forward(self, x, context):
+
+        # concatenate input with context parameters
+        x = torch.cat((x, context.expand(x.shape[0], -1)), dim=1)
+
+        for k in range(len(self.fc_layers) - 1):
+            x = F.relu(self.fc_layers[k](x))
+        y = self.fc_layers[-1](x)
+
+        return y
