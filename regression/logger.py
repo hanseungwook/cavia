@@ -4,8 +4,7 @@ import numpy as np
 
 
 class Logger:
-
-    def __init__(self, best_model):
+    def __init__(self):
         self.train_loss = []
         self.train_conf = []
 
@@ -14,12 +13,6 @@ class Logger:
 
         self.test_loss = []
         self.test_conf = []
-
-        # self.best_valid_model = None
-        self.update_best_model(best_model)
-
-    def update_best_model(self, model):
-        self.best_valid_model = deepcopy(model)
 
     def print_info(self, iter_idx, start_time):
         print(

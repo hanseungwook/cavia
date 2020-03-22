@@ -21,5 +21,6 @@ pip3 install -r requirements.txt
 cd $DIR
 for seed in {1..1}
 do
-    python3.6 regression/main.py
+    python3.6 regression/main.py \
+    --onehot 
 done
