@@ -39,16 +39,16 @@ def initial_setting(args, rerun):
 
 
 
-def get_task_family(task):
+def get_task_family(task, device):
     task_family = {}
     if task == 'sine':
         task_family['train'] = tasks_sine.RegressionTasksSinusoidal()
         task_family['valid'] = tasks_sine.RegressionTasksSinusoidal()
         task_family['test'] = tasks_sine.RegressionTasksSinusoidal()
     elif task == 'celeba':
-        task_family['train'] = tasks_celebA.CelebADataset('train', device=args.device)
-        task_family['valid'] = tasks_celebA.CelebADataset('valid', device=args.device)
-        task_family['test'] = tasks_celebA.CelebADataset('test', device=args.device)
+        task_family['train'] = tasks_celebA.CelebADataset('train', device=device)
+        task_family['valid'] = tasks_celebA.CelebADataset('valid', device=device)
+        task_family['test'] = tasks_celebA.CelebADataset('test', device=device)
     else:
         raise NotImplementedError
     return task_family
@@ -111,8 +111,8 @@ def eval_model(model, context, inputs, target_fnc):
 
 def inner_update_step(args, model, context, train_inputs, target_fnc, eval_cavia = False):
     # update context on current task 
-    task_loss = eval_model (model, context, train_inputs, target_fnc)
-    task_gradients =  torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
+    task_loss = eval_model(model, context, train_inputs, target_fnc)
+    task_gradients = torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
     # update context params (this will set up the computation graph correctly)
 
     if eval_cavia and args.first_order:  # ?? is this necessary??
@@ -165,7 +165,7 @@ def run(args, log_interval=5000, rerun=False):
     path = initial_setting(args, rerun)
     
     # initialise 
-    task_family = get_task_family(args.task)
+    task_family = get_task_family(args.task, args.device)
     model = get_model_decoder(args, task_family['train'])
     meta_optimiser = optim.Adam(model.parameters(), args.lr_meta)
     logger = Logger(model)
@@ -189,7 +189,7 @@ def run(args, log_interval=5000, rerun=False):
 def run_no_inner(args, log_interval=5000, rerun=False):
     path = initial_setting(args, rerun)
 
-    task_family = get_task_family(args.task)
+    task_family = get_task_family(args.task, args.device)
 
     model_decoder = get_model_decoder(args, task_family['train'])
     model = Encoder_Decoder(model_decoder, n_context=args.num_context_params, n_task=1)
@@ -256,10 +256,10 @@ def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradno
         context = model.reset_context()
         # ------------ update context on current task ------------
         for _ in range(1, num_updates + 1):
-            context = inner_update_step(args, model, context, train_inputs, target_fnc, eval_cavia = True)
+            context = inner_update_step(args, model, context, curr_inputs, target_fnc, eval_cavia=True)
 
-            # keep track of gradient norms
-            gradnorms.append(task_gradients[0].norm().item())
+            # Disabling tracking grad norms for now
+            # gradnorms.append(task_gradients[0].norm().item())
 
         # compute true loss on entire input range
         model.eval()
@@ -274,71 +274,6 @@ def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradno
         return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
 
 
-<<<<<<< HEAD
-=======
-
-
-
-def run_no_inner(args, log_interval=5000, rerun=False):
-    initial_setting(args)
-
-    task_family = get_task_family(args.task)
-
-    model_decoder = get_model_decoder( args, task_family['train'] )
-    model = Encoder_Decoder(model_decoder,  n_context=args.num_context_params,  n_task=1)
-
-    # initialise loggers
-    logger = Logger(model)
-
-    # intitialise optimisers
-    outer_optimiser = optim.Adam(model.decoder.parameters(), args.lr_meta)
-    inner_optimiser = optim.SGD(model.encoder.parameters(), args.lr_inner)
-
-
-    start_time = time.time()
-
-    # --- main training loop ---
-
-    for i_iter in range(args.n_iter):
-
-        # sample tasks
-        # Change tasks per metaupdate?
-        target_functions = task_family_train.sample_tasks(args.tasks_per_metaupdate)
-        train_tasks_onehot = task_family_train.sample_tasks_onehot(num_tasks=1, batch_size=args.k_meta_train)
-
-        train_inputs = task_family_train.sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
-
-        # Depending on tasks per metaupdate
-        train_targets = target_functions[t](train_inputs)
-
-        train_outputs = model(train_inputs, train_tasks_onehot)
-
-        loss = F.mse_loss(train_outputs, train_targets)
-    
-        inner_optimiser.zero_grad()
-        outer_optimiser.zero_grad()
-
-        loss.backward()
-
-        inner_optimiser.step()
-        outer_optimiser.step()
-        
-
-        if i_iter % log_interval == 0:
-            logger, start_time = update_logger(logger, path, args, model, eval_1hot, task_family)
-    return 
-        
-        
-
-    return logger
-
-
-
-
-
-
-
->>>>>>> 44fbc88f679e8289fa3add66bd825749723538fe
 def eval_1hot(args, model, task_family, num_updates, n_tasks=100, return_gradnorm=False):
     # get the task family
     input_range = task_family.get_input_range().to(args.device)

@@ -23,7 +23,7 @@ def parse_args():
 
     parser.add_argument('--num_context_params', type=int, default=5, help='number of context parameters (added at first layer)')
     parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1])
-    # parser.add_argument('--num_hidden_layers', type=int, nargs='+', default=[40, 40])
+    parser.add_argument('--num_hidden_layers', type=int, nargs='+', default=[40, 40])
 
     parser.add_argument('--first_order', action='store_true', default=False, help='run first-order version')
 
