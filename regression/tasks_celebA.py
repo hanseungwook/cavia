@@ -25,12 +25,12 @@ class CelebADataset:
     Same regression task as in Garnelo et al. 2018 (Conditional Neural Processes)
     """
 
-    def __init__(self, mode, device):
+    def __init__(self, mode, device, celeba_dir):
 
         self.device = device
 
-        if os.path.isdir('/home/scratch/luiraf/work/data/celeba/'):
-            data_root = '/home/scratch/luiraf/work/data/celeba/'
+        if os.path.isdir(celeba_dir):
+            data_root = celeba_dir
         else:
             raise FileNotFoundError('Can\'t find celebrity faces.')
 

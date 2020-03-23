@@ -54,12 +54,15 @@ class RegressionTasksSinusoidal:
             return target_functions
 
     def sample_tasks_onehot(self, num_tasks, batch_size):
-        q_all = []
+        q_all = torch.zeros(num_tasks, batch_size, num_tasks)
         for i in range(num_tasks):
-            q = torch.zeros(batch_size, num_tasks)
-            q[:, i] = 1.0
-            q_all.append(q)
-        q_all = torch.cat(q_all)
+            q_all[i, :, i] = 1
+
+        return q_all
+    
+    def sample_task_onehot(self, num_tasks, batch_size, cur_task):
+        q_all = torch.zeros(batch_size, num_tasks)
+        q_all[:, cur_task] = 1
 
         return q_all
 
