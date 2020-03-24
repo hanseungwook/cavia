@@ -6,7 +6,6 @@ from torch.nn import Parameter
 from torch.nn import init
 import IPython
 
-
 class Active_Weight(nn.Module):
     def __init__(self, n_input, n_output, n_context, gain_active=1, gain_passive=1, passive=True):  # n_bottleneck
         super().__init__()
@@ -48,8 +47,11 @@ class Active_Weight(nn.Module):
         # print(context.shape)
         # print(self.w_active.shape)
         # print(self.w_passive.shape)
+        # print(context.shape)
         batch_size = context.shape[0]
+        # print(batch_size)
         if batch_size > 1:
+            # IPython.embed()
             weight = F.linear(context, self.w_active, self.w_passive).view(batch_size, self.n_output, self.n_input)
             bias = F.linear(context, self.b_active, self.b_passive).view(batch_size, self.n_output)
         else: 
@@ -69,6 +71,8 @@ class Linear_Active(nn.Module):
         batch_size = context.shape[0]
         
         if batch_size > 1:
+            # print(x.shape)
+            # print(weight.shape)
             x = torch.einsum('bs,bas->ba', x, weight) + bias
         else:
             x = F.linear(x, weight, bias)
@@ -118,9 +122,14 @@ class Onehot_Encoder(nn.Module):
         self.linear = nn.Linear(n_task, n_context, bias=False)
         with torch.no_grad():
             self.linear.weight.zero_()  # Initialize to zero
-        
+    
+    def reinit_linear(self):
+        with torch.no_grad():
+            self.linear.weight.zero_() 
+            
     def forward(self, input):
         context = self.linear(input)
+    
         return context
 
 
@@ -131,6 +140,9 @@ class Encoder_Decoder(nn.Module):
 
         self.encoder = Onehot_Encoder(n_context, n_task)
         self.decoder = decoder
+
+    def reset_context(self):
+        self.encoder.reinit_linear()
 
     def forward(self, input, onehot):
         context = self.encoder(onehot)

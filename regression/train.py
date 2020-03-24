@@ -17,9 +17,6 @@ from models import CaviaModel, Model_Active, Encoder_Decoder, Onehot_Encoder
 from logger import Logger
 import IPython
 
-############ run_no_inner/ eval_cavia / eval_1hot need to be cleaned up ##############
-############ should rename the file... it's not just cavia anymore ##############
-############ check line 118 & line 128 ######################
 
 def initial_setting(args, rerun):
     assert not args.maml
@@ -36,7 +33,6 @@ def initial_setting(args, rerun):
     utils.set_seed(args.seed)
     
     return path
-
 
 
 def get_task_family(args):
@@ -132,10 +128,10 @@ def get_meta_gradient(args, model, task_family, target_fnc):
         context = inner_update_step(args, model, context, train_inputs, target_fnc)
 
     # ------------ compute meta-gradient on test loss of current task ------------
-    loss_meta = eval_model (model, context, test_inputs, target_fnc)
+    loss_meta = eval_model(model, context, test_inputs, target_fnc)
     grad_meta = torch.autograd.grad(loss_meta, model.parameters())
 
-    return grad_meta 
+    return grad_meta
 
 
 def meta_backward(args, model, task_family, target_functions):
@@ -153,10 +149,15 @@ def meta_backward(args, model, task_family, target_functions):
     for i, param in enumerate(model.parameters()):
         param.grad = meta_gradient[i] / args.tasks_per_metaupdate
 
+def get_inputs_outputs_1hot(args, task_family):
+    target_functions = task_family.sample_tasks(args.tasks_per_metaupdate)
+    tasks_onehot = task_family.sample_tasks_onehot(num_tasks=args.tasks_per_metaupdate, batch_size=args.k_meta_train)
+    inputs = task_family.sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
+
+    return inputs, target_functions, tasks_onehot
+
 
 #########################################
-
-
 
 def run(args, log_interval=5000, rerun=False):
 
@@ -186,6 +187,7 @@ def run(args, log_interval=5000, rerun=False):
 
 def run_no_inner(args, log_interval=5000, rerun=False):
     path = initial_setting(args, rerun)
+    train_losses = []
 
     task_family = get_task_family(args)
 
@@ -194,7 +196,6 @@ def run_no_inner(args, log_interval=5000, rerun=False):
 
     # initialise loggers
     logger = Logger(model)
-    logger.best_valid_model = copy.deepcopy(model)
 
     # intitialise optimisers
     outer_optimiser = optim.Adam(model.decoder.parameters(), args.lr_meta)
@@ -202,14 +203,13 @@ def run_no_inner(args, log_interval=5000, rerun=False):
 
     start_time = time.time()
 
+    # Sample tasks
+    target_functions = task_family['train'].sample_tasks(args.tasks_per_metaupdate)
+    train_tasks_onehot = task_family['train'].sample_tasks_onehot(num_tasks=args.tasks_per_metaupdate, batch_size=args.k_meta_train)
+    train_inputs = task_family['train'].sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
     # --- main training loop ---
 
     for i_iter in range(args.n_iter):
-
-        # Sample tasks
-        target_functions = task_family['train'].sample_tasks(args.tasks_per_metaupdate)
-        train_tasks_onehot = task_family['train'].sample_tasks_onehot(num_tasks=args.tasks_per_metaupdate, batch_size=args.k_meta_train)
-        train_inputs = task_family['train'].sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
 
         # Inner & outer loop being done alternatively
         for t in range(args.tasks_per_metaupdate):
@@ -217,7 +217,8 @@ def run_no_inner(args, log_interval=5000, rerun=False):
             train_outputs = model(train_inputs, train_tasks_onehot[t])
 
             loss = F.mse_loss(train_outputs, train_targets)
-        
+            train_losses.append(loss.item())
+
             inner_optimiser.zero_grad()
             outer_optimiser.zero_grad()
 
@@ -226,8 +227,10 @@ def run_no_inner(args, log_interval=5000, rerun=False):
             inner_optimiser.step()
             outer_optimiser.step()
 
+        
         if i_iter % log_interval == 0:
-            logger, start_time = update_logger(logger, path, args, copy.deepcopy(model), eval_1hot, task_family, i_iter, start_time)        
+            print('Train loss: {}'.format(train_losses[-1]))    
+            #logger, start_time = update_logger(logger, path, args, copy.deepcopy(model), eval_1hot, task_family, i_iter, start_time)        
 
     return logger
 
@@ -279,7 +282,7 @@ def eval_1hot(args, model, task_family, num_updates, n_tasks=25, return_gradnorm
     inner_optimiser = optim.SGD(model.encoder.parameters(), args.lr_inner)
 
     # Re-initialize/clear 1 hot encoder for context parameters for evaluation
-    # model.encoder.reinit_linear()
+    model.encoder.reinit_linear()
 
     # --- inner loop ---
 
