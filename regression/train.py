@@ -103,51 +103,39 @@ def eval_model(model, context, inputs, target_fnc):
     return F.mse_loss(outputs, targets)
 
 
-def inner_update_step(args, model, context, train_inputs, target_fnc, eval_cavia = False):
-    # update context on current task 
-    task_loss = eval_model(model, context, train_inputs, target_fnc)
-    task_gradients = torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
-    # update context params (this will set up the computation graph correctly)
-
-    if eval_cavia and args.first_order:  # ?? is this necessary??
-        task_gradients = task_gradients.detach()
-
-    context = context - args.lr_inner * task_gradients
-    return context
-
-
-def get_meta_gradient(args, model, task_family, target_fnc):
-
+def inner_update(args, model, task_family, target_fnc):
     train_inputs = task_family['train'].sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
-    ### SHOULDN'T THIS USE task_family['test'] instead?? ####
-    test_inputs = task_family['train'].sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
-
+    
     context = model.reset_context()
-    # inner-loop update of context
-    for _ in range(args.num_inner_updates):
-        context = inner_update_step(args, model, context, train_inputs, target_fnc)
-
-    # ------------ compute meta-gradient on test loss of current task ------------
-    loss_meta = eval_model(model, context, test_inputs, target_fnc)
-    grad_meta = torch.autograd.grad(loss_meta, model.parameters())
-
-    return grad_meta
+    optim_inner = optim.SGD([context], lr_inner) #     optim_inner.zero_grad()
+    for _ in range(4):
+        loss = eval_model(model, context, train_inputs, target_fnc)
+        context.grad = torch.autograd.grad(loss, context, create_graph= not first_order)[0] #not args.first_order)[0]
+        optim_inner.step()
+    return context 
 
 
-def meta_backward(args, model, task_family, target_functions):
-    meta_gradient = [0 for _ in range(len(model.state_dict()))]     
-
-    # --- compute meta gradient ---
+def get_meta_loss(args, model, task_family, target_fnc):
+    meta_loss = 0
     for t in range(args.tasks_per_metaupdate):
-        target_fnc = target_functions[t]
-        grad_meta = get_meta_gradient(args, model, task_family, target_fnc)
+        context = inner_update(model, task_family, target_fnc)
+        test_inputs = task_family['train'].sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
+        meta_loss += eval_model(model, context, test_inputs, target_fnc)
+    return meta_loss / args.tasks_per_metaupdate
 
-        # clip the gradient and accumulate
-        for i in range(len(grad_meta)):
-            meta_gradient[i] += grad_meta[i].detach().clamp_(-10, 10)
 
-    for i, param in enumerate(model.parameters()):
-        param.grad = meta_gradient[i] / args.tasks_per_metaupdate
+# def meta_backward(args, model, task_family, target_functions):
+
+#     for t in range(tasks_per_metaupdate):
+#         grad_meta = get_meta_gradient(args, model, task_family, target_functions[t])
+
+#         for i, param in enumerate(model.parameters()):
+#             temp = grad_meta[i].detach() / args.tasks_per_metaupdate   # grad_meta[i].detach().clamp_(-10, 10)/ args.tasks_per_metaupdate     # clip the gradient and accumulate
+#             if param.grad is None : 
+#                 param.grad = temp
+#             else:
+#                 param.grad +=  temp
+                
 
 def get_inputs_outputs_1hot(args, task_family):
     target_functions = task_family.sample_tasks(args.tasks_per_metaupdate)
@@ -173,10 +161,11 @@ def run(args, log_interval=5000, rerun=False):
     # --- main training loop ---
 
     for i_iter in range(args.n_iter):
-
-        # sample tasks
-        target_functions = task_family['train'].sample_tasks(args.tasks_per_metaupdate)
-        meta_backward(args, model, task_family, target_functions)
+        target_functions = task_family['train'].sample_tasks(args.tasks_per_metaupdate)          # sample tasks
+        
+        meta_optimiser.zero_grad()
+        meta_loss = get_meta_loss(args, model, task_family, target_functions) 
+        meta_loss.backward()
         meta_optimiser.step()
 
         # ------------ logging ------------
