@@ -11,6 +11,7 @@ def parse_args():
     parser.add_argument('--n_iter', type=int, default=50000, help='number of meta-iterations')
 
     parser.add_argument('--tasks_per_metaupdate', type=int, default=25)
+    parser.add_argument('--total_num_tasks', type=int, default=2500)
 
     parser.add_argument('--k_meta_train', type=int, default=10, help='data points in task training set (during meta training, inner loop)')
     parser.add_argument('--k_meta_test', type=int, default=10, help='data points in task test set (during meta training, outer loop)')
@@ -18,6 +19,7 @@ def parse_args():
 
     parser.add_argument('--lr_inner', type=float, default=1.0, help='inner-loop learning rate (task-specific)')
     parser.add_argument('--lr_meta', type=float, default=0.001, help='outer-loop learning rate')
+    parser.add_argument('--weight_decay', type=float, default=0.0, help='weight decay for inner optimizer')
 
     parser.add_argument('--num_inner_updates', type=int, default=1, help='number of inner-loop updates (during training)')
 
@@ -28,8 +30,8 @@ def parse_args():
     parser.add_argument('--first_order', action='store_true', default=False, help='run first-order version')
 
     parser.add_argument('--maml', action='store_true', default=False, help='run MAML')
-    parser.add_argument('--onehot', action='store_true', default=False, help='run 1hot encoder version')
-    parser.add_argument('--model_type', type=str, default='ACTIVE', help='model type: ACTIVE or CAVIA')
+    parser.add_argument('--encoder', default='', help='1hot or vae, if either')
+    parser.add_argument('--model_type', type=str, default='active', help='model type: active or cavia')
     # parser.add_argument('--blackbox', action='store_true', default=False, help='run black box (our) approach')
 
     parser.add_argument('--seed', type=int, default=42)

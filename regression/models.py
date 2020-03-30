@@ -42,16 +42,8 @@ class Active_Weight(nn.Module):
             init.uniform_(bias, -bound, bound)
             
     def forward(self, context):
-        # print(self.n_output)
-        # print(self.n_input)
-        # print(context.shape)
-        # print(self.w_active.shape)
-        # print(self.w_passive.shape)
-        # print(context.shape)
         batch_size = context.shape[0]
-        # print(batch_size)
         if batch_size > 1:
-            # IPython.embed()
             weight = F.linear(context, self.w_active, self.w_passive).view(batch_size, self.n_output, self.n_input)
             bias = F.linear(context, self.b_active, self.b_passive).view(batch_size, self.n_output)
         else: 
@@ -71,8 +63,6 @@ class Linear_Active(nn.Module):
         batch_size = context.shape[0]
         
         if batch_size > 1:
-            # print(x.shape)
-            # print(weight.shape)
             x = torch.einsum('bs,bas->ba', x, weight) + bias
         else:
             x = F.linear(x, weight, bias)
@@ -123,7 +113,8 @@ class Onehot_Encoder(nn.Module):
         with torch.no_grad():
             self.linear.weight.zero_()  # Initialize to zero
     
-    def reinit_linear(self):
+    def reinit(self, n_context, n_task):
+        self.linear = nn.Linear(n_task, n_context, bias=False)
         with torch.no_grad():
             self.linear.weight.zero_() 
             
@@ -135,10 +126,10 @@ class Onehot_Encoder(nn.Module):
 
 class Encoder_Decoder(nn.Module):
 #     def __init__(self, n_arch, n_context, n_task, gain_w, gain_b, decoder = None): 
-    def __init__(self, decoder, n_context, n_task): 
+    def __init__(self, encoder, decoder): 
         super().__init__()
 
-        self.encoder = Onehot_Encoder(n_context, n_task)
+        self.encoder = encoder
         self.decoder = decoder
 
     def reset_context(self):
@@ -150,7 +141,65 @@ class Encoder_Decoder(nn.Module):
 
         return pred
 
+class Encoder_Core(nn.Module):
+    def __init__(self, input_dim, n_hidden):
+        super().__init__()
+        self.input_dim = input_dim
+        self.n_hidden  = n_hidden # 64
+
+        self.fc1 = nn.Linear(input_dim, 9 * n_hidden)
+        self.fc2 = nn.Linear(9 * n_hidden, 3 * n_hidden)
+        self.fc3 = nn.Linear(3 * n_hidden, n_hidden)
+
+    def _reshape_batch(self, input):
+        return input.view(-1, input.shape[-1])
     
+    def _mean_over_batch(self, input, mean_num, n_task):
+        return input.view(-1, mean_num, input.shape[1]).mean(dim=1, keepdim=False).view(n_task,-1,input.shape[1])
+        
+    def _progressive_mean_over_batch(self, input, n_batch, n_batch_log, n_task, progressive):
+        if progressive:
+            temp = [self._mean_over_batch(input, 2**n, n_task) for n in range(n_batch_log+1)]
+            temp = torch.cat(temp[::-1], dim=1)
+        else: 
+            temp = self._mean_over_batch(input, n_batch, n_task)
+        return self._reshape_batch(temp) 
+
+    def forward(self, input, progressive = False):
+        n_task, n_batch, _ = input.shape        
+        n_batch_log = int(torch.tensor(n_batch).float().log2())
+        
+        x = self._reshape_batch(input)
+        x = F.relu(self.fc1(x))
+        x = self._progressive_mean_over_batch(x, n_batch, n_batch_log, n_task, progressive)
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        return x
+
+# Variational Encoder
+class Encoder_Variational(nn.Module):
+    def __init__(self, input_dim, n_context, n_hidden, progressive = False):
+        super().__init__()
+        self.progressive = progressive
+        self.core = Encoder_Core(input_dim, n_hidden)
+        self.fc3_mu = nn.Linear(n_hidden, n_context)
+        self.fc3_var = nn.Linear(n_hidden, n_context)
+
+    def _reparameterize(self, mu, logvar):
+        std = torch.exp(0.5 * logvar)
+        eps = torch.randn_like(std)
+        return mu + eps * std
+
+    def forward(self, input, progressive = None):
+        x = self.core(input, self.progressive) if progressive == None else self.core(input, progressive)
+#     def forward(self, input, progressive = self.progressive):
+#         x = self.core(input, progressive)
+        mu = self.fc3_mu(x)
+        logvar = self.fc3_var(x)
+        z = self._reparameterize(mu, logvar)
+        return z, mu, logvar
+
+
 
 # class Model_Test(nn.Module):
 #     def __init__(self, model_decoder, n_task, n_context): 
