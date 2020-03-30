@@ -104,14 +104,15 @@ def eval_model(model, context, inputs, target_fnc):
 
 
 def inner_update(args, model, task_family, target_fnc):
+    context = model.reset_context()
+    inner_optim = optim.SGD([context], lr_inner) #     optim_inner.zero_grad()
     train_inputs = task_family['train'].sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
     
-    context = model.reset_context()
-    optim_inner = optim.SGD([context], lr_inner) #     optim_inner.zero_grad()
-    for _ in range(4):
-        loss = eval_model(model, context, train_inputs, target_fnc)
-        context.grad = torch.autograd.grad(loss, context, create_graph= not first_order)[0] #not args.first_order)[0]
-        optim_inner.step()
+    for _ in range(4):  # inner-loop update of context via SGD 
+        inner_loss = eval_model(model, context, train_inputs, target_fnc)
+        context.grad = torch.autograd.grad(inner_loss, context, create_graph= not args.first_order)[0]
+        inner_optim.step()
+        
     return context 
 
 
@@ -123,19 +124,6 @@ def get_meta_loss(args, model, task_family, target_fnc):
         meta_loss += eval_model(model, context, test_inputs, target_fnc)
     return meta_loss / args.tasks_per_metaupdate
 
-
-# def meta_backward(args, model, task_family, target_functions):
-
-#     for t in range(tasks_per_metaupdate):
-#         grad_meta = get_meta_gradient(args, model, task_family, target_functions[t])
-
-#         for i, param in enumerate(model.parameters()):
-#             temp = grad_meta[i].detach() / args.tasks_per_metaupdate   # grad_meta[i].detach().clamp_(-10, 10)/ args.tasks_per_metaupdate     # clip the gradient and accumulate
-#             if param.grad is None : 
-#                 param.grad = temp
-#             else:
-#                 param.grad +=  temp
-                
 
 def get_inputs_outputs_1hot(args, task_family):
     target_functions = task_family.sample_tasks(args.tasks_per_metaupdate)
@@ -151,15 +139,14 @@ def run(args, log_interval=5000, rerun=False):
 
     path = initial_setting(args, rerun)
     
-    # initialise 
     task_family = get_task_family(args)
     model = get_model_decoder(args, task_family['train'])
     meta_optimiser = optim.Adam(model.parameters(), args.lr_meta)
     logger = Logger(model)
 
     start_time = time.time()
+    
     # --- main training loop ---
-
     for i_iter in range(args.n_iter):
         target_functions = task_family['train'].sample_tasks(args.tasks_per_metaupdate)          # sample tasks
         
@@ -173,6 +160,10 @@ def run(args, log_interval=5000, rerun=False):
             logger, start_time = update_logger(logger, path, args, model, eval_cavia, task_family, i_iter, start_time)
 
     return logger
+
+
+#########################################
+
 
 def run_no_inner(args, log_interval=5000, rerun=False):
     path = initial_setting(args, rerun)
