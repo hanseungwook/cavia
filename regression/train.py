@@ -120,50 +120,27 @@ def eval_model_1hot(model, inputs, target_fnc, labels_1hot):
     targets = target_fnc(inputs)
     return F.mse_loss(outputs, targets)
 
-def inner_update_step(args, model, context, train_inputs, target_fnc, eval_cavia = False):
-    # update context on current task 
-    task_loss = eval_model(model, context, train_inputs, target_fnc)
-    task_gradients = torch.autograd.grad(task_loss, context, create_graph=not args.first_order)[0]
-    # update context params (this will set up the computation graph correctly)
-
-    if eval_cavia and args.first_order:  # ?? is this necessary??
-        task_gradients = task_gradients.detach()
-
-    context = context - args.lr_inner * task_gradients
-    return context
-
-
-def get_meta_gradient(args, model, task_family, target_fnc):
-
-    train_inputs = task_family['train'].sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
-    test_inputs = task_family['test'].sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
-
+def inner_update(args, model, task_family, target_fnc):
     context = model.reset_context()
-    # inner-loop update of context
-    for _ in range(args.num_inner_updates):
-        context = inner_update_step(args, model, context, train_inputs, target_fnc)
+    inner_optim = optim.SGD([context], args.lr_inner) #     optim_inner.zero_grad()
+    train_inputs = task_family.sample_inputs(args.k_meta_train, args.use_ordered_pixels).to(args.device)
+    
+    for _ in range(4):  # inner-loop update of context via SGD 
+        inner_loss = eval_model(model, context, train_inputs, target_fnc)
+        context.grad = torch.autograd.grad(inner_loss, context, create_graph= not args.first_order)[0]
+        inner_optim.step()
+        
+    return context 
 
-    # ------------ compute meta-gradient on test loss of current task ------------
-    loss_meta = eval_model(model, context, test_inputs, target_fnc)
-    grad_meta = torch.autograd.grad(loss_meta, model.parameters())
 
-    return grad_meta
-
-
-def meta_backward(args, model, task_family, target_functions):
-    meta_gradient = [0 for _ in range(len(model.state_dict()))]     
-
-    # --- compute meta gradient ---
+def get_meta_loss(args, model, task_family, target_fnc):
+    meta_loss = 0
     for t in range(args.tasks_per_metaupdate):
-        target_fnc = target_functions[t]
-        grad_meta = get_meta_gradient(args, model, task_family, target_fnc)
+        context = inner_update(args, model, task_family['train'], target_fnc)
+        test_inputs = task_family['test'].sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
+        meta_loss += eval_model(model, context, test_inputs, target_fnc)
+    return meta_loss / args.tasks_per_metaupdate
 
-        # clip the gradient and accumulate
-        for i in range(len(grad_meta)):
-            meta_gradient[i] += grad_meta[i].detach().clamp_(-10, 10)
-
-    for i, param in enumerate(model.parameters()):
-        param.grad = meta_gradient[i] / args.tasks_per_metaupdate
 
 def meta_backward_1hot(args, model, inner_optimizer, outer_optimizer, task_family, target_functions, labels_1hot):
     # --- compute meta gradient ---
@@ -204,20 +181,20 @@ def run(args, log_interval=5000, rerun=False):
 
     path = initial_setting(args, rerun)
     
-    # initialise 
     task_family = get_task_family(args)
     model = get_model_decoder(args, task_family['train'])
     meta_optimiser = optim.Adam(model.parameters(), args.lr_meta)
     logger = Logger(model)
 
     start_time = time.time()
+    
     # --- main training loop ---
-
     for i_iter in range(args.n_iter):
-
-        # sample tasks
-        target_functions = task_family['train'].sample_tasks(args.tasks_per_metaupdate)
-        meta_backward(args, model, task_family, target_functions)
+        target_functions = task_family['train'].sample_tasks(args.tasks_per_metaupdate)          # sample tasks
+        
+        meta_optimiser.zero_grad()
+        meta_loss = get_meta_loss(args, model, task_family, target_functions) 
+        meta_loss.backward()
         meta_optimiser.step()
 
         # ------------ logging ------------
@@ -239,12 +216,11 @@ def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradno
 
         # sample a task
         target_fnc = task_family.sample_task()
-        curr_inputs = task_family.sample_inputs(args.k_shot_eval, args.use_ordered_pixels).to(args.device)
 
         context = model.reset_context()
         # ------------ update context on current task ------------
         for _ in range(1, num_updates + 1):
-            context = inner_update_step(args, model, context, curr_inputs, target_fnc, eval_cavia=True)
+            context = inner_update(args, model, task_family, target_fnc)
 
         # compute true loss on entire input range
         model.eval()
