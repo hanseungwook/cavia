@@ -19,3 +19,6 @@ plots/
 results/
 *result_plots
 *result_files
+
+# Folders
+venv/
