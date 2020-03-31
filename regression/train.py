@@ -101,27 +101,28 @@ def eval_model(model, lower_context, higher_context, inputs, target_fnc):
 def inner_update_for_lower_context(args, model, task_family, task_function, higher_context):
     # TODO Support multiple inner-loop
     lower_context = model.reset_context()
-    lower_optimizer = optim.SGD([lower_context], args.lr_inner)
+    # lower_optimizer = optim.SGD([lower_context], args.lr_inner)
     train_inputs = task_family['train'].sample_inputs(args.k_meta_train).to(args.device)
     
     lower_inner_loss = eval_model(model, lower_context, higher_context, train_inputs, task_function)
-    lower_context.grad = torch.autograd.grad(lower_inner_loss, lower_context, create_graph=True)[0]
-    lower_optimizer.step()
+    # lower_context.grad = torch.autograd.grad(lower_inner_loss, lower_context, create_graph=True)[0]
+    lower_context_grad = torch.autograd.grad(lower_inner_loss, lower_context, create_graph=True)[0]
+    lower_context = lower_context - lower_context_grad * args.lr_inner
+    # lower_optimizer.step()
         
     return lower_context 
 
 
 def get_meta_loss(args, model, task_family):
     # TODO Support multiple inner-loop
-    meta_loss = 0.
+    meta_losses = []
 
     for super_task in task_family["train"].super_tasks:
         task_functions = task_family["train"].sample_tasks(super_task)
         higher_context = model.reset_context()
-        higher_optimizer = optim.SGD([higher_context], args.lr_inner)
+        # higher_optimizer = optim.SGD([higher_context], args.lr_inner)
 
-        higher_inner_loss = 0.
-        lower_contexts = []
+        higher_inner_losses, lower_contexts = [], []
 
         for i_task in range(args.tasks_per_metaupdate):
             task_function = task_functions[i_task]
@@ -131,20 +132,23 @@ def get_meta_loss(args, model, task_family):
 
             # Compute inner-loop loss for higher context based on adapted lower context
             train_inputs = task_family['train'].sample_inputs(args.k_meta_train).to(args.device)
-            higher_inner_loss += eval_model(model, lower_context, higher_context, train_inputs, task_function)
+            higher_inner_losses.append(eval_model(model, lower_context, higher_context, train_inputs, task_function))
 
         # Inner-loop update for higher context
-        higher_context.grad = torch.autograd.grad(higher_inner_loss, higher_context, create_graph=True)[0]
-        higher_optimizer.step()
+        higher_inner_loss = sum(higher_inner_losses) / float(len(higher_inner_losses))
+        # higher_context.grad = torch.autograd.grad(higher_inner_loss, higher_context, create_graph=True)[0]
+        higher_context_grad = torch.autograd.grad(higher_inner_loss, higher_context, create_graph=True)[0]
+        higher_context = higher_context - higher_context_grad * args.lr_inner
+        # higher_optimizer.step()
 
         # Get meta-loss for the base model
         for i_task in range(args.tasks_per_metaupdate):
             task_function = task_functions[i_task]
             lower_context = lower_contexts[i_task] 
             test_inputs = task_family['test'].sample_inputs(args.k_meta_train).to(args.device)
-            meta_loss += eval_model(model, lower_context, higher_context, test_inputs, task_function)
+            meta_losses.append(eval_model(model, lower_context, higher_context, test_inputs, task_function))
 
-    return meta_loss / float(args.tasks_per_metaupdate)
+    return sum(meta_losses) / float(len(meta_losses))
 
 
 def run(args, log_interval=5000, rerun=False):
@@ -162,8 +166,6 @@ def run(args, log_interval=5000, rerun=False):
     start_time = time.time()
     
     for i_iter in range(args.n_iter):
-        # task_functions = task_family['train'].sample_tasks()
-        
         meta_optimizer.zero_grad()
         meta_loss = get_meta_loss(args, model, task_family) 
         meta_loss.backward()
@@ -180,7 +182,6 @@ def run(args, log_interval=5000, rerun=False):
 
 def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradnorm=False):
     # get the task family
-    input_range = task_family.get_input_range().to(args.device)
 
     # logging
     losses = []
@@ -203,7 +204,7 @@ def eval_cavia(args, model, task_family, num_updates, n_tasks=100, return_gradno
 
         # compute true loss on entire input range
         model.eval()
-        losses.append(eval_model (model, context, curr_inputs, target_fnc).detach().item())
+        losses.append(eval_model(model, context, curr_inputs, target_fnc).detach().item())
         model.train()
 
     losses_mean = np.mean(losses)

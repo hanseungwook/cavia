@@ -23,5 +23,6 @@ for seed in {1..1}
 do
     python3.6 regression/main.py \
     --task mixture \
-    --model-type CAVIA
+    --model-type CAVIA \
+    --lr-inner 0.01
 done
