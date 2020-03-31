@@ -8,6 +8,7 @@ import scipy.stats as st
 import torch.nn.functional as F
 import torch.optim as optim
 from logger import Logger
+from tensorboardX import SummaryWriter
 
 
 def initial_setting(args, rerun):
@@ -153,6 +154,7 @@ def get_meta_loss(args, model, task_family):
 
 def run(args, log_interval=5000, rerun=False):
     path = initial_setting(args, rerun)
+    tb_writer = SummaryWriter('./logs/tb_{0}'.format("tmp"))
     
     # Set tasks
     task_family = get_task_family(args)
@@ -171,7 +173,7 @@ def run(args, log_interval=5000, rerun=False):
         meta_loss.backward()
         meta_optimizer.step()
 
-        print("meta_loss:", meta_loss.detach().cpu().numpy())
+        tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), i_iter)
 
         # # ------------ logging ------------
         # if i_iter % log_interval == 0:

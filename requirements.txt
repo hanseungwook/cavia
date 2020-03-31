@@ -5,3 +5,4 @@ scipy
 matplotlib
 pillow
 ipython
+tensorboardX==1.2
