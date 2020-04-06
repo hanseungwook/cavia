@@ -10,10 +10,12 @@ import scipy.stats as st
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
 import utils
 import tasks_sine, tasks_celebA
 from models import CaviaModel, Model_Active, Encoder_Decoder, Onehot_Encoder, Encoder_Variational
+from eval import eval_1hot, eval_cavia
 from logger import Logger
 import IPython
 
@@ -40,6 +42,17 @@ def create_targets(inputs, target_functions, n_tasks):
 
 def create_1hot_labels(labels_1hot, n_tasks):
     return torch.cat([labels_1hot[t] for t in range(n_tasks)]).reshape(-1, labels_1hot.shape[2])
+
+def viz_pred(model, inputs, targets, labels, task_type=None):
+    preds = model(inputs, labels)
+    
+    plt.scatter(inputs.detach().numpy(), targets.detach().numpy(), c='green', label='Target', s=1)
+    plt.scatter(inputs.detach().numpy(), preds.detach().numpy(), c='blue', label='Pred', s=1)
+    plt.legend()
+
+    if task_type:
+        plt.title(task_type)
+    plt.show()
 
 def get_task_family(args):
     task_family = {}
@@ -98,8 +111,8 @@ def update_logger(logger, path, args, model, eval_fnc, task_family, i_iter, star
 
     # evaluate on training set
     logger = logger_helper(logger, args, model, eval_fnc, task_family, task_type='train')
-    logger = logger_helper(logger, args, model, eval_fnc, task_family, task_type='test')
     logger = logger_helper(logger, args, model, eval_fnc, task_family, task_type='valid')
+    logger = logger_helper(logger, args, model, eval_fnc, task_family, task_type='test')
 
     # save logging results
     utils.save_obj(logger, path)
@@ -205,37 +218,6 @@ def run(args, log_interval=5000, rerun=False):
 
     return logger
 
-def eval_cavia(args, model, task_family, num_updates, n_tasks=100, task_type='train', return_gradnorm=False):
-    # get the task family
-    input_range = task_family.get_input_range().to(args.device)
-
-    # logging
-    losses = []
-    gradnorms = []
-
-    # --- inner loop ---
-    for t in range(n_tasks):
-
-        # sample a task
-        target_fnc = task_family.sample_task()
-
-        context = model.reset_context()
-        # ------------ update context on current task ------------
-        for _ in range(1, num_updates + 1):
-            context = inner_update(args, model, task_family, target_fnc)
-
-        # compute true loss on entire input range
-        model.eval()
-        losses.append(eval_model(model, context, input_range, target_fnc).detach().item())
-        model.train()
-
-    losses_mean = np.mean(losses)
-    losses_conf = st.t.interval(0.95, len(losses) - 1, loc=losses_mean, scale=st.sem(losses))
-    if not return_gradnorm:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean))
-    else:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
-
 def run_no_inner(args, log_interval=5000, rerun=False):
     path = initial_setting(args, rerun)
     task_family = get_task_family(args)
@@ -267,46 +249,5 @@ def run_no_inner(args, log_interval=5000, rerun=False):
 
     return logger
 
-def eval_1hot(args, model, task_family, num_updates, n_tasks=25, task_type='train', return_gradnorm=False):    
-    # logging
-    losses = []
-    gradnorms = []
 
-    # Optimizer for encoder (context)
-    inner_optimizer = optim.SGD(model.encoder.parameters(), args.lr_inner)
-
-    # Sample tasks
-    target_functions, labels_1hot = task_family.sample_tasks_1hot(total_num_tasks=n_tasks*4, batch_num_tasks=n_tasks, batch_size=args.k_shot_eval)
-
-    if task_type != 'train':
-        print('Reinit model {}'.format(task_type))
-        # Reinitialize one hot encoder for evaluation mode
-        model.encoder.reinit(args.num_context_params, task_family.total_num_tasks)
-        
-        # Inner loop steps
-        for _ in range(1, num_updates + 1):
-            inputs = task_family.sample_inputs(args.k_meta_test * n_tasks, args.use_ordered_pixels).to(args.device)
-            targets = create_targets(inputs, target_functions, n_tasks)
-            labels = create_1hot_labels(labels_1hot, n_tasks)
-
-            update_step_1hot(model, inner_optimizer, inputs, targets, labels, n_tasks)
-
-    
-     # Get entire range's input and respective 1 hot labels
-    input_range = task_family.get_input_range().to(args.device).repeat(n_tasks, 1)
-    input_range_1hot = torch.cat([task_family.create_input_range_1hot_labels(batch_size=int(input_range.shape[0] / n_tasks), cur_label=labels_1hot[t, 0, :]) for t in range(n_tasks)]).reshape(-1, labels_1hot.shape[2])
-    input_range_targets = create_targets(input_range, target_functions, n_tasks)
-
-    # compute true loss on entire input range
-    model.eval()
-    losses.append(eval_model_1hot(model, input_range, input_range_targets, input_range_1hot).item())
-    model.train()
-
-    # IPython.embed()
-    losses_mean = np.mean(losses)
-    losses_conf = st.t.interval(0.95, len(losses) - 1, loc=losses_mean, scale=st.sem(losses))
-    if not return_gradnorm:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean))
-    else:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
 
