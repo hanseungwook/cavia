@@ -147,8 +147,8 @@ def run(args, log_interval=5000, rerun=False):
 
 def vis_prediction(model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
     # Create directories
-    if not os.path.exists("./logs/n_iter" + str(args.n_iter)):
-        os.makedirs("./logs/n_iter" + str(args.n_iter))
+    if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
+        os.makedirs("./logs/n_inner" + str(args.n_inner))
 
     outputs = model(inputs, lower_context, higher_context).detach().cpu().numpy()
     targets = task_function(inputs).detach().cpu().numpy()
@@ -159,5 +159,5 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function, 
     plt.legend()
     plt.title(super_task + "_iteration" + str(iteration))
 
-    plt.savefig("logs/n_iter" + str(args.n_iter) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
     plt.close()
