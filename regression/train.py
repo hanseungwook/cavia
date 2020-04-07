@@ -51,7 +51,6 @@ def eval_model(model, lower_context, higher_context, inputs, target_fnc):
 
 
 def inner_update_for_lower_context(args, model, task_family, task_function, higher_context):
-    # TODO Support multiple inner-loop
     lower_context = model.reset_context()
     train_inputs = task_family['train'].sample_inputs(args.k_meta_train).to(args.device)
     
@@ -64,7 +63,6 @@ def inner_update_for_lower_context(args, model, task_family, task_function, high
 
 
 def get_meta_loss(model, task_family, args, log, tb_writer, iteration):
-    # TODO Support multiple inner-loop
     meta_losses = []
 
     for super_task in task_family["train"].super_tasks:
