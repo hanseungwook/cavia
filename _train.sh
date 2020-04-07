@@ -24,5 +24,24 @@ do
     python3.6 regression/main.py \
     --task mixture \
     --model-type CAVIA \
-    --lr-inner 0.01
+    --lr-inner 0.01 \
+    --n-inner 1
+
+    python3.6 regression/main.py \
+    --task mixture \
+    --model-type CAVIA \
+    --lr-inner 0.01 \
+    --n-inner 2
+
+    python3.6 regression/main.py \
+    --task mixture \
+    --model-type CAVIA \
+    --lr-inner 0.01 \
+    --n-inner 3
+
+    python3.6 regression/main.py \
+    --task mixture \
+    --model-type CAVIA \
+    --lr-inner 0.01 \
+    --n-inner 4
 done

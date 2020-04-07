@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from utils import set_log
-from logger import Logger
 from tensorboardX import SummaryWriter
 
 
@@ -56,9 +55,10 @@ def inner_update_for_lower_context(args, model, task_family, task_function, high
     lower_context = model.reset_context()
     train_inputs = task_family['train'].sample_inputs(args.k_meta_train).to(args.device)
     
-    lower_inner_loss = eval_model(model, lower_context, higher_context, train_inputs, task_function)
-    lower_context_grad = torch.autograd.grad(lower_inner_loss, lower_context, create_graph=True)[0]
-    lower_context = lower_context - lower_context_grad * args.lr_inner
+    for _ in range(args.n_inner):
+        lower_inner_loss = eval_model(model, lower_context, higher_context, train_inputs, task_function)
+        lower_context_grad = torch.autograd.grad(lower_inner_loss, lower_context, create_graph=True)[0]
+        lower_context = lower_context - lower_context_grad * args.lr_inner
         
     return lower_context 
 
@@ -71,22 +71,28 @@ def get_meta_loss(model, task_family, args, log, tb_writer, iteration):
         task_functions = task_family["train"].sample_tasks(super_task)
         higher_context = model.reset_context()
 
-        higher_inner_losses, lower_contexts = [], []
-
+        # Get adapted lower_context
+        lower_contexts = []
         for i_task in range(args.tasks_per_metaupdate):
             task_function = task_functions[i_task]
             lower_context = inner_update_for_lower_context(
                 args, model, task_family, task_function, higher_context)
             lower_contexts.append(lower_context)
 
-            # Compute inner-loop loss for higher context based on adapted lower context
-            train_inputs = task_family['train'].sample_inputs(args.k_meta_train).to(args.device)
-            higher_inner_losses.append(eval_model(model, lower_context, higher_context, train_inputs, task_function))
-
         # Inner-loop update for higher context
-        higher_inner_loss = sum(higher_inner_losses) / float(len(higher_inner_losses))
-        higher_context_grad = torch.autograd.grad(higher_inner_loss, higher_context, create_graph=True)[0]
-        higher_context = higher_context - higher_context_grad * args.lr_inner
+        for _ in range(args.n_inner):
+            higher_inner_losses = []
+
+            # Compute inner-loop loss for higher context based on adapted lower context
+            for i_task in range(args.tasks_per_metaupdate):
+                task_function = task_functions[i_task]
+                lower_context = lower_contexts[i_task] 
+                train_inputs = task_family['train'].sample_inputs(args.k_meta_train).to(args.device)
+                higher_inner_losses.append(eval_model(model, lower_context, higher_context, train_inputs, task_function))
+
+            higher_inner_loss = sum(higher_inner_losses) / float(len(higher_inner_losses))
+            higher_context_grad = torch.autograd.grad(higher_inner_loss, higher_context, create_graph=True)[0]
+            higher_context = higher_context - higher_context_grad * args.lr_inner
 
         log[args.log_name].info("At iteration {} with super task {}, higher-loss: {:.3f}".format(
             iteration, super_task, higher_inner_loss.detach().cpu().numpy()))
@@ -101,8 +107,8 @@ def get_meta_loss(model, task_family, args, log, tb_writer, iteration):
             meta_losses.append(eval_model(model, lower_context, higher_context, test_inputs, task_function))
 
         # Visualize prediction
-        if iteration % 100 == 0: 
-            vis_prediction(model, lower_context, higher_context, test_inputs, task_function)
+        if iteration % 10 == 0: 
+            vis_prediction(model, lower_context, higher_context, test_inputs, task_function, super_task, iteration, args)
 
     return sum(meta_losses) / float(len(meta_losses))
 
@@ -124,8 +130,6 @@ def run(args, log_interval=5000, rerun=False):
     meta_optimizer = optim.Adam(model.parameters(), args.lr_meta)
 
     # Begin meta-train
-    logger = Logger(model)
-    
     for iteration in range(args.n_iter):
         meta_optimizer.zero_grad()
         meta_loss = get_meta_loss(model, task_family, args, log, tb_writer, iteration) 
@@ -136,10 +140,16 @@ def run(args, log_interval=5000, rerun=False):
             iteration, meta_loss.detach().cpu().numpy()))
         tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), iteration)
 
-    return logger
+        if iteration > 500:
+            import sys
+            sys.exit()
 
 
-def vis_prediction(model, lower_context, higher_context, inputs, task_function):
+def vis_prediction(model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
+    # Create directories
+    if not os.path.exists("./logs/n_iter" + str(args.n_iter)):
+        os.makedirs("./logs/n_iter" + str(args.n_iter))
+
     outputs = model(inputs, lower_context, higher_context).detach().cpu().numpy()
     targets = task_function(inputs).detach().cpu().numpy()
 
@@ -147,4 +157,7 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function):
     plt.scatter(inputs, outputs, label="pred")
     plt.scatter(inputs, targets, label="gt")
     plt.legend()
-    plt.show()
+    plt.title(super_task + "_iteration" + str(iteration))
+
+    plt.savefig("logs/n_iter" + str(args.n_iter) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
+    plt.close()
