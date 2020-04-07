@@ -56,6 +56,9 @@ def parse_args():
         '--celeba_dir', type=str, default='', help='Directory to celeba dataset')
     parser.add_argument(
         '--use_ordered_pixels', action='store_true', default=False)
+    parser.add_argument(
+        '--log-name', type=str, default="experiment",
+        help="Logging name")
 
     args = parser.parse_args()
 
