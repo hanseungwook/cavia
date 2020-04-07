@@ -9,11 +9,11 @@ class Logger:
         self.train_loss = []
         self.train_conf = []
 
-        self.valid_loss = []
-        self.valid_conf = []
+        self.valid_loss = [0]
+        self.valid_conf = [0]
 
-        self.test_loss = []
-        self.test_conf = []
+        self.test_loss = [0]
+        self.test_conf = [0]
 
         # self.best_valid_model = None
         self.update_best_model(best_model)

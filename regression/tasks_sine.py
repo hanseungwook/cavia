@@ -59,18 +59,22 @@ class RegressionTasksSinusoidal:
             return target_functions, amplitude, phase
         else:
             return target_functions
+    
+    def sample_tasks_vae(self, total_num_tasks, batch_num_tasks, batch_size, return_specs=False):
+        # Sample whole batch's tasks and create labels
+        self.presample_tasks(total_num_tasks, batch_size)
+
+        # Sample mini-batch's task from whole batch's tasks
+        mini_batch_idx = np.random.choice(range(len(self.target_functions)), batch_num_tasks, replace=False)
+
+        if return_specs:
+            return np.take(self.target_functions, mini_batch_idx), np.take(self.amplitudes, mini_batch_idx), np.take(self.phases, mini_batch_idx)
+        else:
+            return np.take(self.target_functions, mini_batch_idx)
 
     def sample_tasks_1hot(self, total_num_tasks, batch_num_tasks, batch_size, return_specs=False):
         # Sample whole batch's tasks and create labels
-        if not self.target_functions:
-            self.total_num_tasks = total_num_tasks
-            self.amplitudes = np.random.uniform(self.amplitude_range[0], self.amplitude_range[1], total_num_tasks)
-            self.phases = np.random.uniform(self.phase_range[0], self.phase_range[1], total_num_tasks)
-            self.target_functions = [self.get_target_function(self.amplitudes[i], self.phases[i]) for i in range(total_num_tasks)]
-            
-            self.q_all = torch.zeros(total_num_tasks, batch_size, total_num_tasks)
-            for i in range(total_num_tasks):
-                self.q_all[i, :, i] = 1
+        self.presample_tasks(total_num_tasks, batch_size, onehot=True)
 
         # Sample mini-batch's task from whole batch's tasks
         mini_batch_idx = np.random.choice(range(len(self.target_functions)), batch_num_tasks, replace=False)
@@ -79,6 +83,22 @@ class RegressionTasksSinusoidal:
             return np.take(self.target_functions, mini_batch_idx), np.take(self.q_all, mini_batch_idx, axis=0), np.take(self.amplitudes, mini_batch_idx), np.take(self.phases, mini_batch_idx)
         else:
             return np.take(self.target_functions, mini_batch_idx), np.take(self.q_all, mini_batch_idx, axis=0)
+
+    def presample_tasks(self, total_num_tasks, batch_size, onehot=False):
+        # Sample whole batch's tasks and create labels
+        if not self.target_functions:
+            print('Presampling')
+            self.total_num_tasks = total_num_tasks
+            self.amplitudes = np.random.uniform(self.amplitude_range[0], self.amplitude_range[1], total_num_tasks)
+            self.phases = np.random.uniform(self.phase_range[0], self.phase_range[1], total_num_tasks)
+            self.target_functions = [self.get_target_function(self.amplitudes[i], self.phases[i]) for i in range(total_num_tasks)]
+            
+            self.q_all = torch.zeros(total_num_tasks, batch_size, total_num_tasks)
+
+            if onehot:
+                for i in range(total_num_tasks):
+                    self.q_all[i, :, i] = 1
+
 
     def create_input_range_1hot_labels(self, batch_size, cur_label):
         return cur_label.unsqueeze(0).repeat(batch_size, 1)

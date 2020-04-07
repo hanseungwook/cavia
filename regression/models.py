@@ -128,18 +128,39 @@ class Encoder_Decoder(nn.Module):
 #     def __init__(self, n_arch, n_context, n_task, gain_w, gain_b, decoder = None): 
     def __init__(self, encoder, decoder): 
         super().__init__()
-
         self.encoder = encoder
         self.decoder = decoder
 
     def reset_context(self):
         self.encoder.reinit_linear()
 
-    def forward(self, input, onehot):
-        context = self.encoder(onehot)
-        pred = self.decoder(input, context)
+    def forward(self, inputs, encoder_input):
+        context = self.encoder(encoder_input)
+        pred = self.decoder(inputs, context)
 
         return pred
+
+class Encoder_Decoder_VAE(nn.Module):
+#     def __init__(self, n_arch, n_context, n_task, gain_w, gain_b, decoder = None): 
+    def __init__(self, encoder, decoder): 
+        super().__init__()
+        self.encoder = encoder
+        self.decoder = decoder
+
+    def reset_context(self):
+        pass
+
+    def forward(self, inputs, encoder_inputs):
+        context, mu, logvar = self.encoder(encoder_inputs)
+        
+        # Repeating context number of batch_size, for each data point in each task
+        batch_size = encoder_inputs.shape[1]
+        num_context = context.shape[1]
+        context = context.unsqueeze(1).repeat(1, batch_size, 1).reshape(-1, num_context)
+
+        pred = self.decoder(inputs, context)
+
+        return pred, mu, logvar
 
 class Encoder_Core(nn.Module):
     def __init__(self, input_dim, n_hidden):
@@ -169,11 +190,13 @@ class Encoder_Core(nn.Module):
         n_task, n_batch, _ = input.shape        
         n_batch_log = int(torch.tensor(n_batch).float().log2())
         
+        
         x = self._reshape_batch(input)
         x = F.relu(self.fc1(x))
         x = self._progressive_mean_over_batch(x, n_batch, n_batch_log, n_task, progressive)
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
+        
         return x
 
 # Variational Encoder
@@ -188,15 +211,19 @@ class Encoder_Variational(nn.Module):
     def _reparameterize(self, mu, logvar):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(std)
+
         return mu + eps * std
 
     def forward(self, input, progressive = None):
         x = self.core(input, self.progressive) if progressive == None else self.core(input, progressive)
-#     def forward(self, input, progressive = self.progressive):
-#         x = self.core(input, progressive)
         mu = self.fc3_mu(x)
         logvar = self.fc3_var(x)
-        z = self._reparameterize(mu, logvar)
+
+        if self.training:
+            z = self._reparameterize(mu, logvar)
+        else:
+            z = mu
+
         return z, mu, logvar
 
 
