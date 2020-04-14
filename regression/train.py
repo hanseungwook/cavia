@@ -119,7 +119,7 @@ def run(args, log, tb_writer):
     meta_optimizer = optim.Adam(model.parameters(), args.lr_meta)
 
     # Begin meta-train
-    for iteration in range(500):
+    for iteration in range(2000):
         meta_optimizer.zero_grad()
         meta_loss = get_meta_loss(model, task_family, args, log, tb_writer, iteration) 
         meta_loss.backward()
