@@ -1,22 +1,20 @@
-import os
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import matplotlib.pyplot as plt
-from utils import set_log
-from tensorboardX import SummaryWriter
+import os
 
 
 def get_task_family(args):
     task_family = {}
 
     if args.task == 'sine':
-        from regression.task import sine
+        from task import sine
         task_family['train'] = sine.RegressionTasksSinusoidal()
         task_family['valid'] = sine.RegressionTasksSinusoidal()
         task_family['test'] = sine.RegressionTasksSinusoidal()
     elif args.task == 'mixture':
-        from regression.task import mixture
+        from task import mixture
         task_family['train'] = mixture.MixutureRegressionTasks(args)
         task_family['valid'] = mixture.MixutureRegressionTasks(args)
         task_family['test'] = mixture.MixutureRegressionTasks(args)
@@ -31,8 +29,8 @@ def get_model_decoder(args):
     n_context = args.n_context_params
 
     if args.model_type == "CAVIA":
-        from cavia_model import CaviaModel
-        MODEL = CaviaModel
+        from model.cavia import Cavia
+        MODEL = Cavia
         n_arch[0] += n_context * args.n_context_models
     else:
         raise ValueError()
@@ -102,7 +100,8 @@ def get_meta_loss(model, task_family, args, log, tb_writer, iteration):
             task_function = task_functions[i_task]
             lower_context = lower_contexts[i_task] 
             test_inputs = task_family['test'].sample_inputs(args.k_meta_train).to(args.device)
-            meta_losses.append(eval_model(model, lower_context, higher_context, test_inputs, task_function))
+            meta_losses.append(eval_model(
+                model, lower_context, higher_context, test_inputs, task_function))
 
         # Visualize prediction
         if iteration % 10 == 0: 
@@ -111,15 +110,7 @@ def get_meta_loss(model, task_family, args, log, tb_writer, iteration):
     return sum(meta_losses) / float(len(meta_losses))
 
 
-def run(args, log_interval=5000, rerun=False):
-    # Create directories
-    if not os.path.exists("./logs"):
-        os.makedirs("./logs")
-
-    # Set log
-    log = set_log(args)
-    tb_writer = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
-    
+def run(args, log, tb_writer):
     # Set tasks
     task_family = get_task_family(args)
 
@@ -128,7 +119,7 @@ def run(args, log_interval=5000, rerun=False):
     meta_optimizer = optim.Adam(model.parameters(), args.lr_meta)
 
     # Begin meta-train
-    for iteration in range(args.n_iter):
+    for iteration in range(500):
         meta_optimizer.zero_grad()
         meta_loss = get_meta_loss(model, task_family, args, log, tb_writer, iteration) 
         meta_loss.backward()
@@ -137,10 +128,6 @@ def run(args, log_interval=5000, rerun=False):
         log[args.log_name].info("At iteration {}, meta-loss: {:.3f}".format(
             iteration, meta_loss.detach().cpu().numpy()))
         tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), iteration)
-
-        if iteration > 500:
-            import sys
-            sys.exit()
 
 
 def vis_prediction(model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
