@@ -1,8 +1,6 @@
-import torch
-import torch.nn.functional as F
+import os
 import torch.optim as optim
 import matplotlib.pyplot as plt
-import os
 
 
 def get_task_family(args):
@@ -39,75 +37,8 @@ def get_model_decoder(args):
         n_arch=n_arch, 
         n_context=n_context, 
         device=args.device).to(args.device)
+
     return model_decoder
-
-
-def eval_model(model, lower_context, higher_context, inputs, target_fnc):
-    outputs = model(inputs, lower_context, higher_context)
-    targets = target_fnc(inputs)
-    return F.mse_loss(outputs, targets)
-
-
-def inner_update_for_lower_context(args, model, task_family, task_function, higher_context):
-    lower_context = model.reset_context()
-    train_inputs = task_family['train'].sample_inputs(args.k_meta_train).to(args.device)
-    
-    for _ in range(args.n_inner):
-        lower_inner_loss = eval_model(model, lower_context, higher_context, train_inputs, task_function)
-        lower_context_grad = torch.autograd.grad(lower_inner_loss, lower_context, create_graph=True)[0]
-        lower_context = lower_context - lower_context_grad * args.lr_inner
-        
-    return lower_context 
-
-
-def get_meta_loss(model, task_family, args, log, tb_writer, iteration):
-    meta_losses = []
-
-    for super_task in task_family["train"].super_tasks:
-        task_functions = task_family["train"].sample_tasks(super_task)
-        higher_context = model.reset_context()
-
-        # Get adapted lower_context
-        lower_contexts = []
-        for i_task in range(args.tasks_per_metaupdate):
-            task_function = task_functions[i_task]
-            lower_context = inner_update_for_lower_context(
-                args, model, task_family, task_function, higher_context)
-            lower_contexts.append(lower_context)
-
-        # Inner-loop update for higher context
-        for _ in range(args.n_inner):
-            higher_inner_losses = []
-
-            # Compute inner-loop loss for higher context based on adapted lower context
-            for i_task in range(args.tasks_per_metaupdate):
-                task_function = task_functions[i_task]
-                lower_context = lower_contexts[i_task] 
-                train_inputs = task_family['train'].sample_inputs(args.k_meta_train).to(args.device)
-                higher_inner_losses.append(eval_model(model, lower_context, higher_context, train_inputs, task_function))
-
-            higher_inner_loss = sum(higher_inner_losses) / float(len(higher_inner_losses))
-            higher_context_grad = torch.autograd.grad(higher_inner_loss, higher_context, create_graph=True)[0]
-            higher_context = higher_context - higher_context_grad * args.lr_inner
-
-        log[args.log_name].info("At iteration {} with super task {}, higher-loss: {:.3f}".format(
-            iteration, super_task, higher_inner_loss.detach().cpu().numpy()))
-        tb_writer.add_scalars(
-            "higher_inner_loss", {super_task: higher_inner_loss.detach().cpu().numpy()}, iteration)
-
-        # Get meta-loss for the base model
-        for i_task in range(args.tasks_per_metaupdate):
-            task_function = task_functions[i_task]
-            lower_context = lower_contexts[i_task] 
-            test_inputs = task_family['test'].sample_inputs(args.k_meta_train).to(args.device)
-            meta_losses.append(eval_model(
-                model, lower_context, higher_context, test_inputs, task_function))
-
-        # Visualize prediction
-        if iteration % 10 == 0: 
-            vis_prediction(model, lower_context, higher_context, test_inputs, task_function, super_task, iteration, args)
-
-    return sum(meta_losses) / float(len(meta_losses))
 
 
 def run(args, log, tb_writer):
@@ -118,10 +49,20 @@ def run(args, log, tb_writer):
     model = get_model_decoder(args)
     meta_optimizer = optim.Adam(model.parameters(), args.lr_meta)
 
+    # Set algorithm
+    if args.n_context_models == 1:
+        from algorithm.cavia_level1 import CaviaLevel1
+        algorithm = CaviaLevel1()
+    elif args.n_context_models == 2:
+        from algorithm.cavia_level2 import CaviaLevel2
+        algorithm = CaviaLevel2()
+    else:
+        raise ValueError()
+
     # Begin meta-train
     for iteration in range(2000):
         meta_optimizer.zero_grad()
-        meta_loss = get_meta_loss(model, task_family, args, log, tb_writer, iteration) 
+        meta_loss = algorithm.get_meta_loss(model, task_family, args, log, tb_writer, iteration) 
         meta_loss.backward()
         meta_optimizer.step()
 

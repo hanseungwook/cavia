@@ -47,6 +47,9 @@ def parse_args():
     parser.add_argument(
         '--seed', type=int, default=42)
     parser.add_argument(
+        '--prefix', type=str, default="",
+        help="Prefix for logging")
+    parser.add_argument(
         '--log-name', type=str, default="",
         help="Logging name")
 
