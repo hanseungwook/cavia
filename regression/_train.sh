@@ -25,8 +25,9 @@ do
     --task mixture \
     --model-type CAVIA \
     --lr-inner 0.05 \
-    --k-meta-train 50 \
-    --n-context-models 1 \
+    --k-meta-train 5 \
+    --k-meta-test 5 \
+    --n-context-models 2 \
     --n-inner 5 \
     --prefix ""
 done
