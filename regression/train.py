@@ -10,10 +10,11 @@ import scipy.stats as st
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 
 import utils
-import tasks_sine, tasks_celebA
+from tasks import sine, celeba
 from models import CaviaModel, Model_Active, Encoder_Decoder, Encoder_Decoder_VAE, Onehot_Encoder, Encoder_Variational
 from logger import Logger
 import IPython
@@ -58,13 +59,13 @@ def viz_pred(model, inputs, targets, labels, task_type=None):
 def get_task_family(args):
     task_family = {}
     if args.task == 'sine':
-        task_family['train'] = tasks_sine.RegressionTasksSinusoidal()
-        task_family['valid'] = tasks_sine.RegressionTasksSinusoidal()
-        task_family['test'] = tasks_sine.RegressionTasksSinusoidal()
+        task_family['train'] = sine.RegressionTasksSinusoidal()
+        task_family['valid'] = sine.RegressionTasksSinusoidal()
+        task_family['test'] = sine.RegressionTasksSinusoidal()
     elif args.task == 'celeba':
-        task_family['train'] = tasks_celebA.CelebADataset('train', device=args.device, celeba_dir=args.celeba_dir)
-        task_family['valid'] = tasks_celebA.CelebADataset('valid', device=args.device, celeba_dir=args.celeba_dir)
-        task_family['test'] = tasks_celebA.CelebADataset('test', device=args.device, celeba_dir=args.celeba_dir)
+        task_family['train'] = celeba.CelebADataset('train', device=args.device, celeba_dir=args.celeba_dir)
+        task_family['valid'] = celeba.CelebADataset('valid', device=args.device, celeba_dir=args.celeba_dir)
+        task_family['test'] = celeba.CelebADataset('test', device=args.device, celeba_dir=args.celeba_dir)
     else:
         raise NotImplementedError
     return task_family
@@ -118,12 +119,12 @@ def update_logger(logger, path, args, model, eval_fnc, task_family, i_iter, star
     # save logging results
     utils.save_obj(logger, path)
     # save best model
-    # if logger.valid_loss[-1] == np.min(logger.valid_loss):
-    #     logger.update_best_model(model)
-    #     print('saving best model at iter', i_iter)
-    # # visualise results	
-    # if args.task == 'celeba':
-    #     task_family['train'].visualise(task_family['train'], task_family['test'], copy.deepcopy(logger.best_valid_model), args, i_iter)
+    if logger.valid_loss[-1] == np.min(logger.valid_loss):
+        logger.update_best_model(model)
+        print('saving best model at iter', i_iter)
+    # visualise results	
+    if args.task == 'celeba':
+        task_family['train'].visualise(task_family['train'], task_family['test'], copy.deepcopy(logger.best_valid_model), args, i_iter)
 
     logger.print_info(i_iter, start_time)
     # start_time = time.time()
@@ -140,14 +141,6 @@ def eval_model_1hot(model, inputs, targets, labels_1hot):
     outputs = model(inputs, labels_1hot)
     
     return F.mse_loss(outputs, targets)
-
-def eval_model_vae(model, inputs, targets, inputs_targets):
-    outputs, mu, logvar = model(inputs, inputs_targets)
-    pred_loss = F.mse_loss(outputs, targets)
-    # kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-    kld = torch.tensor(0)
-    
-    return pred_loss + kld
 
 
 def inner_update(args, model, task_family, target_fnc):
@@ -205,38 +198,6 @@ def create_inputs_targets(inputs, targets, n_tasks, batch_size):
     targets_batch = targets.reshape(n_tasks, batch_size, -1)
 
     return torch.cat((inputs_batch, targets_batch), dim=2)
-
-def meta_backward_vae(args, model, inner_optimizer, outer_optimizer, task_family, target_functions):
-    # Sample inputs 
-    train_inputs = task_family['train'].sample_inputs(args.k_meta_train * args.tasks_per_metaupdate, args.use_ordered_pixels).to(args.device)
-    test_inputs = task_family['test'].sample_inputs(args.k_meta_train * args.tasks_per_metaupdate, args.use_ordered_pixels).to(args.device)
-
-    # Create targets and labels of all tasks in batch level
-    train_targets = create_targets(train_inputs, target_functions, args.tasks_per_metaupdate)
-    test_targets = create_targets(test_inputs, target_functions, args.tasks_per_metaupdate)
-
-    # Collate inputs and targets into shape (n_task, batch_size, input_dim + output_dim)
-    train_inputs_targets = create_inputs_targets(train_inputs, train_targets, args.tasks_per_metaupdate, args.k_meta_train)
-    test_inputs_targets = create_inputs_targets(test_inputs, test_targets, args.tasks_per_metaupdate, args.k_meta_train)
-
-    # Encoder / inner update
-    update_step_vae(model, inner_optimizer, train_inputs, train_targets, train_inputs_targets, args.tasks_per_metaupdate)
-
-    # Decoder / outer update
-    update_step_vae(model, outer_optimizer, test_inputs, test_targets, test_inputs_targets, args.tasks_per_metaupdate)
-
-
-def update_step_vae(model, optimizer, inputs, targets, inputs_targets, n_tasks):
-    # Update given optimizer (whether inner or outer)
-    optimizer.zero_grad()
-
-    loss = eval_model_vae(model, inputs, targets, inputs_targets)
-    loss /= n_tasks
-    loss.backward()
-
-    optimizer.step()
-
-    return loss
 
 
 #########################################
@@ -302,11 +263,15 @@ def run_vae(args, log_interval=5000, rerun=False):
     path = initial_setting(args, rerun)
     task_family = get_task_family(args)
 
-    # Create model
-    model_encoder = get_model_encoder(args, task_family['train'])
-    model_decoder = get_model_decoder(args, task_family['train'])
+    # Instantiate algorithm
+    from algorithms.vae import VAE
+    algorithm = VAE()
 
-    model = Encoder_Decoder_VAE(model_encoder, model_decoder)
+    # Build model
+    model = algorithm.build_model(args, task_family)
+
+    # Create tensorboard writer
+    writer = SummaryWriter('./logs/tb_{}'.format(args.log_name))
 
     # initialise loggers
     logger = Logger(model)
@@ -322,7 +287,7 @@ def run_vae(args, log_interval=5000, rerun=False):
     for i_iter in range(args.n_iter):
         # Sample new mini-batch of tasks from pre-sampled batch of tasks
         target_functions = task_family['train'].sample_tasks_vae(total_num_tasks=args.total_num_tasks, batch_num_tasks=args.tasks_per_metaupdate, batch_size=args.k_meta_train)
-        meta_backward_vae(args, model, inner_optimizer, outer_optimizer, task_family, target_functions)
+        algorithm.meta_backward(args, inner_optimizer, outer_optimizer, task_family, target_functions, writer, i_iter)
 
         if i_iter % log_interval == 0:
             logger, start_time = update_logger(logger, path, args, copy.deepcopy(model), eval_vae, task_family, i_iter, start_time)        
@@ -409,32 +374,3 @@ def eval_1hot(args, model, task_family, num_updates, n_tasks=25, task_type='trai
     else:
         return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
     
-
-def eval_vae(args, model, task_family, num_updates, n_tasks=25, task_type='train', return_gradnorm=False):    
-    # logging
-    losses = []
-    gradnorms = []
-
-    # Sample tasks
-    target_functions = task_family.sample_tasks_vae(total_num_tasks=n_tasks*4, batch_num_tasks=n_tasks, batch_size=args.k_shot_eval)
-
-     # Get entire range's input and respective 1 hot labels
-    input_range = task_family.get_input_range().to(args.device).repeat(n_tasks, 1)
-    input_range_targets = create_targets(input_range, target_functions, n_tasks)
-
-    bs = int(input_range.shape[0] / n_tasks)
-    inputs_targets = create_inputs_targets(input_range, input_range_targets, n_tasks, bs)
-    
-    # compute true loss on entire input range
-    model.eval()
-    losses.append(eval_model_vae(model, input_range, input_range_targets, inputs_targets).item())
-    # IPython.embed()
-    # viz_pred(model, input_range[:bs], input_range_targets[:bs], inputs_targets[0].unsqueeze(0), task_type)
-    model.train()
-
-    losses_mean = np.mean(losses)
-    losses_conf = st.t.interval(0.95, len(losses) - 1, loc=losses_mean, scale=st.sem(losses))
-    if not return_gradnorm:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean))
-    else:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)

@@ -12,7 +12,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 import utils
-import tasks_sine, tasks_celebA
+from tasks import sine, celeba
 from logger import Logger
 from maml_model import MamlModel
 
