@@ -89,3 +89,20 @@ class VAE(Base):
         optimizer.step()
 
         return loss
+    
+    def viz_pred(self, inputs, targets, labels, task_type=None):
+        with torch.no_grad():
+            self.model.eval()
+            preds = self.model(inputs, labels)
+            self.model.train()
+            
+        if len(preds) == 3:
+            preds = preds[0]
+        
+        plt.scatter(inputs.detach().numpy(), targets.detach().numpy(), c='green', label='Target', s=1)
+        plt.scatter(inputs.detach().numpy(), preds.detach().numpy(), c='blue', label='Pred', s=1)
+        plt.legend()
+
+        if task_type:
+            plt.title(task_type)
+        plt.show()
