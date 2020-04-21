@@ -16,6 +16,8 @@ import matplotlib.pyplot as plt
 import utils
 from tasks import sine, celeba
 from models import CaviaModel, Model_Active, Encoder_Decoder, Encoder_Decoder_VAE, Onehot_Encoder, Encoder_Variational
+from algorithms.vae import VAE
+from algorithms.onehot import OneHot
 from logger import Logger
 import IPython
 
@@ -42,19 +44,6 @@ def create_targets(inputs, target_functions, n_tasks):
 
 def create_1hot_labels(labels_1hot, n_tasks):
     return torch.cat([labels_1hot[t] for t in range(n_tasks)]).reshape(-1, labels_1hot.shape[2])
-
-def viz_pred(model, inputs, targets, labels, task_type=None):
-    preds = model(inputs, labels)
-    if len(preds) == 3:
-        preds = preds[0]
-    
-    plt.scatter(inputs.detach().numpy(), targets.detach().numpy(), c='green', label='Target', s=1)
-    plt.scatter(inputs.detach().numpy(), preds.detach().numpy(), c='blue', label='Pred', s=1)
-    plt.legend()
-
-    if task_type:
-        plt.title(task_type)
-    plt.show()
 
 def get_task_family(args):
     task_family = {}
@@ -137,12 +126,6 @@ def eval_model(model, inputs, target_fnc, context=None):
     
     return F.mse_loss(outputs, targets)
 
-def eval_model_1hot(model, inputs, targets, labels_1hot):
-    outputs = model(inputs, labels_1hot)
-    
-    return F.mse_loss(outputs, targets)
-
-
 def inner_update(args, model, task_family, target_fnc):
     context = model.reset_context()
     inner_optim = optim.SGD([context], args.lr_inner) #     optim_inner.zero_grad()
@@ -162,36 +145,6 @@ def get_meta_loss(args, model, task_family, target_fnc):
         test_inputs = task_family['test'].sample_inputs(args.k_meta_test, args.use_ordered_pixels).to(args.device)
         meta_loss += eval_model(model, context, test_inputs, target_fnc)
     return meta_loss / args.tasks_per_metaupdate
-
-
-def meta_backward_1hot(args, model, inner_optimizer, outer_optimizer, task_family, target_functions, labels_1hot):
-    # --- compute meta gradient ---    
-    train_inputs = task_family['train'].sample_inputs(args.k_meta_train * args.tasks_per_metaupdate, args.use_ordered_pixels).to(args.device)
-    test_inputs = task_family['test'].sample_inputs(args.k_meta_train * args.tasks_per_metaupdate, args.use_ordered_pixels).to(args.device)
-
-    # Create targets and labels of all tasks in batch level
-    train_targets = create_targets(train_inputs, target_functions, args.tasks_per_metaupdate)
-    test_targets = create_targets(test_inputs, target_functions, args.tasks_per_metaupdate)
-    labels = create_1hot_labels(labels_1hot, args.tasks_per_metaupdate)
-    
-    # Encoder / inner update
-    update_step_1hot(model, inner_optimizer, train_inputs, train_targets, labels, args.tasks_per_metaupdate)
-
-    # Decoder / outer update
-    update_step_1hot(model, outer_optimizer, test_inputs, test_targets, labels, args.tasks_per_metaupdate)
-
-
-def update_step_1hot(model, optimizer, inputs, targets, labels, n_tasks):
-    # Update given optimizer (whether inner or outer)
-    optimizer.zero_grad()
-
-    loss = eval_model_1hot(model, inputs, targets, labels)
-    loss /= n_tasks
-    loss.backward()
-
-    optimizer.step()
-
-    return loss
 
 def create_inputs_targets(inputs, targets, n_tasks, batch_size):
     inputs_batch = inputs.reshape(n_tasks, batch_size, -1)
@@ -228,15 +181,15 @@ def run(args, log_interval=5000, rerun=False):
 
     return logger
 
-def run_no_inner(args, log_interval=5000, rerun=False):
+def run_1hot(args, log_interval=5000, rerun=False):
     path = initial_setting(args, rerun)
     task_family = get_task_family(args)
 
-    # Create model
-    model_encoder = get_model_encoder(args, task_family['train'])
-    model_decoder = get_model_decoder(args, task_family['train'])
-    
-    model = Encoder_Decoder(model_encoder, model_decoder)
+    # Instantiate algorithm
+    algorithm = OneHot()
+
+    # Build model
+    model = algorithm.build_model(args, task_family)
 
     # initialise loggers
     logger = Logger(model)
@@ -252,7 +205,7 @@ def run_no_inner(args, log_interval=5000, rerun=False):
     for i_iter in range(args.n_iter):
         # Sample new mini-batch of tasks from pre-sampled batch of tasks
         target_functions, train_labels_onehot = task_family['train'].sample_tasks_1hot(total_num_tasks=args.total_num_tasks, batch_num_tasks=args.tasks_per_metaupdate, batch_size=args.k_meta_train)
-        meta_backward_1hot(args, model, inner_optimizer, outer_optimizer, task_family, target_functions, train_labels_onehot)
+        algorithm.meta_backward(args, model, inner_optimizer, outer_optimizer, task_family, target_functions, train_labels_onehot)
 
         if i_iter % log_interval == 0:
             logger, start_time = update_logger(logger, path, args, copy.deepcopy(model), eval_1hot, task_family, i_iter, start_time)        
@@ -264,7 +217,6 @@ def run_vae(args, log_interval=5000, rerun=False):
     task_family = get_task_family(args)
 
     # Instantiate algorithm
-    from algorithms.vae import VAE
     algorithm = VAE()
 
     # Build model
@@ -290,7 +242,7 @@ def run_vae(args, log_interval=5000, rerun=False):
         algorithm.meta_backward(args, inner_optimizer, outer_optimizer, task_family, target_functions, writer, i_iter)
 
         if i_iter % log_interval == 0:
-            logger, start_time = update_logger(logger, path, args, copy.deepcopy(model), eval_vae, task_family, i_iter, start_time)        
+            logger, start_time = update_logger(logger, path, args, copy.deepcopy(model), algorithm.eval_model_total, task_family, i_iter, start_time)        
 
     return logger
 
@@ -327,50 +279,3 @@ def eval_cavia(args, model, task_family, num_updates, n_tasks=100, task_type='tr
         return losses_mean, np.mean(np.abs(losses_conf - losses_mean))
     else:
         return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
-
-def eval_1hot(args, model, task_family, num_updates, n_tasks=25, task_type='train', return_gradnorm=False):    
-    # logging
-    losses = []
-    gradnorms = []
-
-    # Optimizer for encoder (context)
-    inner_optimizer = optim.SGD(model.encoder.parameters(), args.lr_inner)
-
-    # Sample tasks
-    target_functions, labels_1hot = task_family.sample_tasks_1hot(total_num_tasks=n_tasks*4, batch_num_tasks=n_tasks, batch_size=args.k_shot_eval)
-
-    # Only if task is valid or test, reinitialize model and perform inner updates
-    if task_type != 'train':
-        print('Reinit model {}'.format(task_type))
-        # Reinitialize one hot encoder for evaluation mode
-        model.encoder.reinit(args.num_context_params, task_family.total_num_tasks)
-        model.encoder.train()
-        
-        # Inner loop steps
-        for _ in range(1, num_updates + 1):
-            inputs = task_family.sample_inputs(args.k_meta_test * n_tasks, args.use_ordered_pixels).to(args.device)
-            targets = create_targets(inputs, target_functions, n_tasks)
-            labels = create_1hot_labels(labels_1hot, n_tasks)
-
-            loss = update_step_1hot(model, inner_optimizer, inputs, targets, labels, n_tasks)
-            # print('{} loss: {}'.format(task_type, loss))
-
-     # Get entire range's input and respective 1 hot labels
-    input_range = task_family.get_input_range().to(args.device).repeat(n_tasks, 1)
-    bs = int(input_range.shape[0] / n_tasks)
-    input_range_1hot = torch.cat([task_family.create_input_range_1hot_labels(batch_size=bs, cur_label=labels_1hot[t, 0, :]) for t in range(n_tasks)])
-    input_range_targets = create_targets(input_range, target_functions, n_tasks)
-    
-    # compute true loss on entire input range
-    model.eval()
-    losses.append(eval_model_1hot(model, input_range, input_range_targets, input_range_1hot).item())
-    #viz_pred(model, input_range[:bs], input_range_targets[:bs], input_range_1hot[:bs], task_type)
-    model.train()
-
-    losses_mean = np.mean(losses)
-    losses_conf = st.t.interval(0.95, len(losses) - 1, loc=losses_mean, scale=st.sem(losses))
-    if not return_gradnorm:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean))
-    else:
-        return losses_mean, np.mean(np.abs(losses_conf - losses_mean)), np.mean(gradnorms)
-    

@@ -20,8 +20,13 @@ class VAE(Base):
 
         return self.model
 
-    def eval_model(self, inputs, targets, inputs_targets, writer, i_iter, tag):
-        outputs, mu, logvar = self.model(inputs, inputs_targets)
+    def eval_model(self, inputs, targets, inputs_targets, writer, i_iter, tag, cur_model=None):
+        if cur_model:
+            model = cur_model
+        else:
+            model = self.model
+
+        outputs, mu, logvar = model(inputs, inputs_targets)
         pred_loss = F.mse_loss(outputs, targets)
         kld = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()) * 0.001
 
@@ -33,7 +38,7 @@ class VAE(Base):
     
         return pred_loss + kld
     
-    def eval_model_total(self, args, task_family, n_tasks=25, task_type='train', return_gradnorm=False):
+    def eval_model_total(self, args, task_family, n_tasks=25, task_type='train'):
         # logging
         losses = []
 
