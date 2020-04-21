@@ -36,6 +36,7 @@ def parse_args():
 
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--logger_save_file', type=str, default='./loggers/logger', help='Directory to save logger')
+    parser.add_argument('--log_name', type=str, default='./', help='Directory to save logger')
     parser.add_argument('--log_interval', type=int, default=100, help='Log interval')
     parser.add_argument('--celeba_dir', type=str, default='', help='Directory to celeba dataset')
 
