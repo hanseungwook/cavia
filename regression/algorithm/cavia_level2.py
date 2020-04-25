@@ -9,7 +9,7 @@ class CaviaLevel2(Base):
         super(CaviaLevel2, self).__init__()
 
     def get_meta_loss(self, model, task_family, args, log, tb_writer, iteration):
-        meta_losses = []
+        meta_losses, higher_contexts = [], []
     
         for super_task in task_family["train"].super_tasks:
             task_functions = task_family["train"].sample_tasks(super_task)
@@ -56,8 +56,10 @@ class CaviaLevel2(Base):
             if iteration % 10 == 0:
                 self.vis_prediction(
                     model, lower_context, higher_context, test_inputs, task_function, super_task, iteration, args)
+
+            higher_contexts.append(higher_context)
     
-        return sum(meta_losses) / float(len(meta_losses))
+        return sum(meta_losses) / float(len(meta_losses)), higher_contexts
 
     def vis_prediction(self, model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
         # Create directories

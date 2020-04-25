@@ -6,3 +6,4 @@ matplotlib
 pillow
 ipython
 tensorboardX==1.2
+sklearn

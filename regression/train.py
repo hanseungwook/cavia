@@ -1,6 +1,8 @@
+import torch
 import os
 import torch.optim as optim
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 
 def get_task_family(args):
@@ -59,16 +61,35 @@ def run(args, log, tb_writer):
     else:
         raise ValueError()
 
+    pca = PCA(n_components=2)
+
     # Begin meta-train
     for iteration in range(2000):
         meta_optimizer.zero_grad()
-        meta_loss = algorithm.get_meta_loss(model, task_family, args, log, tb_writer, iteration) 
+        meta_loss, higher_contexts = algorithm.get_meta_loss(model, task_family, args, log, tb_writer, iteration) 
         meta_loss.backward()
         meta_optimizer.step()
 
         log[args.log_name].info("At iteration {}, meta-loss: {:.3f}".format(
             iteration, meta_loss.detach().cpu().numpy()))
         tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), iteration)
+
+        higher_contexts = torch.stack(higher_contexts).detach().cpu().numpy()
+        higher_contexts_pca = pca.fit_transform(higher_contexts)
+
+        # TODO Consider same PCA dimension
+        # TODO Consider also plotting lower context variable
+        for i_super_task, super_task in enumerate(task_family["train"].super_tasks):
+            x, y = higher_contexts_pca[i_super_task, :] 
+            plt.scatter(x, y, label=super_task)
+            print(x, y)
+        plt.legend()
+        plt.title("PCA_iteration" + str(iteration))
+        plt.xlim([-1., 1.])
+        plt.ylim([-1., 1])
+        plt.savefig(
+            "logs/n_inner" + str(args.n_inner) + "/pca_iteration" + str(iteration).zfill(3) + ".png")
+        plt.close()
 
 
 def vis_prediction(model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
