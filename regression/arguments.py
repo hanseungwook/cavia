@@ -60,7 +60,7 @@ def parse_args():
 
     # Set args log name
     args.log_name = \
-        "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_" % (
-            args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models)
+        "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
+            args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models, args.prefix)
 
     return args

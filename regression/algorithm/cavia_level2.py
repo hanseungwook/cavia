@@ -15,7 +15,8 @@ class CaviaLevel2(Base):
             task_functions = task_family["train"].sample_tasks(super_task)
             higher_context = model.reset_context()
     
-            # Get adapted lower_context
+            """"""""
+            # Get pre-adapted lower_context
             lower_contexts = []
             for i_task in range(args.tasks_per_metaupdate):
                 task_function = task_functions[i_task]
@@ -43,6 +44,16 @@ class CaviaLevel2(Base):
                 iteration, super_task, higher_inner_loss.detach().cpu().numpy()))
             tb_writer.add_scalars(
                 "higher_inner_loss", {super_task: higher_inner_loss.detach().cpu().numpy()}, iteration)
+
+            """"""""
+
+            # Get post-adapted lower_context
+            lower_contexts = []
+            for i_task in range(args.tasks_per_metaupdate):
+                task_function = task_functions[i_task]
+                lower_context = self.inner_update_for_lower_context(
+                    args, model, task_family, task_function, higher_context)
+                lower_contexts.append(lower_context)
     
             # Get meta-loss for the base model
             for i_task in range(args.tasks_per_metaupdate):
