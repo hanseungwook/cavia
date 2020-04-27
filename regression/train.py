@@ -32,17 +32,25 @@ def get_model(args):
 
 
 def get_data(task_family, args):
-    data = []
-    for super_task in task_family.super_tasks:
-        super_task_data = []
-        task_functions = task_family.sample_tasks(super_task)
-        for task_function in task_functions:
-            input = task_family.sample_inputs(args.k_meta_train).to(args.device)
-            target = task_function(input)
-            super_task_data.append((input, target))
-        data.append(super_task_data)
+    train_data, val_data = [], []
 
-    return data
+    for super_task in task_family.super_tasks:
+        train_super_task, val_super_task = [], []
+        task_functions = task_family.sample_tasks(super_task)
+
+        for task_function in task_functions:
+            train_input = task_family.sample_inputs(args.k_meta_train).to(args.device)
+            train_target = task_function(train_input)
+            train_super_task.append((train_input, train_target))
+
+            val_input = task_family.sample_inputs(args.k_meta_train).to(args.device)
+            val_target = task_function(val_input)
+            val_super_task.append((val_input, val_target))
+
+        train_data.append(train_super_task)
+        val_data.append(val_super_task)
+
+    return train_data, val_data
 
 
 def run(args, log, tb_writer):
@@ -61,30 +69,31 @@ def run(args, log, tb_writer):
         from algorithm.cavia_level2 import CaviaLevel2
         context_models.append(CaviaLevel2(args, log, tb_writer))
 
+    assert len(context_models) == args.n_context_models
+
     # Begin meta-train
     for iteration in range(2000):
-        # Sample train data points
-        train_dataset = get_data(task_family, args)
+        # Sample train and validation data
+        train_data, val_data = get_data(task_family, args)
 
         # Get higher contexts
-        higher_contexts = context_models[-1].get_contexts(model, context_models, train_dataset)
+        # Returns higher contexts for all super tasks
+        higher_contexts = context_models[-1].optimize(model, context_models, train_data)
 
         # Get lower contexts
+        # Returns lower contexts for all super tasks and sub-tasks per super task
         lower_contexts = []
-        for super_task_data, higher_context in zip(train_dataset, higher_contexts):
-            lower_contexts.append(context_models[0].get_contexts(model, higher_context, super_task_data))
-
-        # Sample validation data points
-        val_dataset = get_data(task_family, args)
+        for super_task, higher_context in zip(train_data, higher_contexts):
+            lower_contexts.append(context_models[0].optimize(model, higher_context, super_task))
 
         # Get meta_loss
         meta_loss = []
-        for i_super_task, super_task_data in enumerate(val_dataset):
+        for i_super_task, super_task in enumerate(val_data):
             higher_context = higher_contexts[i_super_task]
 
-            for i_data, data in enumerate(super_task_data):
-                lower_context = lower_contexts[i_super_task][i_data]
-                input, target = data
+            for i_sub_task, sub_task in enumerate(super_task):
+                lower_context = lower_contexts[i_super_task][i_sub_task]
+                input, target = sub_task
                 pred = model(input, lower_context, higher_context)
                 meta_loss.append(F.mse_loss(pred, target))
         meta_loss = sum(meta_loss) / float(len(meta_loss))
