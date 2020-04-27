@@ -1,52 +1,33 @@
-import os
-import matplotlib.pyplot as plt
+import torch
 from algorithm.base import Base
+import torch.nn.functional as F
 
 
 class CaviaLevel1(Base):
-    def __init__(self):
-        super(CaviaLevel1, self).__init__()
+    def __init__(self, args, log, tb_writer):
+        super(CaviaLevel1, self).__init__(args, log, tb_writer)
 
-    def get_meta_loss(self, model, task_family, args, log, tb_writer, iteration):
-        meta_losses = []
-    
-        for super_task in task_family["train"].super_tasks:
-            higher_context = None
-            task_functions = task_family["train"].sample_tasks(super_task)
-    
-            for i_task in range(args.tasks_per_metaupdate):
-                # Get adapted lower_context
-                task_function = task_functions[i_task]
-                lower_context = self.inner_update_for_lower_context(
-                    args, model, task_family, task_function, higher_context)
+    def inner_update(self, model, lower_context, higher_context, data):
+        input, target = data
+        pred = model(input, lower_context, higher_context)
+        loss = F.mse_loss(pred, target)
 
-                # Get meta loss
-                test_inputs = task_family['test'].sample_inputs(args.k_meta_train).to(args.device)
-                meta_losses.append(self.eval_model(
-                    model, lower_context, higher_context, test_inputs, task_function))
+        grad = torch.autograd.grad(loss, lower_context, create_graph=True)[0]
+        lower_context = lower_context - grad * self.args.lr_inner
 
-            # Visualize prediction
-            if iteration % 10 == 0:
-                self.vis_prediction(
-                    model, lower_context, higher_context, test_inputs, task_function, super_task, iteration, args)
-    
-        return sum(meta_losses) / float(len(meta_losses))
+        return lower_context
 
-    def vis_prediction(self, model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
-        # Create directories
-        if not os.path.exists("./logs/1_level_n_inner" + str(args.n_inner)):
-            os.makedirs("./logs/1_level_n_inner" + str(args.n_inner))
-    
-        outputs = model(inputs, lower_context, higher_context).detach().cpu().numpy()
-        targets = task_function(inputs).detach().cpu().numpy()
-    
-        plt.figure()
-        plt.scatter(inputs, outputs, label="pred")
-        plt.scatter(inputs, targets, label="gt")
-        plt.legend()
-        plt.title(super_task + "_iteration" + str(iteration))
-    
-        plt.savefig(
-            "logs/1_level_n_inner" + str(args.n_inner) + "/iteration" + 
-            str(iteration).zfill(3) + "_" + super_task + ".png")
-        plt.close()  
+    def optimize(self, model, higher_context, data):
+        lower_context = model.reset_context()
+        for _ in range(self.args.n_inner):
+            self.inner_update(model, lower_context, higher_context, data)
+        return lower_context
+
+    def get_contexts(self, model, higher_context, super_task_data):
+        lower_contexts = []
+        for data in super_task_data:
+            lower_context = self.optimize(model, higher_context, data)
+            lower_contexts.append(lower_context)
+
+        assert len(lower_contexts) == len(super_task_data)
+        return lower_contexts

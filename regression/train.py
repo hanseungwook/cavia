@@ -1,30 +1,18 @@
-import torch
-import os
 import torch.optim as optim
-import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
+import torch.nn.functional as F
 
 
 def get_task_family(args):
-    task_family = {}
-
-    if args.task == 'sine':
-        from task import sine
-        task_family['train'] = sine.RegressionTasksSinusoidal()
-        task_family['valid'] = sine.RegressionTasksSinusoidal()
-        task_family['test'] = sine.RegressionTasksSinusoidal()
-    elif args.task == 'mixture':
+    if args.task == 'mixture':
         from task import mixture
-        task_family['train'] = mixture.MixutureRegressionTasks(args)
-        task_family['valid'] = mixture.MixutureRegressionTasks(args)
-        task_family['test'] = mixture.MixutureRegressionTasks(args)
+        task_family = mixture.MixutureRegressionTasks(args)
     else:
         raise NotImplementedError()
 
     return task_family
 
 
-def get_model_decoder(args):
+def get_model(args):
     n_arch = args.architecture
     n_context = args.n_context_params
 
@@ -35,38 +23,73 @@ def get_model_decoder(args):
     else:
         raise ValueError()
         
-    model_decoder = MODEL(
+    model = MODEL(
         n_arch=n_arch, 
         n_context=n_context, 
         device=args.device).to(args.device)
 
-    return model_decoder
+    return model
+
+
+def get_data(task_family, args):
+    data = []
+    for super_task in task_family.super_tasks:
+        super_task_data = []
+        task_functions = task_family.sample_tasks(super_task)
+        for task_function in task_functions:
+            input = task_family.sample_inputs(args.k_meta_train).to(args.device)
+            target = task_function(input)
+            super_task_data.append((input, target))
+        data.append(super_task_data)
+
+    return data
 
 
 def run(args, log, tb_writer):
     # Set tasks
     task_family = get_task_family(args)
 
-    # Set model
-    model = get_model_decoder(args)
+    # Set model that includes theta params
+    model = get_model(args)
     meta_optimizer = optim.Adam(model.parameters(), args.lr_meta)
 
-    # Set algorithm
-    if args.n_context_models == 1:
-        from algorithm.cavia_level1 import CaviaLevel1
-        algorithm = CaviaLevel1()
-    elif args.n_context_models == 2:
-        from algorithm.cavia_level2 import CaviaLevel2
-        algorithm = CaviaLevel2()
-    else:
-        raise ValueError()
+    # Set context models
+    from algorithm.cavia_level1 import CaviaLevel1
+    context_models = [CaviaLevel1(args, log, tb_writer)]
 
-    pca = PCA(n_components=2)
+    if args.n_context_models == 2:
+        from algorithm.cavia_level2 import CaviaLevel2
+        context_models.append(CaviaLevel2(args, log, tb_writer))
 
     # Begin meta-train
     for iteration in range(2000):
+        # Sample train data points
+        train_dataset = get_data(task_family, args)
+
+        # Get higher contexts
+        higher_contexts = context_models[-1].get_contexts(model, context_models, train_dataset)
+
+        # Get lower contexts
+        lower_contexts = []
+        for super_task_data, higher_context in zip(train_dataset, higher_contexts):
+            lower_contexts.append(context_models[0].get_contexts(model, higher_context, super_task_data))
+
+        # Sample validation data points
+        val_dataset = get_data(task_family, args)
+
+        # Get meta_loss
+        meta_loss = []
+        for i_super_task, super_task_data in enumerate(val_dataset):
+            higher_context = higher_contexts[i_super_task]
+
+            for i_data, data in enumerate(super_task_data):
+                lower_context = lower_contexts[i_super_task][i_data]
+                input, target = data
+                pred = model(input, lower_context, higher_context)
+                meta_loss.append(F.mse_loss(pred, target))
+        meta_loss = sum(meta_loss) / float(len(meta_loss))
+
         meta_optimizer.zero_grad()
-        meta_loss, higher_contexts = algorithm.get_meta_loss(model, task_family, args, log, tb_writer, iteration) 
         meta_loss.backward()
         meta_optimizer.step()
 
@@ -74,37 +97,5 @@ def run(args, log, tb_writer):
             iteration, meta_loss.detach().cpu().numpy()))
         tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), iteration)
 
-        higher_contexts = torch.stack(higher_contexts).detach().cpu().numpy()
-        higher_contexts_pca = pca.fit_transform(higher_contexts)
-
-        # TODO Consider same PCA dimension
-        # TODO Consider also plotting lower context variable
-        for i_super_task, super_task in enumerate(task_family["train"].super_tasks):
-            x, y = higher_contexts_pca[i_super_task, :] 
-            plt.scatter(x, y, label=super_task)
-            print(x, y)
-        plt.legend()
-        plt.title("PCA_iteration" + str(iteration))
-        plt.xlim([-1., 1.])
-        plt.ylim([-1., 1])
-        plt.savefig(
-            "logs/n_inner" + str(args.n_inner) + "/pca_iteration" + str(iteration).zfill(3) + ".png")
-        plt.close()
-
-
-def vis_prediction(model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
-    # Create directories
-    if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
-        os.makedirs("./logs/n_inner" + str(args.n_inner))
-
-    outputs = model(inputs, lower_context, higher_context).detach().cpu().numpy()
-    targets = task_function(inputs).detach().cpu().numpy()
-
-    plt.figure()
-    plt.scatter(inputs, outputs, label="pred")
-    plt.scatter(inputs, targets, label="gt")
-    plt.legend()
-    plt.title(super_task + "_iteration" + str(iteration))
-
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
-    plt.close()
+        # # Visualize result
+        # vis_pca(higher_contexts, task_family, iteration, args)

@@ -1,11 +1,10 @@
 import logging
-import hashlib
 import os
-import pickle
 import random
-
-import numpy as np
 import torch
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 
 #################################################################################
@@ -53,25 +52,41 @@ def set_seed(seed, cudnn=True):
         torch.backends.cudnn.deterministic = True
 
 
-def save_obj(obj, name):
-    with open(name + '.pkl', 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+#################################################################################
+# VISUALIZATION
+#################################################################################
+def vis_pca(higher_contexts, task_family, iteration, args):
+    pca = PCA(n_components=2)
+    higher_contexts = torch.stack(higher_contexts).detach().cpu().numpy()
+    higher_contexts_pca = pca.fit_transform(higher_contexts)
+
+    # TODO Consider same PCA dimension
+    # TODO Consider also plotting lower context variable
+    for i_super_task, super_task in enumerate(task_family["train"].super_tasks):
+        x, y = higher_contexts_pca[i_super_task, :] 
+        plt.scatter(x, y, label=super_task)
+        print(x, y)
+    plt.legend()
+    plt.title("PCA_iteration" + str(iteration))
+    plt.xlim([-1., 1.])
+    plt.ylim([-1., 1])
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/pca_iteration" + str(iteration).zfill(3) + ".png")
+    plt.close()
 
 
-def load_obj(name):
-    with open(name + '.pkl', 'rb') as f:
-        return pickle.load(f)
+def vis_prediction(model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
+    # Create directories
+    if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
+        os.makedirs("./logs/n_inner" + str(args.n_inner))
 
+    outputs = model(inputs, lower_context, higher_context).detach().cpu().numpy()
+    targets = task_function(inputs).detach().cpu().numpy()
 
-def get_path_from_args(args):
-    """ Returns a unique hash for an argparse object. """
-    args_str = str(args)
-    path = hashlib.md5(args_str.encode()).hexdigest()
-    return path
+    plt.figure()
+    plt.scatter(inputs, outputs, label="pred")
+    plt.scatter(inputs, targets, label="gt")
+    plt.legend()
+    plt.title(super_task + "_iteration" + str(iteration))
 
-
-def get_base_path():
-    p = os.path.dirname(os.path.realpath(__file__))
-    if os.path.exists(p):
-        return p
-    raise RuntimeError('I dont know where I am; please specify a path for saving results.')
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
+    plt.close()
