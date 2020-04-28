@@ -6,7 +6,55 @@ from torch.nn import Parameter
 from torch.nn import init
 import IPython
 
-class Active_Weight(nn.Module):
+
+class Multiplicative_Weight(nn.Module):
+    def __init__(self, n_input, n_output, n_context, gain_active=1, gain_passive=1, passive=True):  # n_bottleneck
+        super().__init__()
+
+        self.n_input = n_input
+        self.n_output = n_output
+        self.w_passive, self.b_passive = 0, 0
+
+        if passive:
+            w0, b0 = self.initialize(n_input, n_output, gain_passive)
+            self.w0        = Parameter(w0)
+            self.b0        = Parameter(w0)
+            
+            w, b = self.initialize(n_input, n_output, gain_passive)
+            self.w_passive = Parameter(w.view(-1))
+            self.b_passive = Parameter(b)
+
+        if n_context > 0:
+            w_all, b_all = [], []
+            for i in range(n_context):
+                w, b = self.initialize(n_input, n_output, gain_active)
+                w_all.append(w)
+                b_all.append(b)
+            self.w_active = Parameter(torch.stack(w_all, dim=2).view(-1, n_context))
+            self.b_active = Parameter(torch.stack(b_all, dim=1))
+
+    def initialize(self, in_features, out_features, gain):
+        weight = torch.Tensor(out_features, in_features)
+        bias = torch.Tensor(out_features)
+        self.reset_parameters(weight, bias)
+        return gain * weight, gain * bias
+    
+    def reset_parameters(self, weight, bias=None):
+        init.kaiming_uniform_(weight, a=math.sqrt(5))
+        if bias is not None:
+            fan_in, _ = init._calculate_fan_in_and_fan_out(weight)
+            bound = 1 / math.sqrt(fan_in)
+            init.uniform_(bias, -bound, bound)
+            
+    def forward(self, context):
+        o_w = F.sigmoid(F.linear(context, self.w_active, self.w_passive).view(batch_size, self.n_output, self.n_input))
+        o_b = F.sigmoid(F.linear(context, self.b_active, self.b_passive).view(batch_size, self.n_output))
+        weight = self.w0 * o_w
+        bias   = self.b0 * o_b
+        return weight, bias
+
+    
+class Additive_Weight(nn.Module):
     def __init__(self, n_input, n_output, n_context, gain_active=1, gain_passive=1, passive=True):  # n_bottleneck
         super().__init__()
 
@@ -54,9 +102,14 @@ class Active_Weight(nn.Module):
 
 
 class Linear_Active(nn.Module):
-    def __init__(self, n_input, n_output, n_context, gain_w, gain_b, passive): 
+    def __init__(self, mode_type, n_input, n_output, n_context, gain_w, gain_b, passive): 
         super().__init__()
-        self.active_weight = Active_Weight(n_input, n_output, n_context, gain_w, gain_b, passive)
+        if mode_type == 'additive':
+            Modulation_fnc = Additive_Weight
+        elif mode_type == 'multiplicative':
+            Modulation_fnc = Multiplicative_Weight
+            
+        self.active_weight = Modulation_fnc(n_input, n_output, n_context, gain_w, gain_b, passive)
         
     def forward(self, x, context):
         weight, bias = self.active_weight(context)
@@ -71,7 +124,7 @@ class Linear_Active(nn.Module):
 
 
 class Model_Active(nn.Module):
-    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
+    def __init__(self, mode_type, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
         super().__init__()
         if device:
             self.device = device
@@ -87,7 +140,7 @@ class Model_Active(nn.Module):
         module_list = []
         for i in range(self.depth):
             module_list.append(
-                Linear_Active(n_arch[i], n_arch[i + 1], n_context, gain_w, gain_b, passive))
+                Linear_Active(mode_type, n_arch[i], n_arch[i + 1], n_context, gain_w, gain_b, passive))
 
         self.module_list = nn.ModuleList(module_list)
 
