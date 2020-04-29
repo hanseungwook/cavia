@@ -11,7 +11,6 @@ def get_model_type(model_type):
 
     if model_type == "CAVIA":
         MODEL = Cavia
-        n_arch[0] += n_context * args.n_context_models
     elif model_type == "ADDITIVE":
         MODEL = Model_Additive
     elif model_type == "MULTIPLICATIVE":
