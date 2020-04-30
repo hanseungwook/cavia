@@ -6,12 +6,6 @@ from model.models_huh import get_model_type
 from functools import partial
 
 
-### Each 'task' object is assumed to have built-in sample() methods, which returns a 'list of subtasks':
-# lv 2: task = supertask-set,     subtasks  = supertasks
-# lv 1: task = supertask,         subtasks  = tasks (functions)
-# lv 0: task = task (function),   subtasks  = (input, output) data-points
-
-
 def get_base_model(args):
     MODEL_TYPE = get_model_type(args.model_type)
     model = MODEL_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
@@ -38,6 +32,12 @@ def run(args, log, tb_writer=[]):
 
 ##############################################################################
 #  Task Hierarchy
+
+### Each 'task' object is assumed to have built-in sample() methods, which returns a 'list of subtasks':
+# lv 2: task = supertask-set,     subtasks  = supertasks
+# lv 1: task = supertask,         subtasks  = tasks (functions)
+# lv 0: task = task (function),   subtasks  = (input, output) data-points
+
 def get_toy_task(args):    # example hierarhical task
     fnc = poly_fnc  
     task = Example_Hierarchical_Task(fnc, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
@@ -77,16 +77,16 @@ def make_hierarhical_model(model, n_contexts, n_iters, lrs):
 
 
 class Hierarchical_Model(nn.Module):
-    def __init__(self, submodel, n_context, n_iter, lr, adaptation_type = 'optimize', logger = None):
+    def __init__(self, submodel, n_context, n_iter, lr, adaptation_type):
         super().__init__()
         assert hasattr(submodel, 'evaluate')    # submodel has evaluate() method built-in
-        self.submodel = submodel             
-        self.adaptation_type = adaptation_type
+        self.submodel  = submodel             
         self.n_context = n_context
         self.n_iter    = n_iter
         self.lr        = lr
         self.logger    = logger 
         self.device    = submodel.device
+        self.adaptation_type = adaptation_type
         # self.ctx       = None
         self.reset_ctx()
 
@@ -159,45 +159,4 @@ class Logger():
         if iter % self.update_iter:
             self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
             self.tb_writer.add_scalar("Meta loss:", loss, iter)
-
-#########################################
-# Pseudo-code
- 
-# def evaluate(level = 0, tasks = datapoints = [datapoint_i])       : fit each datapoint  (for given function)
-# return loss = F.mse_loss(datapoints)  
-
-# def optimize(level = 0):
-#     for loop:
-#         loss = evaluate(level = 0)
-#         backward_step()
-
-
-# def evaluate(level = 1,  tasks = fncs = [fnc_i])                : fit each function  (for given function_type e.g. 'sinusoid')
-# for fnc_i in tasks:
-#     sample train_datapoints_i, test_datapoints_i
-#     phi0_i = optimize(level = 0,  task = train_datapoints_i)     # optimize phi0_i   
-#     loss_i = evaluate(level = 0,  task = test_datapoints_i)      # using    phi0_i  
-# return sum(loss_i)
-
-# def optimize(level = 1, task):
-#     for loop:
-#         loss = evaluate(level = 1, task)
-#         backward_step()
-
-# def evaluate(level = 2, tasks = fnc_types = [fnc_type_i])       : fit each function_type  (e.g. 'sinusoid')
-# for fnc_type_i in tasks:
-#     sample train_fncs_i, test_datapoints_i
-#     phi1_i = optimize(level = 1,  task = train_fncs_i)       # optimize phi1_i   
-#     loss_i = evaluate(level = 1,  task = test_fncs_i)        # using    phi1_i  
-# return sum(loss_i)
-
-# def optimize(level = 2,  task = ALL_TASK):      # ALL_TASK = [function_types]
-#     for loop:
-#         loss = evaluate(level = 2, task)  # 1 task
-#         backward_step()
-
-# theta = optimize(level = 2,  tasks = [function_types])       # optimize theta = phi2 
-
-
-
 
