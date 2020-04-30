@@ -25,44 +25,37 @@ def get_model_type(model_type):
 
 class BaseModel(nn.Module):
     """     Feed-forward neural network with context    """
-    def __init__(self, FC_module, n_arch, n_level, n_context, nonlin,  device):
+    def __init__(self, n_arch, n_context, nonlin, loss_fnc, device, FC_module):
         super().__init__()
 
-        if device:
-            self.device = device
-        else:
-            self.device = 'cpu'
-
-        self.n_level = n_level  
-        self.ctx = [None] * n_level         # Context parameters     # NOTE that these are *not* registered parameters of the model
-        self.n_context = n_context
-        assert len(n_context) == n_level
-
-        # Fully connected layers
-        self.module_list = nn.ModuleList()
-        for k in range(len(n_arch) - 1):
-            self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]))
-
+        self.device = device if device is not None else 'cpu'
+        self.n_context = n_context #sum(n_context)  # Concatenate all high-level ctx into one. 
         self.nonlin = nonlin
+        self.loss_fnc = loss_fnc
+        self.n_arch = n_arch
+        
+        self.module_list = nn.ModuleList()
+        for i in range(len(n_arch) - 1):
+            self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]))    # Fully connected layers
 
-    def reset_context(self, level):
-        self.ctx[level] = torch.zeros(1,self.n_context[level], requires_grad = True).to(self.device)
-
+    def evaluate(self, data, ctx):
+        inputs, targets = data
+        outputs = self.forward(inputs, ctx)
+        return self.loss_fnc(outputs, targets)
 
 ######################################
 
 class Cavia(BaseModel):
-    def __init__(self, n_arch, n_level, n_context, nonlin=nn.ReLU(),  device = None):
-        super().__init__(n_arch, n_level, n_context, nonlin, device, FC_module = nn.Linear)
+    def __init__(self, n_arch, n_context, nonlin=nn.ReLU(), loss_fnc = nn.MSELoss(), device = None):
+
+        n_arch[0] += n_context  # add n_context to n_input 
+
+        super().__init__(n_arch, n_context, nonlin, loss_fnc, device, FC_module = nn.Linear)
 
 
-    def preprocess(self, x):       # Concatenate input with context
-        ctx = torch.cat(self.ctx, dim=1) 
-        x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)
-        return x
-
-    def forward(self, x):
-        x = self.preprocess(x)
+    def forward(self, x, ctx_list):
+        ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
+        x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
         for i, module in enumerate(self.module_list):
             x = module(x)
             if i < len(self.module_list) - 1:  
@@ -72,7 +65,7 @@ class Cavia(BaseModel):
 ######################################
 
 class Model_Active(BaseModel):
-    def __init__(self, n_arch, n_level, n_context, weight_type, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
+    def __init__(self, n_arch, n_context, weight_type, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), loss_fnc = nn.MSELoss(), passive=True, device=None): 
         if weight_type == 'additive':
             active_weight = Additive_Weight
         elif weight_type == 'multiplicative':
@@ -80,12 +73,12 @@ class Model_Active(BaseModel):
         elif weight_type == 'add_multiplicative':
             active_weight = Add_Multive_Weight
 
-        Linear_Active_ = partial(Linear_Active, active_weight = active_weight, n_context = n_context, gain_w = gain_w, gain_b = gain_b, passive = passive))
-        super().__init__(n_arch, n_level, n_context, nonlin, device, FC_module = Linear_Active_)
+        Linear_Active_ = partial(Linear_Active, active_weight = active_weight, n_context = n_context, gain_w = gain_w, gain_b = gain_b, passive = passive)
+        super().__init__(n_arch, n_context, nonlin, loss_fnc, device, FC_module = Linear_Active_)
 
 
-    def forward(self, x):
-        ctx = torch.cat(self.ctx, dim=1) 
+    def forward(self, x, ctx_list):
+        ctx = torch.cat(ctx_list, dim=1) 
 
         for i, module in enumerate(self.module_list):
             x = module(x, ctx)
@@ -93,7 +86,7 @@ class Model_Active(BaseModel):
                 x = self.nonlin(x)
         return x
 
-        
+
 
 class Model_Additive(Model_Active):
     def __init__(self, n_arch, n_level, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
