@@ -47,7 +47,7 @@ def parse_args():
     # Set args log name
     args.log_name = \
         "iter::%s_lr::%sn_batch::%s_n_ctx::%s_prefix::%s" % (
-            args.n_iters, args.lrs, args.n_batch_trains, len(args.n_contexts), args.prefix)
+            args.n_iters, args.lrs, args.n_batch_train, len(args.n_contexts), args.prefix)
     # args.log_name = \
     #     "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
     #         args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models, args.prefix)

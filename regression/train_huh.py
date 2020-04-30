@@ -13,11 +13,8 @@ from functools import partial
 
 
 def get_base_model(args):
-    n_arch = args.architecture
-    n_context = sum(args.n_contexts)  #args.n_context_params
-
     MODEL_TYPE = get_model_type(args.model_type)
-    model = MODEL_TYPE( n_arch=n_arch, n_context=n_context, device=args.device).to(args.device)
+    model = MODEL_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
     return model
 
 
@@ -122,7 +119,7 @@ class Hierarchical_Model(nn.Module):
             optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
 
 
-    def forward(self, input, ctx_high = []]):                                        # assuming ctx is optimized over training tasks already
+    def forward(self, input, ctx_high = []):                                        # assuming ctx is optimized over training tasks already
         return self.submodel(input, ctx_high + [self.ctx])            
 
 
