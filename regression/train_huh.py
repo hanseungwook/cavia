@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.optim import Adam, SGD
 from model.models_huh import get_model_type
 from functools import partial
+from inspect import signature
 
 
 def get_base_model(args):
@@ -13,14 +14,25 @@ def get_base_model(args):
 
 
 def run(args, log, tb_writer=[]):
-    task = get_toy_task(args)       # implement a hierarchical task here
     base_model = get_base_model(args)
-    model = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1])
+    base_task  = toy_base_task
 
-    optim = Adam(model.parameters(), args.lrs[-1])
+    model = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1])
+    task  = Hierarchical_Task(base_task, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
+
     logger = Logger(log, tb_writer, args.log_name, args.log_interval)
 
-    for iter in range(args.n_iters[-1]): 
+    train(model, task, args.n_iters[-1], args.lrs[-1], logger)     # Train
+
+    test_loss = model.evaluate( task.sample('test') )              # Test
+    return test_loss
+
+
+def train(model, task, n_iter, lr, logger):
+    
+    optim = Adam(model.parameters(), lr)
+
+    for iter in range(n_iter): 
         loss = model.evaluate( task.sample('train') )
         optim.zero_grad()
         loss.backward()
@@ -32,38 +44,34 @@ def run(args, log, tb_writer=[]):
 
 ##############################################################################
 #  Task Hierarchy
+#  A 'task' has built-in sample() method, which returns a 'list of subtasks', and so on..
+# 
+#                                              super-duper-task (base_task)        f(., ., .)  
+# lv 2: task = super-duper-task,   subtasks  = super-tasks                        [f(., ., b)]
+# lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., a, b)]
+# lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, a, b)]
 
-### Each 'task' object is assumed to have built-in sample() methods, which returns a 'list of subtasks':
-# lv 2: task = supertask-set,     subtasks  = supertasks
-# lv 1: task = supertask,         subtasks  = tasks (functions)
-# lv 0: task = task (function),   subtasks  = (input, output) data-points
-
-def get_toy_task(args):    # example hierarhical task
-    fnc = poly_fnc  
-    task = Example_Hierarchical_Task(fnc, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-    return task
-
-
-class Example_Hierarchical_Task():
-    def __init__(self, fnc,  *n_batch_all):
+class Hierarchical_Task():                      # Top-down hierarchy
+    def __init__(self, base_task,  *n_batch_all):
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
+        assert len(n_batch_train) == len(signature(base_task).parameters)   # base_task should take correct number of inputs
+        self.base_task = base_task
         self.n_batch = {'train': n_batch_train[0], 'test': n_batch_test[0], 'valid': n_batch_valid[0]}
         self.n_batch_next =     (n_batch_train[1:],        n_batch_test[1:],         n_batch_valid[1:])
-        self.f = fnc
     
     def sample(self, sample_type):
         n_batch = self.n_batch[sample_type]
 
-        if len(self.n_batch_next[0]) == 0:   # sample datapoints
-            x = torch.randn(n_batch, 1)
-            y = self.f(x)
-            return [x, y]                    # return a list of datapoints [inputs, targets]
-        else:                                # sample the subtask (recursive call on the class)
+        if len(self.n_batch_next[0]) == 0:      # sample datapoints
+            inputs = torch.randn(n_batch, 1)
+            targets = self.base_task(inputs)
+            return [inputs, targets]            # return a list of datapoints [inputs, targets]
+        else:                                   # sample the subtask (recursive call on the class)
             params = torch.randn(n_batch)
-            return [__class__(partial(self.f,par), *self.n_batch_next) for par in params]   # return a list of subtasks
+            return [__class__(partial(self.base_task, par), *self.n_batch_next) for par in params]   # return a list of subtasks
 
 
-def poly_fnc(x,a,b):
+def toy_base_task(x,a,b):
     return a + b * x
 
 
@@ -76,7 +84,7 @@ def make_hierarhical_model(model, n_contexts, n_iters, lrs):
     return model
 
 
-class Hierarchical_Model(nn.Module):
+class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
     def __init__(self, submodel, n_context, n_iter, lr, adaptation_type):
         super().__init__()
         assert hasattr(submodel, 'evaluate')    # submodel has evaluate() method built-in
@@ -84,10 +92,10 @@ class Hierarchical_Model(nn.Module):
         self.n_context = n_context
         self.n_iter    = n_iter
         self.lr        = lr
-        self.logger    = logger 
+        # self.logger    = logger 
         self.device    = submodel.device
         self.adaptation_type = adaptation_type
-        # self.ctx       = None
+
         self.reset_ctx()
 
     def reset_ctx(self):
