@@ -6,6 +6,9 @@ from torch.nn import Parameter
 from torch.nn import init
 from functools import partial
 
+def get_encoder_type(model_type):
+    raise NotImplementedError()
+    # return ENCODER
 
 def get_model_type(model_type):
 

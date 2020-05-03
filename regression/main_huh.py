@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # Set log
     log = set_log(args)
-    tb_writer = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
+    tb_writer = [] #SummaryWriter('./logs/tb_{0}'.format(args.log_name))
 
     # Set seed
     set_seed(args.seed)

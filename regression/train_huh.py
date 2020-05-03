@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam, SGD
-from model.models_huh import get_model_type
+from model.models_huh import get_model_type, get_encoder_type
 from functools import partial
 from inspect import signature
 
@@ -12,20 +12,31 @@ def get_base_model(args):
     model = MODEL_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
     return model
 
+def get_encoder_model(encoder_types):
+    encoders = []
+    for encoder_type in encoder_types:
+        if encoder_type is None:
+            encoders.append(None)
+        else:
+            raise NotImplementedError()
+            ENCODER_TYPE = get_encoder_type(args.model_type)
+            encoder_model = ENCODER_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
+            encoders.append(encoder_model)
+    return encoders
+
 
 def run(args, log, tb_writer=[]):
     base_model = get_base_model(args)
     base_task  = toy_base_task
+    encoder_models = get_encoder_model(args.encoders)
 
-    model = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1])
+    model = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
     task  = Hierarchical_Task(base_task, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-
     logger = Logger(log, tb_writer, args.log_name, args.log_interval)
 
     train(model, task, args.n_iters[-1], args.lrs[-1], logger)     # Train
-
     test_loss = model.evaluate( task.sample('test') )              # Test
-    return test_loss
+    return test_loss, logger
 
 
 def train(model, task, n_iter, lr, logger):
@@ -38,7 +49,7 @@ def train(model, task, n_iter, lr, logger):
         loss.backward()
         optim.step()
         # ------------ logging ------------
-        logger.update(iter, loss.detach().cpu().numpy())
+        # logger.update(iter, loss.detach().cpu().numpy())
         # vis_pca(higher_contexts, task_family, iteration, args)      ## Visualize result
 
 
@@ -56,17 +67,18 @@ class Hierarchical_Task():                      # Top-down hierarchy
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
         assert len(n_batch_train) == len(signature(base_task).parameters)   # base_task should take correct number of inputs
         self.base_task = base_task
-        self.n_batch = {'train': n_batch_train[0], 'test': n_batch_test[0], 'valid': n_batch_valid[0]}
-        self.n_batch_next =     (n_batch_train[1:],        n_batch_test[1:],         n_batch_valid[1:])
+        self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
+        self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
+        self.level = len(self.n_batch_next[0])
     
     def sample(self, sample_type):
         n_batch = self.n_batch[sample_type]
 
-        if len(self.n_batch_next[0]) == 0:      # sample datapoints
+        if self.level == 0:                     # sample datapoints for the bottom level   [inputs, targets]
             inputs = torch.randn(n_batch, 1)
             targets = self.base_task(inputs)
-            return [inputs, targets]            # return a list of datapoints [inputs, targets]
-        else:                                   # sample the subtask (recursive call on the class)
+            return [inputs, targets]            
+        else:                                   # sample subtasks for higher levels
             params = torch.randn(n_batch)
             return [__class__(partial(self.base_task, par), *self.n_batch_next) for par in params]   # return a list of subtasks
 
@@ -78,43 +90,36 @@ def toy_base_task(x,a,b):
 ##############################################################################
 #  Model Hierarchy
 
-def make_hierarhical_model(model, n_contexts, n_iters, lrs):
-    for n_context, n_iter, lr in zip(n_contexts, n_iters, lrs):
-        model = Hierarchical_Model(model, n_context, n_iter, lr, adaptation_type = 'optimize') 
+def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders):
+    for level, (n_context, n_iter, lr, encoder) in enumerate(zip(n_contexts, n_iters, lrs, encoders)):
+        model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder) #, adaptation_type) 
     return model
 
 
 class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, submodel, n_context, n_iter, lr, adaptation_type):
+    def __init__(self, decoder_model, level, n_context, n_iter, lr, encoder_model = None): 
         super().__init__()
-        assert hasattr(submodel, 'evaluate')    # submodel has evaluate() method built-in
-        self.submodel  = submodel             
+        assert hasattr  (decoder_model, 'evaluate')    # submodel has evaluate() method built-in
+        self.submodel  = decoder_model 
+        self.level     = level                  # could be useful for debugging/experimenting
         self.n_context = n_context
         self.n_iter    = n_iter
         self.lr        = lr
-        # self.logger    = logger 
-        self.device    = submodel.device
-        self.adaptation_type = adaptation_type
+        self.device    = decoder_model.device
 
+        self.adaptation = self.optimize if encoder_model is None else encoder_model 
         self.reset_ctx()
 
     def reset_ctx(self):
         self.ctx = torch.zeros(1,self.n_context, requires_grad = True).to(self.device)
 
-
     def evaluate(self, tasks, ctx_high = []):
-        loss = 0                 
+        assert self.level == tasks[0].level                                               # checking if the model level matches with task level
+        loss = 0 
         for task in tasks:
             self.adaptation(task.sample('train'), ctx_high)                                # adapt self.ctx  given high-level ctx 
             loss += self.submodel.evaluate(task.sample('test'), ctx_high + [self.ctx])     # going 1 level down
         return loss / float(len(tasks))  
-
-
-    def adaptation(self, tasks, ctx_high):      
-        if self.adaptation_type == 'optimize':
-            self.optimize(tasks, ctx_high)
-        # elif self.adaptation_type == 'model_based':
-        #     self.encoder_network (tasks, ctx_high)   # to be implemented
 
     def optimize(self, tasks, ctx_high):                            # optimize parameter for a given 'task'
         self.reset_ctx()
@@ -165,6 +170,7 @@ class Logger():
         self.update_iter = update_iter
     def update(self, iter, loss):
         if iter % self.update_iter:
+            
             self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
             self.tb_writer.add_scalar("Meta loss:", loss, iter)
 
