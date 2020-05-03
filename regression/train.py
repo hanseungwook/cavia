@@ -1,5 +1,6 @@
 import torch.optim as optim
 import torch.nn.functional as F
+from utils import vis_pca
 
 
 def get_task_family(args):
@@ -91,9 +92,9 @@ def run(args, log, tb_writer):
         for i_super_task, super_task in enumerate(val_data):
             higher_context = higher_contexts[i_super_task]
 
-            for i_sub_task, sub_task in enumerate(super_task):
-                lower_context = lower_contexts[i_super_task][i_sub_task]
-                input, target = sub_task
+            for i_task, task in enumerate(super_task):
+                lower_context = lower_contexts[i_super_task][i_task]
+                input, target = task
                 pred = model(input, lower_context, higher_context)
                 meta_loss.append(F.mse_loss(pred, target))
         meta_loss = sum(meta_loss) / float(len(meta_loss))
@@ -106,5 +107,5 @@ def run(args, log, tb_writer):
             iteration, meta_loss.detach().cpu().numpy()))
         tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), iteration)
 
-        # # Visualize result
-        # vis_pca(higher_contexts, task_family, iteration, args)
+        # Visualize result
+        vis_pca(higher_contexts, lower_contexts, task_family, iteration, args)

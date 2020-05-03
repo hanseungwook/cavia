@@ -29,6 +29,6 @@ do
     --k-meta-train 5 \
     --k-meta-test 5 \
     --n-context-models 2 \
-    --n-inner 5 \
+    --n-inner 3 \
     --prefix ""
 done

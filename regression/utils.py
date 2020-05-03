@@ -55,17 +55,24 @@ def set_seed(seed, cudnn=True):
 #################################################################################
 # VISUALIZATION
 #################################################################################
-def vis_pca(higher_contexts, task_family, iteration, args):
-    pca = PCA(n_components=2)
-    higher_contexts = torch.stack(higher_contexts).detach().cpu().numpy()
-    higher_contexts_pca = pca.fit_transform(higher_contexts)
+def vis_pca(higher_contexts, lower_contexts, task_family, iteration, args):
+    # Create directories
+    if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
+        os.makedirs("./logs/n_inner" + str(args.n_inner))
 
     # TODO Consider same PCA dimension
-    # TODO Consider also plotting lower context variable
-    for i_super_task, super_task in enumerate(task_family["train"].super_tasks):
-        x, y = higher_contexts_pca[i_super_task, :] 
-        plt.scatter(x, y, label=super_task)
-        print(x, y)
+    pca = PCA(n_components=2)
+
+    contexts = torch.stack(higher_contexts).detach().cpu().numpy()
+    for lower_contexts_ in lower_contexts:
+        lower_contexts_ = torch.stack(lower_contexts_).detach().cpu().numpy()
+        contexts = np.concatenate((contexts, lower_contexts_))
+    contexts = pca.fit_transform(contexts)
+
+    for i_context in range(contexts.shape[0]):
+        x, y = contexts[i_context, :] 
+        plt.scatter(x, y)
+
     plt.legend()
     plt.title("PCA_iteration" + str(iteration))
     plt.xlim([-1., 1.])
