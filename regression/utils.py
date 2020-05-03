@@ -4,6 +4,7 @@ import random
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.decomposition import PCA
 
 
@@ -60,6 +61,13 @@ def vis_pca(higher_contexts, lower_contexts, task_family, iteration, args):
     if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
         os.makedirs("./logs/n_inner" + str(args.n_inner))
 
+    # Set color for visualization
+    colors = [
+        sns.color_palette("hls", 8)[0],
+        sns.color_palette("hls", 8)[2],
+        sns.color_palette("hls", 8)[5],
+        sns.color_palette("hls", 8)[7]] 
+
     # TODO Consider same PCA dimension
     pca = PCA(n_components=2)
 
@@ -68,15 +76,25 @@ def vis_pca(higher_contexts, lower_contexts, task_family, iteration, args):
         lower_contexts_ = torch.stack(lower_contexts_).detach().cpu().numpy()
         contexts = np.concatenate((contexts, lower_contexts_))
     contexts = pca.fit_transform(contexts)
+    higher_contexts = contexts[0:4, :]
+    lower_contexts = contexts[4:, :]
 
-    for i_context in range(contexts.shape[0]):
-        x, y = contexts[i_context, :] 
-        plt.scatter(x, y)
+    # Visualize higher contexts
+    for i_super_task in range(4):
+        x, y = higher_contexts[i_super_task, :] 
+        plt.scatter(x, y, c=colors[i_super_task], s=65)
+
+    # Visualize lower contexts
+    for i_super_task in range(4):
+        for i_task in range(25):
+            i_context = i_super_task * 25 + i_task
+            x, y = lower_contexts[i_context, :] 
+            plt.scatter(x, y, c=colors[i_super_task], alpha=0.25, s=30)
 
     plt.legend()
     plt.title("PCA_iteration" + str(iteration))
-    plt.xlim([-1., 1.])
-    plt.ylim([-1., 1])
+    # plt.xlim([-1., 1.])
+    # plt.ylim([-1., 1])
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/pca_iteration" + str(iteration).zfill(3) + ".png")
     plt.close()
 
