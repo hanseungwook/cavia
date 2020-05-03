@@ -84,37 +84,7 @@ class MixutureRegressionTasks(object):
 
         return target_functions
 
-    def sample_tasks_onehot(self, num_tasks, batch_size):
-        raise NotImplementedError()
-
-    def sample_datapoints(self, batch_size):
-        """
-        Sample random input/output pairs (e.g. for training an orcale)
-        :param batch_size:
-        :return:
-        """
-        raise NotImplementedError()
-
-        amplitudes = torch.Tensor(np.random.uniform(self.amplitude_range[0], self.amplitude_range[1], batch_size))
-        phases = torch.Tensor(np.random.uniform(self.phase_range[0], self.phase_range[1], batch_size))
-
-        inputs = torch.rand((batch_size, self.num_inputs))
-        inputs = inputs * (self.input_range[1] - self.input_range[0]) + self.input_range[0]
-        inputs = inputs.view(-1)
-
-        outputs = torch.sin(inputs - phases) * amplitudes
-        outputs = outputs.unsqueeze(1)
-
-        return torch.stack((inputs, amplitudes, phases)).t(), outputs
-
-    def get_input_range(self, size=100):
-        raise NotImplementedError()
-        return torch.linspace(self.input_range[0], self.input_range[1], steps=size).unsqueeze(1)
-
     def sample_inputs(self, batch_size, *args, **kwargs):
         inputs = torch.rand((batch_size, self.num_inputs))
         inputs = inputs * (self.input_range[1] - self.input_range[0]) + self.input_range[0]
         return inputs
-
-    def sample_task(self):
-        raise NotImplementedError()
