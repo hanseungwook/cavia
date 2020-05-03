@@ -2,7 +2,7 @@ import arguments
 import train_huh
 import os
 from utils import set_log, set_seed
-# from tensorboardX import SummaryWriter
+from tensorboardX import SummaryWriter
 
 
 if __name__ == '__main__':
@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # Set log
     log = set_log(args)
-    tb_writer = [] #SummaryWriter('./logs/tb_{0}'.format(args.log_name))
+    tb_writer = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
 
     # Set seed
     set_seed(args.seed)

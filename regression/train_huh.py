@@ -49,7 +49,7 @@ def train(model, task, n_iter, lr, logger):
         loss.backward()
         optim.step()
         # ------------ logging ------------
-        # logger.update(iter, loss.detach().cpu().numpy())
+        logger.update(iter, loss.detach().cpu().numpy())
         # vis_pca(higher_contexts, task_family, iteration, args)      ## Visualize result
 
 
