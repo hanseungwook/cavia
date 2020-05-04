@@ -27,8 +27,8 @@ def get_encoder_model(encoder_types):
 
 
 def run(args, log, tb_writer=[]):
-    base_model = get_base_model(args)
-    base_task  = toy_base_task
+    base_model  = get_base_model(args)
+    base_task   = Base_Task()
     encoder_models = get_encoder_model(args.encoders)
 
     model = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
@@ -64,7 +64,7 @@ def train(model, task, n_iter, lr, logger):
 # lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
 
 class Hierarchical_Task():                      # Top-down hierarchy
-    def __init__(self, base_task,  *n_batch_all, task_idx=None):
+    def __init__(self, base_task, *n_batch_all, task_idx=None):
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
         assert len(n_batch_train) == len(signature(base_task).parameters)   # base_task should take correct number of inputs
         self.base_task = base_task(task_idx)
@@ -92,7 +92,7 @@ class Hierarchical_Task():                      # Top-down hierarchy
 ##############################################################################
 #  Base Task
 class Base_Task():
-    def __init__(self, task_idx):
+    def __init__(self, task_idx=None):
         self.task_fn = None
         self.task_idx = task_idx
         if self.task_idx is not None:
