@@ -27,16 +27,16 @@ def get_encoder_model(encoder_types):
 
 
 def run(args, log, tb_writer=[]):
-    base_model  = get_base_model(args)
-    base_task   = Base_Task()
-    encoder_models = get_encoder_model(args.encoders)
+    base_model      = get_base_model(args)
+    base_task       = Base_Task()
+    encoder_models  = get_encoder_model(args.encoders)
 
-    model = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
-    task  = Hierarchical_Task(base_task, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-    logger = Logger(log, tb_writer, args.log_name, args.log_interval)
+    model   = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
+    task    = Hierarchical_Task(base_task, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
+    logger  = Logger(log, tb_writer, args.log_name, args.log_interval)
 
     train(model, task, args.n_iters[-1], args.lrs[-1], logger)     # Train
-    test_loss = model.evaluate( task.sample('test') )              # Test
+    test_loss = model.evaluate( task.sample('test'))              # Test
     return test_loss, logger
 
 
