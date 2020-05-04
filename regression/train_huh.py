@@ -168,11 +168,6 @@ def get_cubic_function():
 
     return cubic_function
 
-
-def toy_base_task(x,a,b):
-    return a + b * x
-
-
 ##############################################################################
 #  Model Hierarchy
 
