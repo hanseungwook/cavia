@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam, SGD
+import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
 from functools import partial
 from inspect import signature
@@ -63,13 +64,15 @@ def train(model, task, n_iter, lr, logger):
 # lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, a, b)]
 
 class Hierarchical_Task():                      # Top-down hierarchy
-    def __init__(self, base_task,  *n_batch_all):
+    def __init__(self, base_task,  *n_batch_all, task_idx=None):
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
         assert len(n_batch_train) == len(signature(base_task).parameters)   # base_task should take correct number of inputs
-        self.base_task = base_task
+        self.base_task = base_task(task_idx)
         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
         self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
         self.level = len(self.n_batch_next[0])
+        self.n_super_tasks = 4
+        self.task_idx = task_idx
     
     def sample(self, sample_type):
         n_batch = self.n_batch[sample_type]
@@ -77,10 +80,93 @@ class Hierarchical_Task():                      # Top-down hierarchy
         if self.level == 0:                     # sample datapoints for the bottom level   [inputs, targets]
             inputs = torch.randn(n_batch, 1)
             targets = self.base_task(inputs)
-            return [inputs, targets]            
-        else:                                   # sample subtasks for higher levels
-            params = torch.randn(n_batch)
-            return [__class__(partial(self.base_task, par), *self.n_batch_next) for par in params]   # return a list of subtasks
+            return [inputs, targets]          
+        elif self.level == 1:                   # sample task functions        
+            return [self.__class__(self.base_task, *self.n_batch_next, task_idx=self.task_idx) for _ in range(n_batch)]   # return a list of subtasks
+        elif self.level == 2:                   # sample super-tasks
+            assert n_batch <= self.n_super_tasks
+            supertasks = np.random.choice(range(self.n_super_tasks), n_batch, replace=False)
+            
+            return [self.__class__(self.base_task, *self.n_batch_next, task_idx=supertask) for supertask in supertasks]   # return a list of subtasks
+
+##############################################################################
+#  Base Task
+class Base_Task():
+    def __init__(self, task_idx):
+        self.task_fn = None
+        self.task_idx = task_idx
+        if self.task_idx is not None:
+            self.task_fn = task_func(self.task_idx)
+    
+    def __call__(self, x):
+        assert self.task_fn is not None              # Task function has to be defined at this point
+        
+        return self.task_fn(x)
+
+def task_func(task_idx):
+    return {
+        '0': get_sin_function,
+        '1': get_linear_function,
+        '2': get_cubic_function,
+        '3': get_quadratic_function
+    }[task_idx]
+
+@staticmethod
+def get_sin_function():
+    # Define amp & phase
+    amplitude = np.random.uniform(0.1, 5.)
+    phase = np.random.uniform(0., np.pi)
+    def sin_function(x):
+        if isinstance(x, torch.Tensor):
+            return torch.sin(x - phase) * amplitude
+        else:
+            return np.sin(x - phase) * amplitude
+
+    return sin_function
+
+@staticmethod
+def get_linear_function():
+    slope = np.random.uniform(-3., 3.)
+    bias = np.random.uniform(-3., 3.)
+    def linear_function(x):
+        return slope * x + bias
+
+    return linear_function
+
+@staticmethod
+def get_quadratic_function():
+    slope1 = np.random.uniform(-0.2, 0.2)
+    slope2 = np.random.uniform(-2.0, 2.0)
+    bias = np.random.uniform(-3., 3.)
+    def quadratic_function(x):
+        if isinstance(x, torch.Tensor):
+            return slope1 * torch.pow(x, 2) + slope2 * x + bias
+        else:
+            return slope1 * np.squre(x, 2) + slope2 * x + bias
+
+    return quadratic_function
+
+@staticmethod
+def get_cubic_function():
+    slope1 = np.random.uniform(-0.1, 0.1)
+    slope2 = np.random.uniform(-0.2, 0.2)
+    slope3 = np.random.uniform(-2.0, 2.0)
+    bias = np.random.uniform(-3., 3.)
+    def cubic_function(x):
+        if isinstance(x, torch.Tensor):
+            return \
+                slope1 * torch.pow(x, 3) + \
+                slope2 * torch.pow(x, 2) + \
+                slope3 * x + \
+                bias
+        else:
+            return \
+                slope1 * np.power(x, 3) + \
+                slope2 * np.power(x, 2) + \
+                slope3 * x + \
+                bias
+
+    return cubic_function
 
 
 def toy_base_task(x,a,b):
