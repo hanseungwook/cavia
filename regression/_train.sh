@@ -22,13 +22,12 @@ cd $DIR
 for seed in {1..1}
 do
     python3.6 main.py \
-    --task mixture \
-    --model-type CAVIA \
-    --lr-inner 0.001 \
+    --task "mixture" \
+    --model-type "CAVIA" \
+    --lr-inner 0.03 \
     --lr-meta 0.001 \
-    --k-meta-train 5 \
-    --k-meta-test 5 \
-    --n-context-models 2 \
-    --n-inner 3 \
+    --n-sample 20 \
+    --n-context-models 1 \
+    --n-inner 5 \
     --prefix ""
 done

@@ -6,17 +6,14 @@ def parse_args():
     parser = argparse.ArgumentParser(description='CAVIA (Regression experiments)')
 
     parser.add_argument(
-        '--task', type=str, choices=["sine", "mixture"], 
-        default='mixture', help="Problem to solve")
+        '--task', type=str, choices=["sine", "mixture"], default='mixture', 
+        help="Problem to solve")
     parser.add_argument(
-        '--tasks-per-metaupdate', type=int, 
-        default=25, help="Number of tasks per meta-update")
+        '--tasks-per-metaupdate', type=int, default=25, 
+        help="Number of tasks per meta-update")
     parser.add_argument(
-        '--k-meta-train', type=int, default=10, 
-        help='data points in task training set (during meta training, inner loop)')
-    parser.add_argument(
-        '--k-meta-test', type=int, default=10, 
-        help='data points in task test set (during meta training, outer loop)')
+        '--n-sample', type=int, default=10, 
+        help='data points in task set')
     parser.add_argument(
         '--lr-inner', type=float, default=0.01,
         help='inner-loop learning rate (task-specific)')
@@ -33,16 +30,13 @@ def parse_args():
         '--n-context-models', type=int, default=2, 
         help='Numbers of context models (i.e., lower-level modules other than the highest module)')
     parser.add_argument(
-        '--architecture', type=int, nargs='+', 
-        default=[1, 40, 40, 1], help="Architecture of neural network")
+        '--architecture', type=int, nargs='+', default=[1, 40, 40, 1], 
+        help="Architecture of neural network")
     parser.add_argument(
         '--num_hidden_layers', type=int, nargs='+', default=[40, 40])
     parser.add_argument(
-        '--first_order', action='store_true', default=False, 
-        help='run first-order version')
-    parser.add_argument(
-        '--model-type', type=str, choices=["CAVIA"], 
-        default="CAVIA", help='model type: ACTIVE or CAVIA')
+        '--model-type', type=str, choices=["CAVIA"], default="CAVIA", 
+        help='model type: ACTIVE or CAVIA')
 
     parser.add_argument(
         '--seed', type=int, default=42)
@@ -60,7 +54,7 @@ def parse_args():
 
     # Set args log name
     args.log_name = \
-        "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
-            args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models, args.prefix)
+        "n_inner::%s_n_sample::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
+            args.n_inner, args.n_sample, args.lr_inner, args.n_context_models, args.prefix)
 
     return args

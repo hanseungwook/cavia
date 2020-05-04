@@ -1,6 +1,5 @@
-import torch.optim as optim
 import torch.nn.functional as F
-from utils import vis_pca
+from utils import vis_pca, vis_prediction
 
 
 def get_task_family(args):
@@ -14,22 +13,37 @@ def get_task_family(args):
 
 
 def get_model(args):
-    n_arch = args.architecture
-    n_context = args.n_context_params
-
     if args.model_type == "CAVIA":
         from model.cavia import Cavia
         MODEL = Cavia
-        n_arch[0] += n_context * args.n_context_models
+        n_arch = args.architecture
+        n_arch[0] += args.n_context_params * args.n_context_models
     else:
         raise ValueError()
         
     model = MODEL(
         n_arch=n_arch, 
-        n_context=n_context, 
-        device=args.device).to(args.device)
+        args=args).to(args.device)
 
     return model
+
+
+def get_context_model(args, log, tb_writer):
+    from algorithm.cavia_level1 import CaviaLevel1
+    from algorithm.cavia_level2 import CaviaLevel2
+
+    if args.n_context_models == 1:
+        context_models = [
+            CaviaLevel1(args, log, tb_writer)]
+
+    elif args.n_context_models == 2:
+        context_models = [
+            CaviaLevel1(args, log, tb_writer),
+            CaviaLevel2(args, log, tb_writer)]
+    else:
+        raise ValueError()
+
+    return context_models
 
 
 def get_data(task_family, args):
@@ -40,11 +54,11 @@ def get_data(task_family, args):
         task_functions = task_family.sample_tasks(super_task)
 
         for task_function in task_functions:
-            train_input = task_family.sample_inputs(args.k_meta_train).to(args.device)
+            train_input = task_family.sample_inputs(args.n_sample).to(args.device)
             train_target = task_function(train_input)
             train_super_task.append((train_input, train_target))
 
-            val_input = task_family.sample_inputs(args.k_meta_train).to(args.device)
+            val_input = task_family.sample_inputs(args.n_sample).to(args.device)
             val_target = task_function(val_input)
             val_super_task.append((val_input, val_target))
 
@@ -54,23 +68,31 @@ def get_data(task_family, args):
     return train_data, val_data
 
 
+def get_meta_loss(model, higher_contexts, lower_contexts, val_data):
+    meta_loss = []
+
+    for i_super_task, super_task in enumerate(val_data):
+        higher_context = higher_contexts[i_super_task]
+
+        for i_task, task in enumerate(super_task):
+            lower_context = lower_contexts[i_super_task][i_task]
+            input, target = task
+            pred = model(input, lower_context, higher_context)
+            meta_loss.append(F.mse_loss(pred, target))
+
+    meta_loss = sum(meta_loss) / float(len(meta_loss))
+    return meta_loss
+
+
 def run(args, log, tb_writer):
     # Set tasks
     task_family = get_task_family(args)
 
     # Set model that includes theta params
     model = get_model(args)
-    meta_optimizer = optim.Adam(model.parameters(), args.lr_meta)
 
     # Set context models
-    from algorithm.cavia_level1 import CaviaLevel1
-    context_models = [CaviaLevel1(args, log, tb_writer)]
-
-    if args.n_context_models == 2:
-        from algorithm.cavia_level2 import CaviaLevel2
-        context_models.append(CaviaLevel2(args, log, tb_writer))
-
-    assert len(context_models) == args.n_context_models
+    context_models = get_context_model(args, log, tb_writer)
 
     # Begin meta-train
     for iteration in range(2000):
@@ -79,7 +101,10 @@ def run(args, log, tb_writer):
 
         # Get higher contexts
         # Returns higher contexts for all super tasks
-        higher_contexts = context_models[-1].optimize(model, context_models, train_data)
+        if args.n_context_models == 1:
+            higher_contexts = [None for _ in range(len(task_family.super_tasks))]
+        else:
+            higher_contexts = context_models[-1].optimize(model, context_models, train_data)
 
         # Get lower contexts
         # Returns lower contexts for all super tasks and sub-tasks per super task
@@ -87,25 +112,13 @@ def run(args, log, tb_writer):
         for super_task, higher_context in zip(train_data, higher_contexts):
             lower_contexts.append(context_models[0].optimize(model, higher_context, super_task))
 
-        # Get meta_loss
-        meta_loss = []
-        for i_super_task, super_task in enumerate(val_data):
-            higher_context = higher_contexts[i_super_task]
+        # Optimize meta-parameter
+        meta_loss = get_meta_loss(model, higher_contexts, lower_contexts, val_data)
+        model.optimize(meta_loss)
 
-            for i_task, task in enumerate(super_task):
-                lower_context = lower_contexts[i_super_task][i_task]
-                input, target = task
-                pred = model(input, lower_context, higher_context)
-                meta_loss.append(F.mse_loss(pred, target))
-        meta_loss = sum(meta_loss) / float(len(meta_loss))
-
-        meta_optimizer.zero_grad()
-        meta_loss.backward()
-        meta_optimizer.step()
-
+        # Log result
         log[args.log_name].info("At iteration {}, meta-loss: {:.3f}".format(
             iteration, meta_loss.detach().cpu().numpy()))
         tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), iteration)
-
-        # Visualize result
         vis_pca(higher_contexts, lower_contexts, task_family, iteration, args)
+        vis_prediction(model, higher_contexts, lower_contexts, val_data, iteration, args)

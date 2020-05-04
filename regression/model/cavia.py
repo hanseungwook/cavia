@@ -1,28 +1,22 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
 import torch.nn.functional as F
 
 
 class Cavia(nn.Module):
-    """
-    Feed-forward neural network with context parameters.
-    """
-    def __init__(self, n_arch, n_context, device):
+    def __init__(self, n_arch, args):
         super(Cavia, self).__init__()
+        self.args = args
 
-        self.device = device
-
-        # Fully connected layers
         self.fc_layers = nn.ModuleList()
-        for k in range(len(n_arch) - 1):
-            self.fc_layers.append(nn.Linear(n_arch[k], n_arch[k + 1]))
+        for i_layer in range(len(n_arch) - 1):
+            self.fc_layers.append(nn.Linear(n_arch[i_layer], n_arch[i_layer + 1]))
 
-        # Context parameters 
-        # NOTE that these are *not* registered parameters of the model
-        self.n_context = n_context
+        self.optimizer = optim.Adam(self.parameters(), args.lr_meta)
 
     def reset_context(self):
-        context = torch.zeros(self.n_context).to(self.device)
+        context = torch.zeros(self.args.n_context_params).to(self.args.device)
         context.requires_grad = True
         return context
 
@@ -35,8 +29,14 @@ class Cavia(nn.Module):
             higher_context = higher_context.expand(x.shape[0], -1)
             x = torch.cat((x, lower_context, higher_context), dim=1)
 
-        for k in range(len(self.fc_layers) - 1):
-            x = F.relu(self.fc_layers[k](x))
+        # Perform prediction
+        for i_layer in range(len(self.fc_layers) - 1):
+            x = F.relu(self.fc_layers[i_layer](x))
         y = self.fc_layers[-1](x)
 
         return y
+
+    def optimize(self, loss):
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()

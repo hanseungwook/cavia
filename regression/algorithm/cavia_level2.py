@@ -32,5 +32,4 @@ class CaviaLevel2(Base):
                 higher_context = self.inner_update(model, context_models, higher_context, super_task)
             higher_contexts.append(higher_context)
 
-        assert len(higher_contexts) == len(train_data)
         return higher_contexts

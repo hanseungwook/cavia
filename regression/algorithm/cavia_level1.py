@@ -7,8 +7,8 @@ class CaviaLevel1(Base):
     def __init__(self, args, log, tb_writer):
         super(CaviaLevel1, self).__init__(args, log, tb_writer)
 
-    def inner_update(self, model, lower_context, higher_context, sub_task):
-        input, target = sub_task
+    def inner_update(self, model, lower_context, higher_context, task):
+        input, target = task
         pred = model(input, lower_context, higher_context)
         loss = F.mse_loss(pred, target)
 
@@ -19,10 +19,10 @@ class CaviaLevel1(Base):
 
     def optimize(self, model, higher_context, super_task):
         lower_contexts = []
-        for sub_task in super_task:
+        for task in super_task:
             lower_context = model.reset_context()
             for _ in range(self.args.n_inner):
-                lower_context = self.inner_update(model, lower_context, higher_context, sub_task)
+                lower_context = self.inner_update(model, lower_context, higher_context, task)
             lower_contexts.append(lower_context)
 
         assert len(lower_contexts) == len(super_task)

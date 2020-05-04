@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 
 
 #################################################################################
@@ -62,34 +63,31 @@ def vis_pca(higher_contexts, lower_contexts, task_family, iteration, args):
         os.makedirs("./logs/n_inner" + str(args.n_inner))
 
     # Set color for visualization
-    colors = [
-        sns.color_palette("hls", 8)[0],
-        sns.color_palette("hls", 8)[2],
-        sns.color_palette("hls", 8)[5],
-        sns.color_palette("hls", 8)[7]] 
+    n_super_task = len(task_family.super_tasks)
+    colors = []
+    for i_super_task in range(n_super_task):
+        colors.append(sns.color_palette("hls", n_super_task)[i_super_task])
 
-    # TODO Consider same PCA dimension
+    # Preprocess data
+    lower_contexts_ = []
+    for lower_context in lower_contexts:
+        lower_context = torch.stack(lower_context).detach().cpu().numpy()
+        lower_contexts_.append(lower_context)
+
+    contexts = np.vstack(lower_contexts_)
+    if args.n_context_models == 2:
+        raise NotImplementedError()
+        higher_contexts = torch.stack(higher_contexts).detach().cpu().numpy()
+        contexts = np.concatenate((contexts, higher_contexts))
+    # contexts = StandardScaler().fit_transform(contexts)
+
+    # Fit PCA
     pca = PCA(n_components=2)
-
-    contexts = torch.stack(higher_contexts).detach().cpu().numpy()
-    for lower_contexts_ in lower_contexts:
-        lower_contexts_ = torch.stack(lower_contexts_).detach().cpu().numpy()
-        contexts = np.concatenate((contexts, lower_contexts_))
     contexts = pca.fit_transform(contexts)
-    higher_contexts = contexts[0:4, :]
-    lower_contexts = contexts[4:, :]
-
-    # Visualize higher contexts
-    for i_super_task in range(4):
-        x, y = higher_contexts[i_super_task, :] 
-        plt.scatter(x, y, c=colors[i_super_task], s=65)
-
-    # Visualize lower contexts
-    for i_super_task in range(4):
+    for i_super_task, context in enumerate(np.split(contexts, n_super_task)):
         for i_task in range(25):
-            i_context = i_super_task * 25 + i_task
-            x, y = lower_contexts[i_context, :] 
-            plt.scatter(x, y, c=colors[i_super_task], alpha=0.25, s=30)
+            x, y = context[i_task, :] 
+            plt.scatter(x, y, c=colors[i_super_task], alpha=1.0, s=30)
 
     plt.legend()
     plt.title("PCA_iteration" + str(iteration))
@@ -99,19 +97,27 @@ def vis_pca(higher_contexts, lower_contexts, task_family, iteration, args):
     plt.close()
 
 
-def vis_prediction(model, lower_context, higher_context, inputs, task_function, super_task, iteration, args):
+def vis_prediction(model, higher_contexts, lower_contexts, val_data, iteration, args):
     # Create directories
     if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
         os.makedirs("./logs/n_inner" + str(args.n_inner))
 
-    outputs = model(inputs, lower_context, higher_context).detach().cpu().numpy()
-    targets = task_function(inputs).detach().cpu().numpy()
+    for i_super_task, super_task in enumerate(val_data):
+        higher_context = higher_contexts[i_super_task]
 
-    plt.figure()
-    plt.scatter(inputs, outputs, label="pred")
-    plt.scatter(inputs, targets, label="gt")
-    plt.legend()
-    plt.title(super_task + "_iteration" + str(iteration))
+        for i_task, task in enumerate(super_task):
+            lower_context = lower_contexts[i_super_task][i_task]
+            input, target = task
+            pred = model(input, lower_context, higher_context).detach().numpy()
+            break
 
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
-    plt.close()
+        plt.figure()
+        plt.scatter(input, pred, label="pred")
+        plt.scatter(input, target, label="gt")
+        plt.legend()
+        plt.title(str(i_super_task) + "_iteration" + str(iteration))
+
+        plt.savefig(
+            "logs/n_inner" + str(args.n_inner) + "/iteration" + 
+            str(iteration).zfill(3) + "_" + str(i_super_task) + ".png")
+        plt.close()
