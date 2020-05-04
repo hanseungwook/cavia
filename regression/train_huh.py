@@ -58,10 +58,10 @@ def train(model, task, n_iter, lr, logger):
 #  Task Hierarchy
 #  A 'task' has built-in sample() method, which returns a 'list of subtasks', and so on..
 # 
-#                                              super-duper-task (base_task)        f(., ., .)  
-# lv 2: task = super-duper-task,   subtasks  = super-tasks                        [f(., ., b)]
-# lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., a, b)]
-# lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, a, b)]
+#                                              super-duper-task (base_task)        f(., ., task_idx=None)  
+# lv 2: task = super-duper-task,   subtasks  = super-tasks                        [f(., ., task_idx=None)]
+# lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., ., task_idx)]
+# lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
 
 class Hierarchical_Task():                      # Top-down hierarchy
     def __init__(self, base_task,  *n_batch_all, task_idx=None):
