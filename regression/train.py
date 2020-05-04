@@ -1,5 +1,5 @@
 import torch.nn.functional as F
-from utils import vis_pca, vis_prediction
+from utils import vis_pca, vis_prediction, vis_context
 
 
 def get_task_family(args):
@@ -120,5 +120,7 @@ def run(args, log, tb_writer):
         log[args.log_name].info("At iteration {}, meta-loss: {:.3f}".format(
             iteration, meta_loss.detach().cpu().numpy()))
         tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), iteration)
-        vis_pca(higher_contexts, lower_contexts, task_family, iteration, args)
-        vis_prediction(model, higher_contexts, lower_contexts, val_data, iteration, args)
+        if iteration % 10 == 0:
+            vis_pca(higher_contexts, lower_contexts, task_family, iteration, args)
+            vis_prediction(model, higher_contexts, lower_contexts, val_data, iteration, args)
+            vis_context(lower_contexts, task_family, iteration, args)

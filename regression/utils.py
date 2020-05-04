@@ -85,7 +85,7 @@ def vis_pca(higher_contexts, lower_contexts, task_family, iteration, args):
     pca = PCA(n_components=2)
     contexts = pca.fit_transform(contexts)
     for i_super_task, context in enumerate(np.split(contexts, n_super_task)):
-        for i_task in range(25):
+        for i_task in range(args.tasks_per_metaupdate):
             x, y = context[i_task, :] 
             plt.scatter(x, y, c=colors[i_super_task], alpha=1.0, s=30)
 
@@ -121,3 +121,30 @@ def vis_prediction(model, higher_contexts, lower_contexts, val_data, iteration, 
             "logs/n_inner" + str(args.n_inner) + "/iteration" + 
             str(iteration).zfill(3) + "_" + str(i_super_task) + ".png")
         plt.close()
+
+
+def vis_context(lower_contexts, task_family, iteration, args):
+    # Create directories
+    if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
+        os.makedirs("./logs/n_inner" + str(args.n_inner))
+
+    # Set color for visualization
+    n_super_task = len(task_family.super_tasks)
+    assert n_super_task == 1, "Should be only sinusoidal task"
+
+    # Preprocess data
+    context = torch.stack(lower_contexts[0]).detach().cpu().numpy()
+
+    # Visualize
+    x, y = context[:, 0], context[:, 1]
+    plt.scatter(x, y, c=task_family.phases, s=30)
+    plt.colorbar()
+    plt.title("Context (phase) iteration" + str(iteration))
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_phase.png")
+    plt.close()
+
+    plt.scatter(x, y, c=task_family.amplitudes, s=30)
+    plt.colorbar()
+    plt.title("Context (amp) iteration" + str(iteration))
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_amp.png")
+    plt.close()
