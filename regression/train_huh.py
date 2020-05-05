@@ -66,8 +66,8 @@ def train(model, task, n_iter, lr, logger):
 class Hierarchical_Task():                      # Top-down hierarchy
     def __init__(self, base_task, *n_batch_all, task_idx=None):
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
-        assert len(n_batch_train) == len(signature(base_task).parameters)   # base_task should take correct number of inputs
-        self.base_task = base_task(task_idx)
+
+        self.base_task = base_task
         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
         self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
         self.level = len(self.n_batch_next[0])
@@ -79,10 +79,12 @@ class Hierarchical_Task():                      # Top-down hierarchy
 
         if self.level == 0:                     # sample datapoints for the bottom level   [inputs, targets]
             inputs = torch.randn(n_batch, 1)
-            targets = self.base_task(inputs)
+            targets = self.base_task(self.task_idx)(inputs)
             return [inputs, targets]          
+
         elif self.level == 1:                   # sample task functions        
             return [self.__class__(self.base_task, *self.n_batch_next, task_idx=self.task_idx) for _ in range(n_batch)]   # return a list of subtasks
+
         elif self.level == 2:                   # sample super-tasks
             assert n_batch <= self.n_super_tasks
             supertasks = np.random.choice(range(self.n_super_tasks), n_batch, replace=False)
@@ -95,27 +97,33 @@ class Base_Task():
     def __init__(self, task_idx=None):
         self.task_fn = None
         self.task_idx = task_idx
+        self.params = None
+
         if self.task_idx is not None:
-            self.task_fn = task_func(self.task_idx)
+            self.params, self.task_fn = task_func(self.task_idx)
+            self.task_fn = self.task_fn(*self.params)
     
     def __call__(self, x):
         assert self.task_fn is not None              # Task function has to be defined at this point
-        
+        assert self.params is not None               # Params of task function have to be defined
+
         return self.task_fn(x)
 
 def task_func(task_idx):
     return {
-        0: get_sin_function,
-        1: get_linear_function,
-        2: get_cubic_function,
-        3: get_quadratic_function
+        0: (get_sin_params(), get_sin_function),
+        1: (get_linear_params(), get_linear_function),
+        2: (get_cubic_params(), get_cubic_function),
+        3: (get_quadratic_params(), get_quadratic_function)
     }[task_idx]
 
-@staticmethod
-def get_sin_function():
-    # Define amp & phase
+def get_sin_params():
     amplitude = np.random.uniform(0.1, 5.)
     phase = np.random.uniform(0., np.pi)
+
+    return amplitude, phase
+
+def get_sin_function(amplitude, phase):
     def sin_function(x):
         if isinstance(x, torch.Tensor):
             return torch.sin(x - phase) * amplitude
@@ -124,20 +132,26 @@ def get_sin_function():
 
     return sin_function
 
-@staticmethod
-def get_linear_function():
+def get_linear_params():
     slope = np.random.uniform(-3., 3.)
     bias = np.random.uniform(-3., 3.)
+
+    return slope, bias
+
+def get_linear_function(slope, bias):
     def linear_function(x):
         return slope * x + bias
 
     return linear_function
 
-@staticmethod
-def get_quadratic_function():
+def get_quadratic_params():
     slope1 = np.random.uniform(-0.2, 0.2)
     slope2 = np.random.uniform(-2.0, 2.0)
     bias = np.random.uniform(-3., 3.)
+
+    return slope1, slope2, bias
+
+def get_quadratic_function(slope1, slope2, bias):
     def quadratic_function(x):
         if isinstance(x, torch.Tensor):
             return slope1 * torch.pow(x, 2) + slope2 * x + bias
@@ -146,12 +160,15 @@ def get_quadratic_function():
 
     return quadratic_function
 
-@staticmethod
-def get_cubic_function():
+def get_cubic_params():
     slope1 = np.random.uniform(-0.1, 0.1)
     slope2 = np.random.uniform(-0.2, 0.2)
     slope3 = np.random.uniform(-2.0, 2.0)
     bias = np.random.uniform(-3., 3.)
+
+    return slope1, slope2, slope3, bias
+
+def get_cubic_function(slope1, slope2, slope3, bias):
     def cubic_function(x):
         if isinstance(x, torch.Tensor):
             return \
