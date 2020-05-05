@@ -105,10 +105,10 @@ class Base_Task():
 
 def task_func(task_idx):
     return {
-        '0': get_sin_function,
-        '1': get_linear_function,
-        '2': get_cubic_function,
-        '3': get_quadratic_function
+        0: get_sin_function,
+        1: get_linear_function,
+        2: get_cubic_function,
+        3: get_quadratic_function
     }[task_idx]
 
 @staticmethod
