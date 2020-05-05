@@ -8,7 +8,13 @@ class MixutureRegressionTasks(object):
         self.args = args
         self.num_inputs = 1
         self.input_range = [-5, 5]
-        self.super_tasks = ["sin", "linear", "quadratic", "cubic"]
+        # self.super_tasks = ["sin", "linear", "quadratic", "cubic"]
+        self.super_tasks = ["sin", "linear"]
+        self.reset()
+
+    def reset(self):
+        self.amplitudes, self.phases = [], []
+        self.slopes, self.biases = [], []
 
     @staticmethod
     def get_sin_function(amplitude, phase):
@@ -63,10 +69,16 @@ class MixutureRegressionTasks(object):
                 amplitude = np.random.uniform(0.1, 5.)
                 phase = np.random.uniform(0., np.pi)
                 target_function = self.get_sin_function(amplitude, phase)
+
+                self.amplitudes.append(amplitude)
+                self.phases.append(phase)
             elif super_task == "linear":
                 slope = np.random.uniform(-3., 3.)
                 bias = np.random.uniform(-3., 3.)
                 target_function = self.get_linear_function(slope, bias)
+
+                self.slopes.append(slope)
+                self.biases.append(bias)
             elif super_task == "quadratic":
                 slope1 = np.random.uniform(-0.2, 0.2)
                 slope2 = np.random.uniform(-2.0, 2.0)

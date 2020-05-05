@@ -49,6 +49,7 @@ def get_context_model(args, log, tb_writer):
 def get_data(task_family, args):
     train_data, val_data = [], []
 
+    task_family.reset()
     for super_task in task_family.super_tasks:
         train_super_task, val_super_task = [], []
         task_functions = task_family.sample_tasks(super_task)

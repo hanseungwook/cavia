@@ -79,7 +79,7 @@ def vis_pca(higher_contexts, lower_contexts, task_family, iteration, args):
         raise NotImplementedError()
         higher_contexts = torch.stack(higher_contexts).detach().cpu().numpy()
         contexts = np.concatenate((contexts, higher_contexts))
-    # contexts = StandardScaler().fit_transform(contexts)
+    contexts = StandardScaler().fit_transform(contexts)
 
     # Fit PCA
     pca = PCA(n_components=2)
@@ -128,23 +128,39 @@ def vis_context(lower_contexts, task_family, iteration, args):
     if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
         os.makedirs("./logs/n_inner" + str(args.n_inner))
 
-    # Set color for visualization
-    n_super_task = len(task_family.super_tasks)
-    assert n_super_task == 1, "Should be only sinusoidal task"
-
     # Preprocess data
     context = torch.stack(lower_contexts[0]).detach().cpu().numpy()
 
     # Visualize
     x, y = context[:, 0], context[:, 1]
+
+    plt.figure()
     plt.scatter(x, y, c=task_family.phases, s=30)
     plt.colorbar()
     plt.title("Context (phase) iteration" + str(iteration))
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_phase.png")
     plt.close()
 
+    plt.figure()
     plt.scatter(x, y, c=task_family.amplitudes, s=30)
     plt.colorbar()
     plt.title("Context (amp) iteration" + str(iteration))
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_amp.png")
+    plt.close()
+
+    # Preprocess data
+    context = torch.stack(lower_contexts[1]).detach().cpu().numpy()
+
+    # Visualize
+    x, y = context[:, 0], context[:, 1]
+    plt.scatter(x, y, c=task_family.slopes, s=30)
+    plt.colorbar()
+    plt.title("Context (slope) iteration" + str(iteration))
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_slope.png")
+    plt.close()
+
+    plt.scatter(x, y, c=task_family.biases, s=30)
+    plt.colorbar()
+    plt.title("Context (bias) iteration" + str(iteration))
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_bias.png")
     plt.close()

@@ -26,8 +26,10 @@ do
     --model-type "CAVIA" \
     --lr-inner 0.03 \
     --lr-meta 0.001 \
-    --n-sample 20 \
+    --n-sample 10 \
     --n-context-models 1 \
+    --n-context-params 2 \
     --n-inner 5 \
+    --tasks-per-metaupdate 1000 \
     --prefix ""
 done
