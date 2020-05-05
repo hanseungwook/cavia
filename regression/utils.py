@@ -128,39 +128,74 @@ def vis_context(lower_contexts, task_family, iteration, args):
     if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
         os.makedirs("./logs/n_inner" + str(args.n_inner))
 
-    # Preprocess data
-    context = torch.stack(lower_contexts[0]).detach().cpu().numpy()
+    # # Vis sinusoidal
+    # context = torch.stack(lower_contexts[0]).detach().cpu().numpy()
+    # x, y = context[:, 0], context[:, 1]
 
-    # Visualize
-    x, y = context[:, 0], context[:, 1]
+    # plt.figure()
+    # plt.scatter(x, y, c=task_family.phases, s=30)
+    # plt.colorbar()
+    # plt.title("Context (phase) iteration" + str(iteration))
+    # plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_phase.png")
+    # plt.close()
 
-    plt.figure()
-    plt.scatter(x, y, c=task_family.phases, s=30)
-    plt.colorbar()
-    plt.title("Context (phase) iteration" + str(iteration))
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_phase.png")
-    plt.close()
+    # plt.figure()
+    # plt.scatter(x, y, c=task_family.amplitudes, s=30)
+    # plt.colorbar()
+    # plt.title("Context (amp) iteration" + str(iteration))
+    # plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_amp.png")
+    # plt.close()
 
-    plt.figure()
-    plt.scatter(x, y, c=task_family.amplitudes, s=30)
-    plt.colorbar()
-    plt.title("Context (amp) iteration" + str(iteration))
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_amp.png")
-    plt.close()
+    # Vis others
+    for i_super_task, super_task in zip(range(3), ["linear", "quadratic", "cubic"]):
+        context = torch.stack(lower_contexts[i_super_task]).detach().cpu().numpy()
+        x, y, z, w = context[:, 0], context[:, 1], context[:, 2], context[:, 3]
 
-    # Preprocess data
-    context = torch.stack(lower_contexts[1]).detach().cpu().numpy()
+        for i_param, prefix in zip(range(4), ["slope1", "slope2", "slope3", "bias"]):
+            plt.scatter(x, y, c=task_family.params[super_task][i_param], s=30)
+            plt.xlabel("Context 0")
+            plt.ylabel("Context 1")
+            plt.colorbar()
+            plt.title(prefix + " iteration" + str(iteration))
+            plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_" + super_task + "_" + prefix + "_xy.png")
+            plt.close()
 
-    # Visualize
-    x, y = context[:, 0], context[:, 1]
-    plt.scatter(x, y, c=task_family.slopes, s=30)
-    plt.colorbar()
-    plt.title("Context (slope) iteration" + str(iteration))
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_slope.png")
-    plt.close()
+            plt.scatter(x, z, c=task_family.params[super_task][i_param], s=30)
+            plt.xlabel("Context 0")
+            plt.ylabel("Context 2")
+            plt.colorbar()
+            plt.title(prefix + " iteration" + str(iteration))
+            plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_" + super_task + "_" + prefix + "_xz.png")
+            plt.close()
 
-    plt.scatter(x, y, c=task_family.biases, s=30)
-    plt.colorbar()
-    plt.title("Context (bias) iteration" + str(iteration))
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_bias.png")
-    plt.close()
+            plt.scatter(x, w, c=task_family.params[super_task][i_param], s=30)
+            plt.xlabel("Context 0")
+            plt.ylabel("Context 3")
+            plt.colorbar()
+            plt.title(prefix + " iteration" + str(iteration))
+            plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_" + super_task + "_" + prefix + "_xw.png")
+            plt.close()
+
+            plt.scatter(y, z, c=task_family.params[super_task][i_param], s=30)
+            plt.xlabel("Context 1")
+            plt.ylabel("Context 2")
+            plt.colorbar()
+            plt.title(prefix + " iteration" + str(iteration))
+            plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_" + super_task + "_" + prefix + "_yz.png")
+            plt.close()
+
+            plt.scatter(y, w, c=task_family.params[super_task][i_param], s=30)
+            plt.xlabel("Context 1")
+            plt.ylabel("Context 3")
+            plt.colorbar()
+            plt.title(prefix + " iteration" + str(iteration))
+            plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_" + super_task + "_" + prefix + "_yw.png")
+            plt.close()
+
+            plt.scatter(z, w, c=task_family.params[super_task][i_param], s=30)
+            plt.xlabel("Context 2")
+            plt.ylabel("Context 3")
+            plt.colorbar()
+            plt.title(prefix + " iteration" + str(iteration))
+            plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_" + super_task + "_" + prefix + "_zw.png")
+            plt.close()

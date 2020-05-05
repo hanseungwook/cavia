@@ -96,7 +96,7 @@ def run(args, log, tb_writer):
     context_models = get_context_model(args, log, tb_writer)
 
     # Begin meta-train
-    for iteration in range(2000):
+    for iteration in range(1250):
         # Sample train and validation data
         train_data, val_data = get_data(task_family, args)
 

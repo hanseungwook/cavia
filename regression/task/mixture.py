@@ -9,12 +9,15 @@ class MixutureRegressionTasks(object):
         self.num_inputs = 1
         self.input_range = [-5, 5]
         # self.super_tasks = ["sin", "linear", "quadratic", "cubic"]
-        self.super_tasks = ["sin", "linear"]
+        self.super_tasks = ["linear", "quadratic", "cubic"]
         self.reset()
 
     def reset(self):
-        self.amplitudes, self.phases = [], []
-        self.slopes, self.biases = [], []
+        self.params = {}
+        self.params["sin"] = [[] for _ in range(2)]
+        self.params["linear"] = [[] for _ in range(4)]
+        self.params["quadratic"] = [[] for _ in range(4)]
+        self.params["cubic"] = [[] for _ in range(4)]
 
     @staticmethod
     def get_sin_function(amplitude, phase):
@@ -73,25 +76,40 @@ class MixutureRegressionTasks(object):
                 self.amplitudes.append(amplitude)
                 self.phases.append(phase)
             elif super_task == "linear":
-                slope = np.random.uniform(-3., 3.)
+                slope1, slope2 = 0, 0
+                slope3 = np.random.uniform(-3., 3.)
                 bias = np.random.uniform(-3., 3.)
-                target_function = self.get_linear_function(slope, bias)
+                target_function = self.get_linear_function(slope3, bias)
 
-                self.slopes.append(slope)
-                self.biases.append(bias)
+                self.params["linear"][0].append(slope1) 
+                self.params["linear"][1].append(slope2) 
+                self.params["linear"][2].append(slope3)
+                self.params["linear"][3].append(bias) 
             elif super_task == "quadratic":
-                slope1 = np.random.uniform(-0.2, 0.2)
-                slope2 = np.random.uniform(-2.0, 2.0)
+                slope1 = 0
+                slope2 = np.random.uniform(-0.2, 0.2)
+                slope3 = np.random.uniform(-2.0, 2.0)
                 bias = np.random.uniform(-3., 3.)
-                target_function = self.get_quadratic_function(slope1, slope2, bias)
+                target_function = self.get_quadratic_function(slope2, slope3, bias)
+
+                self.params["quadratic"][0].append(slope1) 
+                self.params["quadratic"][1].append(slope2) 
+                self.params["quadratic"][2].append(slope3)
+                self.params["quadratic"][3].append(bias) 
             elif super_task == "cubic":
                 slope1 = np.random.uniform(-0.1, 0.1)
                 slope2 = np.random.uniform(-0.2, 0.2)
                 slope3 = np.random.uniform(-2.0, 2.0)
                 bias = np.random.uniform(-3., 3.)
                 target_function = self.get_cubic_function(slope1, slope2, slope3, bias)
+
+                self.params["cubic"][0].append(slope1) 
+                self.params["cubic"][1].append(slope2) 
+                self.params["cubic"][2].append(slope3)
+                self.params["cubic"][3].append(bias) 
             else:
                 raise ValueError()
+
             target_functions.append(target_function)
 
         return target_functions
