@@ -28,7 +28,7 @@ def get_encoder_model(encoder_types):
 
 def run(args, log, tb_writer=[]):
     base_model      = get_base_model(args)
-    base_task       = Base_Task()
+    base_task       = Base_Task
     encoder_models  = get_encoder_model(args.encoders)
 
     model   = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
