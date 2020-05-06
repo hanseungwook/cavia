@@ -20,9 +20,9 @@ def get_encoder_model(encoder_types):
             encoders.append(None)
         else:
             raise NotImplementedError()
-            ENCODER_TYPE = get_encoder_type(args.model_type)
-            encoder_model = ENCODER_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
-            encoders.append(encoder_model)
+            # ENCODER_TYPE = get_encoder_type(args.model_type)
+            # encoder_model = ENCODER_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
+            # encoders.append(encoder_model)
     return encoders
 
 
@@ -63,6 +63,34 @@ def train(model, task, n_iter, lr, logger):
 # lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., ., task_idx)]
 # lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
 
+
+# class Hierarchical_Task():                      # Top-down hierarchy
+#     def __init__(self, base_task,  *n_batch_all):
+#         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
+#         assert len(n_batch_train) == len(signature(base_task).parameters)   # base_task should take correct number of inputs
+#         self.base_task = base_task
+#         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
+#         self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
+#         self.level = len(self.n_batch_next[0])
+
+#     def pre_sample():
+#         self.random_seed = random_seed()
+
+#     def sample(self, sample_type):
+#         self.choose_n_k_random_seed(self.random_seed)
+
+#         n_batch = self.n_batch[sample_type]
+
+#         if self.level == 0:                     # sample datapoints for the bottom level   [inputs, targets]
+#             inputs = torch.randn(n_batch, 1)
+#             targets = self.base_task(inputs)
+#             return [inputs, targets]            
+#         else:                                   # sample subtasks for higher levels
+#             params = torch.randn(n_batch)
+#             return [__class__(partial(self.base_task, par), *self.n_batch_next) for par in params]   # return a list of subtasks
+
+
+
 class Hierarchical_Task():                      # Top-down hierarchy
     def __init__(self, base_task, *n_batch_all, task_idx=None):
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
@@ -71,7 +99,7 @@ class Hierarchical_Task():                      # Top-down hierarchy
         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
         self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
         self.level = len(self.n_batch_next[0])
-        self.n_super_tasks = 4
+        self.n_super_tasks = 2 #4
         self.task_idx = task_idx
     
     def sample(self, sample_type):
@@ -88,11 +116,13 @@ class Hierarchical_Task():                      # Top-down hierarchy
         elif self.level == 2:                   # sample super-tasks
             assert n_batch <= self.n_super_tasks
             supertasks = np.random.choice(range(self.n_super_tasks), n_batch, replace=False)
-            
             return [self.__class__(self.base_task, *self.n_batch_next, task_idx=supertask) for supertask in supertasks]   # return a list of subtasks
 
 ##############################################################################
 #  Base Task
+
+# f = Base_Task():   f(x,task, supertask)
+
 class Base_Task():
     def __init__(self, task_idx=None):
         self.task_fn = None
@@ -109,18 +139,31 @@ class Base_Task():
 
         return self.task_fn(x)
 
+# class toy_base_task():
+#     def __init__(self, task_idx=None):
+#         self.task_fn = None
+#         self.task_idx = task_idx
+#         self.params = None
+
+#         self.function_list = [
+#             ('sine', get_sin_params(), get_sin_function),
+#             ('linear', get_linear_params(), get_linear_function),
+#             ('quadratic', get_quadratic_params(), get_quadratic_function)
+#             ('cubic', get_cubic_params(), get_cubic_function)
+#         ]
+#     def __call__(self, x,par,task_idx):
+
 def task_func(task_idx):
     return {
         0: (get_sin_params(), get_sin_function),
         1: (get_linear_params(), get_linear_function),
-        2: (get_cubic_params(), get_cubic_function),
-        3: (get_quadratic_params(), get_quadratic_function)
+        # 2: (get_quadratic_params(), get_quadratic_function),
+        # 3: (get_cubic_params(), get_cubic_function),
     }[task_idx]
 
 def get_sin_params():
     amplitude = np.random.uniform(0.1, 5.)
     phase = np.random.uniform(0., np.pi)
-
     return amplitude, phase
 
 def get_sin_function(amplitude, phase):
@@ -244,7 +287,7 @@ class manual_optim():
 
     def zero_grad(self):
         for par in self.param_list:
-            par.grad = torch.zeros(par.data.shape, device=par.device)
+            par.grad = torch.zeros(par.data.shape, device=par.device)   #             par.grad = par.zeros_like()
 
     def backward(self, loss):
         assert len(self.param_list) == 1            # may only work for a list of one?  # shouldn't run autograd multiple times over a graph 
