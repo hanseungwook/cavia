@@ -1,3 +1,4 @@
+import torch
 import torch.nn.functional as F
 from utils import vis_pca, vis_prediction, vis_context
 
@@ -46,13 +47,17 @@ def get_context_model(args, log, tb_writer):
     return context_models
 
 
-def get_data(task_family, args):
+def get_data(task_family, args, number=None):
+    if number is None:
+        number = args.tasks_per_metaupdate
+
     train_data, val_data = [], []
 
     task_family.reset()
     for super_task in task_family.super_tasks:
         train_super_task, val_super_task = [], []
-        task_functions = task_family.sample_tasks(super_task)
+
+        task_functions = task_family.sample_tasks(super_task, number)
 
         for task_function in task_functions:
             train_input = task_family.sample_inputs(args.n_sample).to(args.device)
@@ -98,7 +103,7 @@ def run(args, log, tb_writer):
     # Begin meta-train
     for iteration in range(2000):
         # Sample train and validation data
-        train_data, val_data = get_data(task_family, args)
+        train_data, val_data = get_data(task_family, args, number=None)
 
         # Get higher contexts
         # Returns higher contexts for all super tasks
@@ -122,6 +127,24 @@ def run(args, log, tb_writer):
             iteration, meta_loss.detach().cpu().numpy()))
         tb_writer.add_scalar("Meta loss:", meta_loss.detach().cpu().numpy(), iteration)
         if iteration % 10 == 0:
-            vis_pca(higher_contexts, lower_contexts, task_family, iteration, args)
-            vis_prediction(model, higher_contexts, lower_contexts, val_data, iteration, args)
-            vis_context(lower_contexts, task_family, iteration, args)
+            torch.save(model.state_dict(), "./logs/" + str(iteration) + ".pth")
+
+        # if iteration % 200 == 0:
+        #     test_data, _ = get_data(task_family, args, number=750)
+
+        #     # Get higher contexts
+        #     # Returns higher contexts for all super tasks
+        #     if args.n_context_models == 1:
+        #         higher_contexts = [None for _ in range(len(task_family.super_tasks))]
+        #     else:
+        #         higher_contexts = context_models[-1].optimize(model, context_models, test_data)
+
+        #     # Get lower contexts
+        #     # Returns lower contexts for all super tasks and sub-tasks per super task
+        #     lower_contexts = []
+        #     for super_task, higher_context in zip(test_data, higher_contexts):
+        #         lower_contexts.append(context_models[0].optimize(model, higher_context, super_task))
+
+        #     # vis_pca(higher_contexts, lower_contexts, task_family, iteration, args)
+        #     # vis_prediction(model, higher_contexts, lower_contexts, val_data, iteration, args)
+        #     vis_context(lower_contexts, task_family, iteration, args)

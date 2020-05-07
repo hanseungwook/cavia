@@ -61,10 +61,10 @@ class MixutureRegressionTasks(object):
 
         return cubic_function
 
-    def sample_tasks(self, super_task):
+    def sample_tasks(self, super_task, number):
         target_functions = []
 
-        for _ in range(self.args.tasks_per_metaupdate):
+        for _ in range(number):
             if super_task == "sin":
                 amplitude = np.random.uniform(0.1, 5.)
                 phase = np.random.uniform(0., np.pi)

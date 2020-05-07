@@ -27,9 +27,9 @@ do
     --lr-inner 0.03 \
     --lr-meta 0.001 \
     --n-sample 10 \
-    --n-context-models 1 \
+    --n-context-models 2 \
     --n-context-params 2 \
-    --n-inner 5 \
-    --tasks-per-metaupdate 1000 \
+    --n-inner 3 \
+    --tasks-per-metaupdate 50 \
     --prefix ""
 done
