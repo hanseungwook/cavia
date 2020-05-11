@@ -18,7 +18,7 @@ def parse_args():
         '--first_order', action='store_true', default=False, 
         help='run first-order version')
     parser.add_argument(
-        '--model-type', type=str, choices=["CAVIA"], 
+        '--model-type', type=str, choices=["CAVIA", "ADDITIVE", "MULTIPLICATIVE", "ADD_MULTIPLICATIVE"], 
         default="CAVIA", help='model type: CAVIA, ADDITIVE, MULTIPLICATIVE, ADD_MULTIPLICATIVE"')
     parser.add_argument(
         '--seed', type=int, default=42)
@@ -29,6 +29,7 @@ def parse_args():
         '--log-name', type=str, default="",
         help="Logging name")
 
+<<<<<<< HEAD
     parser.add_argument('--lrs',           type=float, nargs='+', default=[0.01, 0.01, 0.001])     # lr  for inner-loop, midloop, outerloop
     parser.add_argument('--n_iters',       type=int, nargs='+', default=[2, 3, 100])             # optim_iter for inner-loop, midloop, outerloop
     parser.add_argument('--n_batch_train', type=int, nargs='+', default=[30, 5, 3])              # number of datapoints, tasks, super-tasks 
@@ -38,6 +39,17 @@ def parse_args():
     parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
 
     parser.add_argument('--log_interval', type=int, default=100)
+=======
+    parser.add_argument('--lrs',           type=int, nargs='+', default=[0.03, 0.03, 0.001])     # lr  for inner-loop, midloop, outerloop
+    parser.add_argument('--n_iters',       type=int, nargs='+', default=[3, 3, 1000])             # optim_iter for inner-loop, midloop, outerloop
+    parser.add_argument('--n_batch_train', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks 
+    parser.add_argument('--n_batch_test',  type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
+    parser.add_argument('--n_batch_valid', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
+    parser.add_argument('--n_contexts',    type=int, nargs='+', default=[2, 1])                  # number of context variables: phi0, phi1 
+    parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
+
+    parser.add_argument('--log_interval',  type=int, nargs='+', default=100)
+>>>>>>> 5b7b96fb39ebd847246d250aeec8015c8921f8ab
 
 
     args = parser.parse_args()
@@ -47,8 +59,9 @@ def parse_args():
 
     # Set args log name
     args.log_name = \
-        "iter::%s_lr::%sn_batch::%s_n_ctx::%s_prefix::%s" % (
-            args.n_iters, args.lrs, args.n_batch_train, len(args.n_contexts), args.prefix)
+        "test::" 
+        # "iter::%s_lr::%sn_batch::%s_n_ctx::%s_prefix::%s" % (
+        #     args.n_iters, args.lrs, args.n_batch_train, len(args.n_contexts), args.prefix)
     # args.log_name = \
     #     "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
     #         args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models, args.prefix)

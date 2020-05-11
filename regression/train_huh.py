@@ -21,9 +21,9 @@ def get_encoder_model(encoder_types):
             encoders.append(None)
         else:
             raise NotImplementedError()
-            ENCODER_TYPE = get_encoder_type(args.model_type)
-            encoder_model = ENCODER_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
-            encoders.append(encoder_model)
+            # ENCODER_TYPE = get_encoder_type(args.model_type)
+            # encoder_model = ENCODER_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
+            # encoders.append(encoder_model)
     return encoders
 
 
@@ -92,7 +92,7 @@ class Dataset():
 # Constitutes/returns upon sample a list of Level1Dataset
 # Passes parameter generating and task generating function to lower dataset
 class Level2Dataset(Dataset):
-    def __init__(self, *n_batch_all, num_supertasks=2):
+    def __init__(self, *n_batch_all, num_supertasks=4):
         super().__init__()
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
@@ -172,30 +172,12 @@ class Level0Dataset(Dataset):
         self.test_inputs = torch.randn(self.num_presample, 1)
 
 ##############################################################################
-#  Base Task
-class Base_Task():
-    def __init__(self, task_idx=None):
-        #self.task_object initialize
-        self.task_fn = None
-        self.task_idx = task_idx
-        self.params = None
-
-        if self.task_idx is not None:
-            self.params, self.task_fn = task_func(self.task_idx)
-            self.task_fn = self.task_fn(*self.params)
-    
-    def __call__(self, x):
-        # self.task object call
-        assert self.task_fn is not None              # Task function has to be defined at this point
-        assert self.params is not None               # Params of task function have to be defined
-
-        return self.task_fn(x)
+# Parameter and task sampling functions
 
 def get_sin_params():
     # Sample n_batch number of parameters
     amplitude = np.random.uniform(0.1, 5.)
     phase = np.random.uniform(0., np.pi)
-
     return amplitude, phase
 
 def get_sin_function(amplitude, phase):
@@ -260,10 +242,11 @@ def get_cubic_function(slope1, slope2, slope3, bias):
 
     return cubic_function
 
-task_func = [(get_sin_params, get_sin_function),
+task_func = [
+             (get_sin_params, get_sin_function),
              (get_linear_params, get_linear_function),
-            #  (get_cubic_params, get_cubic_function),
-            #  (get_quadratic_params, get_quadratic_function)]\
+             (get_cubic_params, get_cubic_function),
+             (get_quadratic_params, get_quadratic_function)
             ]
 
 ##############################################################################
@@ -325,7 +308,7 @@ class manual_optim():
 
     def zero_grad(self):
         for par in self.param_list:
-            par.grad = torch.zeros(par.data.shape, device=par.device)
+            par.grad = torch.zeros(par.data.shape, device=par.device)   #             par.grad = par.zeros_like()
 
     def backward(self, loss):
         assert len(self.param_list) == 1            # may only work for a list of one?  # shouldn't run autograd multiple times over a graph 

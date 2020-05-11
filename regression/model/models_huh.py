@@ -6,6 +6,8 @@ from torch.nn import Parameter
 from torch.nn import init
 from functools import partial
 
+from pdb import set_trace
+
 def get_encoder_type(model_type):
     raise NotImplementedError()
     # return ENCODER
@@ -70,13 +72,17 @@ class Cavia(BaseModel):
 class Model_Active(BaseModel):
     def __init__(self, n_arch, n_context, weight_type, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), loss_fnc = nn.MSELoss(), passive=True, device=None): 
         if weight_type == 'additive':
-            active_weight = Additive_Weight
+            active_type = Additive_Weight
         elif weight_type == 'multiplicative':
-            active_weight = Multive_Weight
+            active_type = Multive_Weight
         elif weight_type == 'add_multiplicative':
-            active_weight = Add_Multive_Weight
+            active_type = Add_Multive_Weight
 
-        Linear_Active_ = partial(Linear_Active, active_weight = active_weight, n_context = n_context, gain_w = gain_w, gain_b = gain_b, passive = passive)
+        Linear_Active_ = partial(Linear_Active, active_type = active_type, n_context = n_context, gain_w = gain_w, gain_b = gain_b, passive = passive)
+
+        # set_trace()
+        # Linear_Active__ = Linear_Active(2, 2,  active_type,  n_context, gain_w, gain_b)
+
         super().__init__(n_arch, n_context, nonlin, loss_fnc, device, FC_module = Linear_Active_)
 
 
@@ -92,27 +98,27 @@ class Model_Active(BaseModel):
 
 
 class Model_Additive(Model_Active):
-    def __init__(self, n_arch, n_level, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
-        super().__init__(n_arch, n_level, n_context, weight_type = 'additive', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
+    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
+        super().__init__(n_arch, n_context, weight_type = 'additive', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
 
 class Model_Multiplicative(Model_Active):
-    def __init__(self, n_arch, n_level, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
-        super().__init__(n_arch, n_level, n_context, weight_type = 'multiplicative', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
+    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
+        super().__init__(n_arch, n_context, weight_type = 'multiplicative', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
 
 class Model_Add_Multiplicative(Model_Active):
-    def __init__(self, n_arch, n_level, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
-        super().__init__(n_arch, n_level, n_context, weight_type = 'add_multiplicative', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
+    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
+        super().__init__(n_arch, n_context, weight_type = 'add_multiplicative', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
 
 ######################################
 
 class Linear_Active(nn.Module):
-    def __init__(self, n_input, n_output, active_weight, n_context, gain_w, gain_b, passive): 
+    def __init__(self, n_input, n_output, active_type, n_context, gain_w, gain_b, passive): 
         super().__init__()
             
-        self.active_weight = active_weight(n_input, n_output, n_context, gain_w, gain_b, passive)
+        self.active_type = active_type(n_input, n_output, n_context, gain_w, gain_b) #, passive)
         
     def forward(self, x, context):
-        weight, bias = self.active_weight(context)
+        weight, bias = self.active_type(context)
         batch_size = context.shape[0]
         
         if batch_size > 1:
@@ -212,8 +218,8 @@ class Additive_Weight(Active_Weight):
             
     def forward(self, context):
         batch_size = context.shape[0]
-        d_w = F.linear(context, self.w_active, 0).view(batch_size, self.n_output, self.n_input)
-        d_b = F.linear(context, self.b_active, 0).view(batch_size, self.n_output)
+        d_w = F.linear(context, self.w_active, torch.zeros(1)).view(batch_size, self.n_output, self.n_input)
+        d_b = F.linear(context, self.b_active, torch.zeros(1)).view(batch_size, self.n_output)
         if batch_size == 1:
             d_w.squeeze_(dim=0)
             d_b.squeeze_(dim=0)
