@@ -6,6 +6,7 @@ import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
 from functools import partial
 from inspect import signature
+import random
 
 
 def get_base_model(args):
@@ -28,15 +29,14 @@ def get_encoder_model(encoder_types):
 
 def run(args, log, tb_writer=[]):
     base_model      = get_base_model(args)
-    base_task       = Base_Task
     encoder_models  = get_encoder_model(args.encoders)
 
     model   = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
-    task    = Hierarchical_Task(base_task, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
+    dataset = Level2Dataset(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
     logger  = Logger(log, tb_writer, args.log_name, args.log_interval)
 
-    train(model, task, args.n_iters[-1], args.lrs[-1], logger)     # Train
-    test_loss = model.evaluate( task.sample('test'))              # Test
+    train(model, dataset, args.n_iters[-1], args.lrs[-1], logger)     # Train
+    test_loss = model.evaluate(dataset.sample('test'))              # Test
     return test_loss, logger
 
 
@@ -63,105 +63,119 @@ def train(model, task, n_iter, lr, logger):
 # lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., ., task_idx)]
 # lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
 
-
 # class Hierarchical_Task():                      # Top-down hierarchy
-#     def __init__(self, base_task,  *n_batch_all):
+#     def __init__(self, dataset, *n_batch_all):
 #         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
-#         assert len(n_batch_train) == len(signature(base_task).parameters)   # base_task should take correct number of inputs
-#         self.base_task = base_task
+
 #         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
 #         self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
 #         self.level = len(self.n_batch_next[0])
-
-#     def pre_sample():
-#         self.random_seed = random_seed()
-
+#         self.n_super_tasks = 4
+#         self.dataset = dataset
+    
 #     def sample(self, sample_type):
-#         self.choose_n_k_random_seed(self.random_seed)
-
 #         n_batch = self.n_batch[sample_type]
 
 #         if self.level == 0:                     # sample datapoints for the bottom level   [inputs, targets]
-#             inputs = torch.randn(n_batch, 1)
-#             targets = self.base_task(inputs)
-#             return [inputs, targets]            
-#         else:                                   # sample subtasks for higher levels
-#             params = torch.randn(n_batch)
-#             return [__class__(partial(self.base_task, par), *self.n_batch_next) for par in params]   # return a list of subtasks
+#             return self.dataset.sample(n_batch, sample_type)
+#         elif self.level == 1:
+#             return [self.__class__(self.dataset.sample(), *self.n_batch_next) for i in range(n_batch)]
 
+# Base class for datasets (may not really be necessary)
+class Dataset():
+    def __init__(self):
+        self.data = None
+    
+    def sample(self):
+        raise NotImplementedError
 
-
-class Hierarchical_Task():                      # Top-down hierarchy
-    def __init__(self, base_task, *n_batch_all, task_idx=None):
+# Constitutes/returns upon sample a list of Level1Dataset
+# Passes parameter generating and task generating function to lower dataset
+class Level2Dataset(Dataset):
+    def __init__(self, *n_batch_all, num_supertasks=4):
+        super().__init__()
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
-
-        self.base_task = base_task
         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
         self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
+        self.n_super_tasks = num_supertasks
         self.level = len(self.n_batch_next[0])
-        self.n_super_tasks = 2 #4
-        self.task_idx = task_idx
     
+    # Returns a np array of Level1Datasets
+    def sample(self, sample_type):
+        n_batch = self.n_batch[sample_type]
+        assert n_batch <= self.n_super_tasks        # Cannot sample more than the total # of supertasks
+
+        gen_fns = random.sample(task_func, n_batch)
+
+        return [Level1Dataset(gen_fn, *self.n_batch_next) for gen_fn in gen_fns]
+
+# Constitutes/returns upon sample a list of Level0Dataset
+# Receives parameter generating and task generating function
+# Passes task function (with parameters defined) to lower dataset
+class Level1Dataset(Dataset):
+    def __init__(self, gen_fn, *n_batch_all, num_presample=100):
+        n_batch_train, n_batch_test, n_batch_valid = n_batch_all
+        self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
+        self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
+
+        self.num_presample = num_presample
+        self.param_gen_fn, self.task_gen_fn = gen_fn
+        self.train_data = None
+        self.test_data = None
+
+        self.level = len(self.n_batch_next[0])
+
+        # Sample both train and test fn parameters
+        self.sample_params()
+
+    # Returns a np array of Level0Datasets
     def sample(self, sample_type):
         n_batch = self.n_batch[sample_type]
 
-        if self.level == 0:                     # sample datapoints for the bottom level   [inputs, targets]
-            inputs = torch.randn(n_batch, 1)
-            targets = self.base_task(self.task_idx)(inputs)
-            return [inputs, targets]          
+        if sample_type == 'train':
+            return np.random.choice(self.train_data, n_batch, replace=False)
+        elif sample_type == 'test':
+            return np.random.choice(self.test_data, n_batch, replace=False)
 
-        elif self.level == 1:                   # sample task functions        
-            return [self.__class__(self.base_task, *self.n_batch_next, task_idx=self.task_idx) for _ in range(n_batch)]   # return a list of subtasks
+    def sample_params(self):
+        self.train_data = [Level0Dataset(self.task_gen_fn(*self.param_gen_fn()), *self.n_batch_next) for i in range(self.num_presample)]
+        self.test_data = [Level0Dataset(self.task_gen_fn(*self.param_gen_fn()), *self.n_batch_next) for i in range(self.num_presample)]
 
-        elif self.level == 2:                   # sample super-tasks
-            assert n_batch <= self.n_super_tasks
-            supertasks = np.random.choice(range(self.n_super_tasks), n_batch, replace=False)
-            return [self.__class__(self.base_task, *self.n_batch_next, task_idx=supertask) for supertask in supertasks]   # return a list of subtasks
+# Returns [inputs, outputs] upon sample
+# Receives task function (with parameters defined)
+class Level0Dataset(Dataset):
+    def __init__(self, task_fn, *n_batch_all, num_presample=100):
+        n_batch_train, n_batch_test, n_batch_valid = n_batch_all
+        self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
+        self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
+
+        self.task_fn = task_fn
+        self.train_inputs = None
+        self.test_inputs = None
+        self.num_presample = num_presample
+
+        self.level = len(self.n_batch_next[0])
+
+        self.sample_inputs()
+
+    # Returns a list: [inputs, outputs]
+    def sample(self, sample_type):
+        n_batch = self.n_batch[sample_type]
+
+        if sample_type == 'train':
+            return [self.train_inputs[:n_batch], self.task_fn(self.train_inputs[:n_batch])]
+        elif sample_type == 'test':
+            return [self.test_inputs[:n_batch], self.task_fn(self.test_inputs[:n_batch])]
+
+    def sample_inputs(self):
+        self.train_inputs = torch.randn(self.num_presample, 1)
+        self.test_inputs = torch.randn(self.num_presample, 1)
 
 ##############################################################################
-#  Base Task
-
-# f = Base_Task():   f(x,task, supertask)
-
-class Base_Task():
-    def __init__(self, task_idx=None):
-        self.task_fn = None
-        self.task_idx = task_idx
-        self.params = None
-
-        if self.task_idx is not None:
-            self.params, self.task_fn = task_func(self.task_idx)
-            self.task_fn = self.task_fn(*self.params)
-    
-    def __call__(self, x):
-        assert self.task_fn is not None              # Task function has to be defined at this point
-        assert self.params is not None               # Params of task function have to be defined
-
-        return self.task_fn(x)
-
-# class toy_base_task():
-#     def __init__(self, task_idx=None):
-#         self.task_fn = None
-#         self.task_idx = task_idx
-#         self.params = None
-
-#         self.function_list = [
-#             ('sine', get_sin_params(), get_sin_function),
-#             ('linear', get_linear_params(), get_linear_function),
-#             ('quadratic', get_quadratic_params(), get_quadratic_function)
-#             ('cubic', get_cubic_params(), get_cubic_function)
-#         ]
-#     def __call__(self, x,par,task_idx):
-
-def task_func(task_idx):
-    return {
-        0: (get_sin_params(), get_sin_function),
-        1: (get_linear_params(), get_linear_function),
-        # 2: (get_quadratic_params(), get_quadratic_function),
-        # 3: (get_cubic_params(), get_cubic_function),
-    }[task_idx]
+# Parameter and task sampling functions
 
 def get_sin_params():
+    # Sample n_batch number of parameters
     amplitude = np.random.uniform(0.1, 5.)
     phase = np.random.uniform(0., np.pi)
     return amplitude, phase
@@ -227,6 +241,13 @@ def get_cubic_function(slope1, slope2, slope3, bias):
                 bias
 
     return cubic_function
+
+task_func = [
+             (get_sin_params, get_sin_function),
+             (get_linear_params, get_linear_function),
+             (get_cubic_params, get_cubic_function),
+             (get_quadratic_params, get_quadratic_function)
+            ]
 
 ##############################################################################
 #  Model Hierarchy
@@ -310,7 +331,7 @@ class Logger():
         self.log_name = log_name
         self.update_iter = update_iter
     def update(self, iter, loss):
-        if iter % self.update_iter:
+        if not (iter % self.update_iter):
             
             self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
             self.tb_writer.add_scalar("Meta loss:", loss, iter)
