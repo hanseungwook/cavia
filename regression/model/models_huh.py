@@ -6,7 +6,7 @@ from torch.nn import Parameter
 from torch.nn import init
 from functools import partial
 
-from pdb import set_trace
+# from pdb import set_trace
 
 def get_encoder_type(model_type):
     raise NotImplementedError()
@@ -79,9 +79,6 @@ class Model_Active(BaseModel):
             active_type = Add_Multive_Weight
 
         Linear_Active_ = partial(Linear_Active, active_type = active_type, n_context = n_context, gain_w = gain_w, gain_b = gain_b, passive = passive)
-
-        # set_trace()
-        # Linear_Active__ = Linear_Active(2, 2,  active_type,  n_context, gain_w, gain_b)
 
         super().__init__(n_arch, n_context, nonlin, loss_fnc, device, FC_module = Linear_Active_)
 
@@ -265,8 +262,8 @@ class Add_Multive_Weight(Active_Weight):
         batch_size = context.shape[0]
         o_w = F.linear(context, self.w_multiplicative, self.w_passive).view(batch_size, self.n_output, self.n_input)
         o_b = F.linear(context, self.b_multiplicative, self.b_passive).view(batch_size, self.n_output)
-        d_w = F.linear(context, self.w_additive, 0).view(batch_size, self.n_output, self.n_input)
-        d_b = F.linear(context, self.b_additive, 0).view(batch_size, self.n_output)
+        d_w = F.linear(context, self.w_additive, torch.zeros(1)).view(batch_size, self.n_output, self.n_input)
+        d_b = F.linear(context, self.b_additive, torch.zeros(1)).view(batch_size, self.n_output)
 
         if batch_size == 1:
             o_w.squeeze_(dim=0)

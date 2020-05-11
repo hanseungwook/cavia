@@ -29,8 +29,8 @@ def parse_args():
         '--log-name', type=str, default="",
         help="Logging name")
 
-    parser.add_argument('--lrs',           type=int, nargs='+', default=[0.03, 0.03, 0.001])     # lr  for inner-loop, midloop, outerloop
-    parser.add_argument('--n_iters',       type=int, nargs='+', default=[3, 3, 1000])             # optim_iter for inner-loop, midloop, outerloop
+    parser.add_argument('--lrs',           type=int, nargs='+', default=[0.05, 0.05, 0.001])     # lr  for inner-loop, midloop, outerloop
+    parser.add_argument('--n_iters',       type=int, nargs='+', default=[3, 2, 1000])             # optim_iter for inner-loop, midloop, outerloop
     parser.add_argument('--n_batch_train', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks 
     parser.add_argument('--n_batch_test',  type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
     parser.add_argument('--n_batch_valid', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
@@ -38,7 +38,6 @@ def parse_args():
     parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
 
     parser.add_argument('--log_interval',  type=int, nargs='+', default=100)
-
 
     args = parser.parse_args()
 
