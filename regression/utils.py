@@ -5,8 +5,16 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pylab as plot
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+
+sns.set_style("ticks")
+sns.set_palette(sns.color_palette("hls", 8))
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+params = {'legend.fontsize': 14}
+plot.rcParams.update(params)
 
 
 #################################################################################
@@ -136,16 +144,18 @@ def vis_context(lower_contexts, task_family, iteration, args):
 
     plt.figure()
     plt.scatter(x, y, c=task_family.phases, s=30)
-    plt.colorbar()
-    plt.title("Context (phase) iteration" + str(iteration))
+    cbar = plt.colorbar()
+    cbar.set_label(r'Phase', rotation=90)
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_phase.png")
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_phase.svg")
     plt.close()
 
     plt.figure()
     plt.scatter(x, y, c=task_family.amplitudes, s=30)
-    plt.colorbar()
-    plt.title("Context (amp) iteration" + str(iteration))
+    cbar = plt.colorbar()
+    cbar.set_label(r'Amplitude', rotation=90)
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_amp.png")
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_amp.svg")
     plt.close()
 
     # Preprocess data
@@ -154,13 +164,15 @@ def vis_context(lower_contexts, task_family, iteration, args):
     # Visualize
     x, y = context[:, 0], context[:, 1]
     plt.scatter(x, y, c=task_family.slopes, s=30)
-    plt.colorbar()
-    plt.title("Context (slope) iteration" + str(iteration))
+    cbar = plt.colorbar()
+    cbar.set_label(r'Slope', rotation=90)
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_slope.png")
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_slope.svg")
     plt.close()
 
     plt.scatter(x, y, c=task_family.biases, s=30)
-    plt.colorbar()
-    plt.title("Context (bias) iteration" + str(iteration))
+    cbar = plt.colorbar()
+    cbar.set_label(r'Bias', rotation=90)
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_bias.png")
+    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_bias.svg")
     plt.close()
