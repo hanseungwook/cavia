@@ -8,7 +8,6 @@ class MixutureRegressionTasks(object):
         self.args = args
         self.num_inputs = 1
         self.input_range = [-5, 5]
-        # self.super_tasks = ["sin", "linear", "quadratic", "cubic"]
         self.super_tasks = ["sin", "linear"]
         self.reset()
 
@@ -61,10 +60,10 @@ class MixutureRegressionTasks(object):
 
         return cubic_function
 
-    def sample_tasks(self, super_task, number):
+    def sample_tasks(self, super_task, n_task):
         target_functions = []
 
-        for _ in range(number):
+        for _ in range(n_task):
             if super_task == "sin":
                 amplitude = np.random.uniform(0.1, 5.)
                 phase = np.random.uniform(0., np.pi)

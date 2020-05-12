@@ -131,48 +131,19 @@ def vis_prediction(model, higher_contexts, lower_contexts, val_data, iteration, 
         plt.close()
 
 
-def vis_context(lower_contexts, task_family, iteration, args):
-    # Create directories
-    if not os.path.exists("./logs/n_inner" + str(args.n_inner)):
-        os.makedirs("./logs/n_inner" + str(args.n_inner))
+def vis_context(higher_contexts, lower_contexts, task_family, args):
+    for i_super_task, super_task in enumerate(task_family.super_tasks):
+        # Preprocess data
+        higher_context = higher_contexts[i_super_task].detach().cpu().numpy()
+        lower_context = torch.stack(lower_contexts[i_super_task]).detach().cpu().numpy()
 
-    # Preprocess data
-    context = torch.stack(lower_contexts[0]).detach().cpu().numpy()
+        # Visualize
+        plt.figure()
 
-    # Visualize
-    x, y = context[:, 0], context[:, 1]
+        x, y = lower_context[:, 0], lower_context[:, 1]
+        plt.scatter(x, y, c=sns.color_palette()[0], s=30)
 
-    plt.figure()
-    plt.scatter(x, y, c=task_family.phases, s=30)
-    cbar = plt.colorbar()
-    cbar.set_label(r'Phase', rotation=90)
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_phase.png")
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_phase.svg")
-    plt.close()
-
-    plt.figure()
-    plt.scatter(x, y, c=task_family.amplitudes, s=30)
-    cbar = plt.colorbar()
-    cbar.set_label(r'Amplitude', rotation=90)
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_amp.png")
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_amp.svg")
-    plt.close()
-
-    # Preprocess data
-    context = torch.stack(lower_contexts[1]).detach().cpu().numpy()
-
-    # Visualize
-    x, y = context[:, 0], context[:, 1]
-    plt.scatter(x, y, c=task_family.slopes, s=30)
-    cbar = plt.colorbar()
-    cbar.set_label(r'Slope', rotation=90)
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_slope.png")
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_slope.svg")
-    plt.close()
-
-    plt.scatter(x, y, c=task_family.biases, s=30)
-    cbar = plt.colorbar()
-    cbar.set_label(r'Bias', rotation=90)
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_bias.png")
-    plt.savefig("logs/n_inner" + str(args.n_inner) + "/context_iteration" + str(iteration).zfill(3) + "_bias.svg")
-    plt.close()
+        x, y = higher_context[0], higher_context[1]
+        plt.scatter(x, y, c=sns.color_palette()[5], s=60)
+        plt.savefig("logs/tb_" + str(args.log_name) + "/task::" + super_task + "_context.png")
+        plt.close()

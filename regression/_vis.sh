@@ -25,5 +25,6 @@ do
     --task "mixture" \
     --model-type "CAVIA" \
     --n-context-models 2 \
+    --vis-mode \
     --prefix ""
 done

@@ -1,6 +1,6 @@
+import os
 import arguments
 import train
-import os
 from utils import set_log, set_seed
 from tensorboardX import SummaryWriter
 
