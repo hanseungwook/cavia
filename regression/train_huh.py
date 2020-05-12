@@ -31,11 +31,13 @@ def get_encoder_model(encoder_types):
 
 
 def run(args, logger):
+    k_batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
+    n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
+    dataset = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
+
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders)
-
-    model   = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
-    dataset = Level2Dataset(task_func_list, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
+    model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
 
     train(model, dataset, args.n_iters[-1], args.lrs[-1], logger)     # Train
     test_loss = model.evaluate(dataset.sample('test'))              # Test
@@ -84,58 +86,50 @@ def train(model, task, n_iter, lr, logger):
 #             return [self.__class__(self.dataset.sample(), *self.n_batch_next) for i in range(n_batch)]
 
 # Base class for datasets (may not really be necessary)
-class Dataset():
-    def __init__(self, task_fn, *n_batch_all):
+
+def make_batch_dict(n_trains, n_tests, n_valids):
+    return [{'train': n_train, 'test': n_test, 'valid': n_valid} for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids)]
+
+
+class Hierarchical_Task():
+    def __init__(self, task_fn, batch_dict):
+        k_batch_dict, n_batch_dict = batch_dict
         self.task_fn = task_fn
-        n_batch_train, n_batch_test, n_batch_valid = n_batch_all
-        self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
-        self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
-        self.level = len(self.n_batch_next[0])
-        self.K_presample = {'train': 100, 'test': 100, 'valid': 100}
+        self.level = len(k_batch_dict) - 1
+        self.k_batch = k_batch_dict[-1]
+        self.n_batch = n_batch_dict[-1]
+        self.batch_dict_next = (k_batch_dict[:-1], n_batch_dict[:-1])
+        self.data = self.run_pre_sample()
 
     def run_pre_sample(self):
-        return {'train': self.pre_sample(self.K_presample['train']), 
-                'test':  self.pre_sample(self.K_presample['test'])}
+        return {'train': self.pre_sample(self.k_batch['train']), 
+                'test':  self.pre_sample(self.k_batch['test'])}
+
+
+    def pre_sample(self, K_batch):
+        if self.level == 0:
+            n_input, n_output = 1, 1
+            input_data  = torch.randn(K_batch, n_input)
+            target_data = self.task_fn(input_data) #.view(K_batch,n_output)
+            return [(input_data[i,:], target_data[i,:]) for i in range(K_batch)]
+        else:
+            if isinstance(self.task_fn, list):
+                assert K_batch <= len(self.task_fn)
+                tasks = random.sample(self.task_fn, K_batch)
+            else:
+                tasks = [self.task_fn() for _ in range(K_batch)]
+            return [self.__class__(task, self.batch_dict_next) for task in tasks]
+
 
     def sample(self, sample_type):
-        n_batch = self.n_batch[sample_type]
+        batch = self.n_batch[sample_type]
+        dataset = random.sample(self.data[sample_type], batch)
         if self.level == 0:
-            input_data  = self.data[sample_type][:n_batch]
-            target_data = self.task_fn(input_data)
+            input_data  = torch.cat([data[0] for data in dataset], dim=0).view(batch,-1)
+            target_data = torch.cat([data[1] for data in dataset], dim=0).view(batch,-1)
             return [input_data, target_data]
-        else:
-            return random.sample(self.data[sample_type], n_batch)
-
-
-# num_presample = [100, 100, 2]
-
-class Level2Dataset(Dataset):
-    def __init__(self, task_fn, *n_batch_all): #, num_supertasks=4):
-        super().__init__(task_fn, *n_batch_all)
-        self.K_presample = {'train': 2, 'test': 2, 'valid': 2}
-        self.data = self.run_pre_sample()
-
-    def pre_sample(self, K_batch):
-        # assert K_batch <= self.n_super_tasks        # Cannot sample more than the total # of supertasks
-        gen_fns = random.sample(self.task_fn, K_batch)
-        return [Level1Dataset(gen_fn, *self.n_batch_next) for gen_fn in gen_fns]
-
-class Level1Dataset(Dataset):
-    def __init__(self, task_fn, *n_batch_all):
-        super().__init__(task_fn, *n_batch_all)
-        self.data = self.run_pre_sample()
-
-    def pre_sample(self, K_batch):
-        param_gen_fn, task_gen_fn = self.task_fn
-        return [Level0Dataset(task_gen_fn(*param_gen_fn()), *self.n_batch_next) for i in range(K_batch)]
-
-class Level0Dataset(Dataset):
-    def __init__(self, task_fn, *n_batch_all):
-        super().__init__(task_fn, *n_batch_all)
-        self.data = self.run_pre_sample()
-
-    def pre_sample(self, K_batch):
-        return torch.randn(K_batch, 1)
+        else: 
+            return dataset
 
 
 

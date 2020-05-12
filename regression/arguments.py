@@ -31,6 +31,9 @@ def parse_args():
 
     parser.add_argument('--lrs',           type=float, nargs='+', default=[0.05, 0.05, 0.001])     # lr  for inner-loop, midloop, outerloop
     parser.add_argument('--n_iters',       type=int, nargs='+', default=[3, 2, 1000])             # optim_iter for inner-loop, midloop, outerloop
+    parser.add_argument('--k_batch_train', type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks 
+    parser.add_argument('--k_batch_test',  type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks
+    parser.add_argument('--k_batch_valid', type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks
     parser.add_argument('--n_batch_train', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks 
     parser.add_argument('--n_batch_test',  type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
     parser.add_argument('--n_batch_valid', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
