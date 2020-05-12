@@ -2,11 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam, SGD
-import numpy as np
-from model.models_huh import get_model_type, get_encoder_type
+import random
+# import numpy as np
 from functools import partial
 from inspect import signature
-import random
+
+from model.models_huh import get_model_type, get_encoder_type
+from task.mixture2 import task_func_list
+from utils import manual_optim
 
 
 def get_base_model(args):
@@ -27,13 +30,12 @@ def get_encoder_model(encoder_types):
     return encoders
 
 
-def run(args, log, tb_writer=[]):
+def run(args, logger):
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders)
 
     model   = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
-    dataset = Level2Dataset(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-    logger  = Logger(log, tb_writer, args.log_name, args.log_interval)
+    dataset = Level2Dataset(task_func_list, args.n_batch_train, args.n_batch_test, args.n_batch_valid)
 
     train(model, dataset, args.n_iters[-1], args.lrs[-1], logger)     # Train
     test_loss = model.evaluate(dataset.sample('test'))              # Test
@@ -83,171 +85,59 @@ def train(model, task, n_iter, lr, logger):
 
 # Base class for datasets (may not really be necessary)
 class Dataset():
-    def __init__(self):
-        self.data = None
-    
-    def sample(self):
-        raise NotImplementedError
-
-# Constitutes/returns upon sample a list of Level1Dataset
-# Passes parameter generating and task generating function to lower dataset
-class Level2Dataset(Dataset):
-    def __init__(self, *n_batch_all, num_supertasks=4):
-        super().__init__()
+    def __init__(self, task_fn, *n_batch_all):
+        self.task_fn = task_fn
         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
         self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
-        self.n_super_tasks = num_supertasks
         self.level = len(self.n_batch_next[0])
-    
-    # Returns a np array of Level1Datasets
+        self.K_presample = {'train': 100, 'test': 100, 'valid': 100}
+
+    def run_pre_sample(self):
+        return {'train': self.pre_sample(self.K_presample['train']), 
+                'test':  self.pre_sample(self.K_presample['test'])}
+
     def sample(self, sample_type):
         n_batch = self.n_batch[sample_type]
-        assert n_batch <= self.n_super_tasks        # Cannot sample more than the total # of supertasks
+        if self.level == 0:
+            input_data  = self.data[sample_type][:n_batch]
+            target_data = self.task_fn(input_data)
+            return [input_data, target_data]
+        else:
+            return random.sample(self.data[sample_type], n_batch)
 
-        gen_fns = random.sample(task_func, n_batch)
 
+# num_presample = [100, 100, 2]
+
+class Level2Dataset(Dataset):
+    def __init__(self, task_fn, *n_batch_all): #, num_supertasks=4):
+        super().__init__(task_fn, *n_batch_all)
+        self.K_presample = {'train': 2, 'test': 2, 'valid': 2}
+        self.data = self.run_pre_sample()
+
+    def pre_sample(self, K_batch):
+        # assert K_batch <= self.n_super_tasks        # Cannot sample more than the total # of supertasks
+        gen_fns = random.sample(self.task_fn, K_batch)
         return [Level1Dataset(gen_fn, *self.n_batch_next) for gen_fn in gen_fns]
 
-# Constitutes/returns upon sample a list of Level0Dataset
-# Receives parameter generating and task generating function
-# Passes task function (with parameters defined) to lower dataset
 class Level1Dataset(Dataset):
-    def __init__(self, gen_fn, *n_batch_all, num_presample=100):
-        n_batch_train, n_batch_test, n_batch_valid = n_batch_all
-        self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
-        self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
+    def __init__(self, task_fn, *n_batch_all):
+        super().__init__(task_fn, *n_batch_all)
+        self.data = self.run_pre_sample()
 
-        self.num_presample = num_presample
-        self.param_gen_fn, self.task_gen_fn = gen_fn
-        self.train_data = None
-        self.test_data = None
+    def pre_sample(self, K_batch):
+        param_gen_fn, task_gen_fn = self.task_fn
+        return [Level0Dataset(task_gen_fn(*param_gen_fn()), *self.n_batch_next) for i in range(K_batch)]
 
-        self.level = len(self.n_batch_next[0])
-
-        # Sample both train and test fn parameters
-        self.sample_params()
-
-    # Returns a np array of Level0Datasets
-    def sample(self, sample_type):
-        n_batch = self.n_batch[sample_type]
-
-        if sample_type == 'train':
-            return np.random.choice(self.train_data, n_batch, replace=False)
-        elif sample_type == 'test':
-            return np.random.choice(self.test_data, n_batch, replace=False)
-
-    def sample_params(self):
-        self.train_data = [Level0Dataset(self.task_gen_fn(*self.param_gen_fn()), *self.n_batch_next) for i in range(self.num_presample)]
-        self.test_data = [Level0Dataset(self.task_gen_fn(*self.param_gen_fn()), *self.n_batch_next) for i in range(self.num_presample)]
-
-# Returns [inputs, outputs] upon sample
-# Receives task function (with parameters defined)
 class Level0Dataset(Dataset):
-    def __init__(self, task_fn, *n_batch_all, num_presample=100):
-        n_batch_train, n_batch_test, n_batch_valid = n_batch_all
-        self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
-        self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
+    def __init__(self, task_fn, *n_batch_all):
+        super().__init__(task_fn, *n_batch_all)
+        self.data = self.run_pre_sample()
 
-        self.task_fn = task_fn
-        self.train_inputs = None
-        self.test_inputs = None
-        self.num_presample = num_presample
+    def pre_sample(self, K_batch):
+        return torch.randn(K_batch, 1)
 
-        self.level = len(self.n_batch_next[0])
 
-        self.sample_inputs()
-
-    # Returns a list: [inputs, outputs]
-    def sample(self, sample_type):
-        n_batch = self.n_batch[sample_type]
-
-        if sample_type == 'train':
-            return [self.train_inputs[:n_batch], self.task_fn(self.train_inputs[:n_batch])]
-        elif sample_type == 'test':
-            return [self.test_inputs[:n_batch], self.task_fn(self.test_inputs[:n_batch])]
-
-    def sample_inputs(self):
-        self.train_inputs = torch.randn(self.num_presample, 1)
-        self.test_inputs = torch.randn(self.num_presample, 1)
-
-##############################################################################
-# Parameter and task sampling functions
-
-def get_sin_params():
-    # Sample n_batch number of parameters
-    amplitude = np.random.uniform(0.1, 5.)
-    phase = np.random.uniform(0., np.pi)
-    return amplitude, phase
-
-def get_sin_function(amplitude, phase):
-    def sin_function(x):
-        if isinstance(x, torch.Tensor):
-            return torch.sin(x - phase) * amplitude
-        else:
-            return np.sin(x - phase) * amplitude
-
-    return sin_function
-
-def get_linear_params():
-    slope = np.random.uniform(-3., 3.)
-    bias = np.random.uniform(-3., 3.)
-
-    return slope, bias
-
-def get_linear_function(slope, bias):
-    def linear_function(x):
-        return slope * x + bias
-
-    return linear_function
-
-def get_quadratic_params():
-    slope1 = np.random.uniform(-0.2, 0.2)
-    slope2 = np.random.uniform(-2.0, 2.0)
-    bias = np.random.uniform(-3., 3.)
-
-    return slope1, slope2, bias
-
-def get_quadratic_function(slope1, slope2, bias):
-    def quadratic_function(x):
-        if isinstance(x, torch.Tensor):
-            return slope1 * torch.pow(x, 2) + slope2 * x + bias
-        else:
-            return slope1 * np.squre(x, 2) + slope2 * x + bias
-
-    return quadratic_function
-
-def get_cubic_params():
-    slope1 = np.random.uniform(-0.1, 0.1)
-    slope2 = np.random.uniform(-0.2, 0.2)
-    slope3 = np.random.uniform(-2.0, 2.0)
-    bias = np.random.uniform(-3., 3.)
-
-    return slope1, slope2, slope3, bias
-
-def get_cubic_function(slope1, slope2, slope3, bias):
-    def cubic_function(x):
-        if isinstance(x, torch.Tensor):
-            return \
-                slope1 * torch.pow(x, 3) + \
-                slope2 * torch.pow(x, 2) + \
-                slope3 * x + \
-                bias
-        else:
-            return \
-                slope1 * np.power(x, 3) + \
-                slope2 * np.power(x, 2) + \
-                slope3 * x + \
-                bias
-
-    return cubic_function
-
-task_func = [
-             (get_sin_params, get_sin_function),
-             (get_linear_params, get_linear_function),
-             (get_cubic_params, get_cubic_function),
-             (get_quadratic_params, get_quadratic_function)
-            ]
 
 ##############################################################################
 #  Model Hierarchy
@@ -296,43 +186,4 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
     def forward(self, input, ctx_high = []):                                        # assuming ctx is optimized over training tasks already
         return self.submodel(input, ctx_high + [self.ctx])            
-
-
-#####################################
-# Manual optim :  replace optim.SGD  due to memory leak problem
-
-class manual_optim():
-    def __init__(self, param_list, lr):
-        self.param_list = param_list
-        self.lr = lr
-
-    def zero_grad(self):
-        for par in self.param_list:
-            par.grad = torch.zeros(par.data.shape, device=par.device)   #             par.grad = par.zeros_like()
-
-    def backward(self, loss):
-        assert len(self.param_list) == 1            # may only work for a list of one?  # shouldn't run autograd multiple times over a graph 
-        for par in self.param_list:  
-            par.grad += torch.autograd.grad(loss, par, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
-
-    def step(self):
-        for par in self.param_list:
-            par.data = par.data - self.lr * par.grad
-            # par.data -= self.lr * par.grad      # compare these
-            # par = par - self.lr * par.grad      # compare these
-            # par -= par.grad * self.lr           # # compare these... get tiny differences in grad result.
-
-
-#####################################
-class Logger():
-    def __init__(self, log, tb_writer, log_name, update_iter):
-        self.log = log
-        self.tb_writer = tb_writer
-        self.log_name = log_name
-        self.update_iter = update_iter
-    def update(self, iter, loss):
-        if not (iter % self.update_iter):
-            
-            self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
-            self.tb_writer.add_scalar("Meta loss:", loss, iter)
 

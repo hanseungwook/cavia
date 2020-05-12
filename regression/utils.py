@@ -10,6 +10,20 @@ from sklearn.decomposition import PCA
 #################################################################################
 # LOGGING
 #################################################################################
+
+class Logger():
+    def __init__(self, log, tb_writer, log_name, update_iter):
+        self.log = log
+        self.tb_writer = tb_writer
+        self.log_name = log_name
+        self.update_iter = update_iter
+    def update(self, iter, loss):
+        if not (iter % self.update_iter):
+            
+            self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
+            self.tb_writer.add_scalar("Meta loss:", loss, iter)
+
+
 def set_logger(logger_name, log_file, level=logging.INFO):
     log = logging.getLogger(logger_name)
     formatter = logging.Formatter('%(asctime)s : %(message)s')
@@ -36,6 +50,9 @@ def set_log(args):
     return log
 
 
+
+##########################
+
 def set_seed(seed, cudnn=True):
     """
     Seed everything we can!
@@ -50,6 +67,32 @@ def set_seed(seed, cudnn=True):
     # note: the below slows down the code but makes it reproducible
     if (seed is not None) and cudnn:
         torch.backends.cudnn.deterministic = True
+
+
+#####################################
+# Manual optim :  replace optim.SGD  due to memory leak problem
+
+class manual_optim():
+    def __init__(self, param_list, lr):
+        self.param_list = param_list
+        self.lr = lr
+
+    def zero_grad(self):
+        for par in self.param_list:
+            par.grad = torch.zeros(par.data.shape, device=par.device)   #             par.grad = par.zeros_like()
+
+    def backward(self, loss):
+        assert len(self.param_list) == 1            # may only work for a list of one?  # shouldn't run autograd multiple times over a graph 
+        for par in self.param_list:  
+            par.grad += torch.autograd.grad(loss, par, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
+
+    def step(self):
+        for par in self.param_list:
+            par.data = par.data - self.lr * par.grad
+            # par.data -= self.lr * par.grad      # compare these
+            # par = par - self.lr * par.grad      # compare these
+            # par -= par.grad * self.lr           # # compare these... get tiny differences in grad result.
+
 
 
 #################################################################################
