@@ -67,34 +67,14 @@ def train(model, task, n_iter, lr, logger):
 # lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., ., task_idx)]
 # lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
 
-# class Hierarchical_Task():                      # Top-down hierarchy
-#     def __init__(self, dataset, *n_batch_all):
-#         n_batch_train, n_batch_test, n_batch_valid = n_batch_all
-
-#         self.n_batch = {'train': n_batch_train[-1], 'test': n_batch_test[-1], 'valid': n_batch_valid[-1]}
-#         self.n_batch_next =     (n_batch_train[:-1],        n_batch_test[:-1],         n_batch_valid[:-1])
-#         self.level = len(self.n_batch_next[0])
-#         self.n_super_tasks = 4
-#         self.dataset = dataset
-    
-#     def sample(self, sample_type):
-#         n_batch = self.n_batch[sample_type]
-
-#         if self.level == 0:                     # sample datapoints for the bottom level   [inputs, targets]
-#             return self.dataset.sample(n_batch, sample_type)
-#         elif self.level == 1:
-#             return [self.__class__(self.dataset.sample(), *self.n_batch_next) for i in range(n_batch)]
-
-# Base class for datasets (may not really be necessary)
-
 def make_batch_dict(n_trains, n_tests, n_valids):
     return [{'train': n_train, 'test': n_test, 'valid': n_valid} for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids)]
 
 
 class Hierarchical_Task():
-    def __init__(self, task_fn, batch_dict):
+    def __init__(self, task, batch_dict):
         k_batch_dict, n_batch_dict = batch_dict
-        self.task_fn = task_fn
+        self.task = task
         self.level = len(k_batch_dict) - 1
         self.k_batch = k_batch_dict[-1]
         self.n_batch = n_batch_dict[-1]
@@ -110,14 +90,14 @@ class Hierarchical_Task():
         if self.level == 0:
             n_input, n_output = 1, 1
             input_data  = torch.randn(K_batch, n_input)
-            target_data = self.task_fn(input_data) #.view(K_batch,n_output)
+            target_data = self.task(input_data) #.view(K_batch,n_output)
             return [(input_data[i,:], target_data[i,:]) for i in range(K_batch)]
         else:
-            if isinstance(self.task_fn, list):
-                assert K_batch <= len(self.task_fn)
-                tasks = random.sample(self.task_fn, K_batch)
+            if isinstance(self.task, list):
+                assert K_batch <= len(self.task)
+                tasks = random.sample(self.task, K_batch)
             else:
-                tasks = [self.task_fn() for _ in range(K_batch)]
+                tasks = [self.task() for _ in range(K_batch)]
             return [self.__class__(task, self.batch_dict_next) for task in tasks]
 
 
