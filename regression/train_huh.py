@@ -23,10 +23,10 @@ def get_encoder_model(encoder_types):
         if encoder_type is None:
             encoders.append(None)
         else:
-            raise NotImplementedError()
-            # ENCODER_TYPE = get_encoder_type(args.model_type)
-            # encoder_model = ENCODER_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
-            # encoders.append(encoder_model)
+            ENCODER_TYPE = get_encoder_type(encoder_type) # Check if n_hidden is the task embedding dimension in Encoder_Core().
+            encoder_model = ENCODER_TYPE( input_dim=args.input_dim, n_hidden=args.n_hidden, tree_hidden_dim=args.tree_hidden_dim, 
+                                cluster_layer_0=args.cluster_layer_0, cluster_layer_1=args.cluster_layer_1)
+            encoders.append(encoder_model)
     return encoders
 
 
