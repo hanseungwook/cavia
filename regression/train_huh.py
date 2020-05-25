@@ -84,7 +84,7 @@ class Hierarchical_Task():
     def pre_sample(self, K_batch):
         if self.level == 0:
             n_input = 1
-            input_data  = torch.randn(K_batch, n_input)
+            input_data = torch.randn(K_batch, n_input)
             target_data = self.task(input_data)
             return [(input_data[i, :], target_data[i, :]) for i in range(K_batch)]
         else:
@@ -94,7 +94,6 @@ class Hierarchical_Task():
             else:
                 tasks = [self.task() for _ in range(K_batch)]
             return [self.__class__(task, self.batch_dict_next) for task in tasks]
-
 
     def sample(self, sample_type):
         batch = self.n_batch[sample_type]
@@ -111,7 +110,7 @@ class Hierarchical_Task():
 #  Model Hierarchy
 def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders):
     for level, (n_context, n_iter, lr, encoder) in enumerate(zip(n_contexts, n_iters, lrs, encoders)):
-        model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder) #, adaptation_type) 
+        model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder)
     return model
 
 
@@ -154,6 +153,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
             for i_task, ctx in context_dict.items():
                 task = tasks[i_task]
+                ctx = torch.from_numpy(ctx)
                 loss += self.submodel.evaluate(task.sample('test'), ctx_high + [ctx])
 
         return loss / float(len(tasks))  
@@ -169,6 +169,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             optim.step()
 
         if context_dict is None:
-            return ctx
+            return ctx.detach()
         else:
-            context_dict[rank] = ctx
+            context_dict[rank] = ctx.detach().cpu().numpy()
