@@ -1,10 +1,14 @@
+import time
 import random
 import torch
 import torch.nn as nn
+import torch.multiprocessing as mp
 from torch.optim import Adam
 from model.models_huh import get_model_type
 from task.mixture2 import task_func_list
 from utils import manual_optim
+
+torch.set_num_threads(3)
 
 
 def get_base_model(args):
@@ -28,12 +32,12 @@ def run(args, logger):
     n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
     dataset = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
 
-    base_model      = get_base_model(args)
-    encoder_models  = get_encoder_model(args.encoders)
-    model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
+    base_model = get_base_model(args)
+    encoder_models = get_encoder_model(args.encoders)
+    model = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
 
-    train(model, dataset, args.n_iters[-1], args.lrs[-1], logger)     # Train
-    test_loss = model.evaluate(dataset.sample('test'))              # Test
+    train(model, dataset, args.n_iters[-1], args.lrs[-1], logger)
+    test_loss = model.evaluate(dataset.sample('test'))
     return test_loss, logger
 
 
@@ -73,16 +77,16 @@ class Hierarchical_Task():
         self.data = self.run_pre_sample()
 
     def run_pre_sample(self):
-        return {'train': self.pre_sample(self.k_batch['train']), 
-                'test':  self.pre_sample(self.k_batch['test'])}
-
+        return {
+            'train': self.pre_sample(self.k_batch['train']), 
+            'test': self.pre_sample(self.k_batch['test'])}
 
     def pre_sample(self, K_batch):
         if self.level == 0:
-            n_input, n_output = 1, 1
+            n_input = 1
             input_data  = torch.randn(K_batch, n_input)
-            target_data = self.task(input_data) #.view(K_batch,n_output)
-            return [(input_data[i,:], target_data[i,:]) for i in range(K_batch)]
+            target_data = self.task(input_data)
+            return [(input_data[i, :], target_data[i, :]) for i in range(K_batch)]
         else:
             if isinstance(self.task, list):
                 assert K_batch <= len(self.task)
@@ -96,17 +100,15 @@ class Hierarchical_Task():
         batch = self.n_batch[sample_type]
         dataset = random.sample(self.data[sample_type], batch)
         if self.level == 0:
-            input_data  = torch.cat([data[0] for data in dataset], dim=0).view(batch,-1)
-            target_data = torch.cat([data[1] for data in dataset], dim=0).view(batch,-1)
+            input_data = torch.cat([data[0] for data in dataset], dim=0).view(batch, -1)
+            target_data = torch.cat([data[1] for data in dataset], dim=0).view(batch, -1)
             return [input_data, target_data]
         else: 
             return dataset
 
 
-
 ##############################################################################
 #  Model Hierarchy
-
 def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders):
     for level, (n_context, n_iter, lr, encoder) in enumerate(zip(n_contexts, n_iters, lrs, encoders)):
         model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder) #, adaptation_type) 
@@ -114,9 +116,9 @@ def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders):
 
 
 class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, decoder_model, level, n_context, n_iter, lr, encoder_model = None): 
+    def __init__(self, decoder_model, level, n_context, n_iter, lr, encoder_model=None): 
         super().__init__()
-        assert hasattr  (decoder_model, 'evaluate')    # submodel has evaluate() method built-in
+        assert hasattr(decoder_model, 'evaluate')    # submodel has evaluate() method built-in
         self.submodel = decoder_model 
         self.level = level                  # could be useful for debugging/experimenting
         self.n_context = n_context
@@ -124,25 +126,49 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         self.lr = lr
         self.device = decoder_model.device
         self.adaptation = self.optimize if encoder_model is None else encoder_model 
-        # self.reset_ctx()
 
     def evaluate(self, tasks, ctx_high=[]):
         assert self.level == tasks[0].level
 
+        # At super-task level, apply no threading
         loss = 0. 
-        for task in tasks:
-            ctx = self.adaptation(task.sample('train'), ctx_high)
-            loss += self.submodel.evaluate(task.sample('test'), ctx_high + [ctx])
+        if len(tasks) == 2:
+            for task in tasks:
+                ctx = self.adaptation(task.sample('train'), ctx_high)
+                loss += self.submodel.evaluate(task.sample('test'), ctx_high + [ctx])
+
+        # At lower level, apply threading
+        else:
+            processes, context_dict = [], mp.Manager().dict()
+            for i_task, task in enumerate(tasks):
+                p = mp.Process(
+                    target=self.adaptation,
+                    args=(task.sample('train'), ctx_high, context_dict, i_task))
+                p.start()
+                processes.append(p)
+                time.sleep(0.01)
+
+            for p in processes:
+                time.sleep(0.01)
+                p.join()
+
+            for i_task, ctx in context_dict.items():
+                task = tasks[i_task]
+                loss += self.submodel.evaluate(task.sample('test'), ctx_high + [ctx])
+
         return loss / float(len(tasks))  
 
-    def optimize(self, tasks, ctx_high):
+    def optimize(self, tasks, ctx_high, context_dict=None, rank=None):
         ctx = torch.zeros(1, self.n_context, requires_grad=True).to(self.device)
         optim = manual_optim([ctx], self.lr)
 
-        for iter in range(self.n_iter): 
+        for _ in range(self.n_iter): 
             loss = self.submodel.evaluate(tasks, ctx_high + [ctx])  
             optim.zero_grad()
             optim.backward(loss)
             optim.step()
 
-        return ctx
+        if context_dict is None:
+            return ctx
+        else:
+            context_dict[rank] = ctx
