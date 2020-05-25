@@ -1,21 +1,17 @@
+import random
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.optim import Adam, SGD
-import random
-# import numpy as np
-from functools import partial
-from inspect import signature
-
-from model.models_huh import get_model_type, get_encoder_type
+from torch.optim import Adam
+from model.models_huh import get_model_type
 from task.mixture2 import task_func_list
 from utils import manual_optim
 
 
 def get_base_model(args):
     MODEL_TYPE = get_model_type(args.model_type)
-    model = MODEL_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
+    model = MODEL_TYPE(n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
     return model
+
 
 def get_encoder_model(encoder_types):
     encoders = []
@@ -24,9 +20,6 @@ def get_encoder_model(encoder_types):
             encoders.append(None)
         else:
             raise NotImplementedError()
-            # ENCODER_TYPE = get_encoder_type(args.model_type)
-            # encoder_model = ENCODER_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
-            # encoders.append(encoder_model)
     return encoders
 
 
@@ -45,17 +38,15 @@ def run(args, logger):
 
 
 def train(model, task, n_iter, lr, logger):
-    
     optim = Adam(model.parameters(), lr)
 
     for iter in range(n_iter): 
-        loss = model.evaluate( task.sample('train') )
+        loss = model.evaluate(task.sample('train'))
         optim.zero_grad()
         loss.backward()
         optim.step()
-        # ------------ logging ------------
+
         logger.update(iter, loss.detach().cpu().numpy())
-        # vis_pca(higher_contexts, task_family, iteration, args)      ## Visualize result
 
 
 ##############################################################################
@@ -126,38 +117,32 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
     def __init__(self, decoder_model, level, n_context, n_iter, lr, encoder_model = None): 
         super().__init__()
         assert hasattr  (decoder_model, 'evaluate')    # submodel has evaluate() method built-in
-        self.submodel  = decoder_model 
-        self.level     = level                  # could be useful for debugging/experimenting
+        self.submodel = decoder_model 
+        self.level = level                  # could be useful for debugging/experimenting
         self.n_context = n_context
-        self.n_iter    = n_iter
-        self.lr        = lr
-        self.device    = decoder_model.device
-
+        self.n_iter = n_iter
+        self.lr = lr
+        self.device = decoder_model.device
         self.adaptation = self.optimize if encoder_model is None else encoder_model 
-        self.reset_ctx()
+        # self.reset_ctx()
 
-    def reset_ctx(self):
-        self.ctx = torch.zeros(1,self.n_context, requires_grad = True).to(self.device)
+    def evaluate(self, tasks, ctx_high=[]):
+        assert self.level == tasks[0].level
 
-    def evaluate(self, tasks, ctx_high = []):
-        assert self.level == tasks[0].level                                               # checking if the model level matches with task level
-        loss = 0 
+        loss = 0. 
         for task in tasks:
-            self.adaptation(task.sample('train'), ctx_high)                                # adapt self.ctx  given high-level ctx 
-            loss += self.submodel.evaluate(task.sample('test'), ctx_high + [self.ctx])     # going 1 level down
+            ctx = self.adaptation(task.sample('train'), ctx_high)
+            loss += self.submodel.evaluate(task.sample('test'), ctx_high + [ctx])
         return loss / float(len(tasks))  
 
-    def optimize(self, tasks, ctx_high):                            # optimize parameter for a given 'task'
-        self.reset_ctx()
-        optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
+    def optimize(self, tasks, ctx_high):
+        ctx = torch.zeros(1, self.n_context, requires_grad=True).to(self.device)
+        optim = manual_optim([ctx], self.lr)
 
         for iter in range(self.n_iter): 
-            loss = self.submodel.evaluate(tasks, ctx_high + [self.ctx])  
+            loss = self.submodel.evaluate(tasks, ctx_high + [ctx])  
             optim.zero_grad()
             optim.backward(loss)
-            optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
+            optim.step()
 
-
-    def forward(self, input, ctx_high = []):                                        # assuming ctx is optimized over training tasks already
-        return self.submodel(input, ctx_high + [self.ctx])            
-
+        return ctx
