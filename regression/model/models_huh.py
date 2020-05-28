@@ -8,9 +8,12 @@ from functools import partial
 
 # from pdb import set_trace
 
-def get_encoder_type(model_type):
-    raise NotImplementedError()
-    # return ENCODER
+def get_encoder_type(encoder_type):
+    if encoder_type == "HSML":
+        MODEL = HSML
+    else:
+        raise ValueError()
+    return ENCODER
 
 def get_model_type(model_type):
 
@@ -275,11 +278,141 @@ class Add_Multive_Weight(Active_Weight):
         bias   = self.b0 * F.sigmoid(o_b) + d_b
         return weight, bias
 
+######################################
 
+class Encoder_Core(nn.Module):
+    def __init__(self, input_dim, n_hidden):
+        super().__init__()
+        self.input_dim = input_dim
+        self.n_hidden  = n_hidden # 64
 
+        self.fc1 = nn.Linear(input_dim, 9 * n_hidden)
+        self.fc2 = nn.Linear(9 * n_hidden, 3 * n_hidden)
+        self.fc3 = nn.Linear(3 * n_hidden, n_hidden)
 
+    def _reshape_batch(self, input):
+        return input.view(-1, input.shape[-1])
+    
+    def _mean_over_batch(self, input, mean_num, n_task):
+        return input.view(-1, mean_num, input.shape[1]).mean(dim=1, keepdim=False).view(n_task,-1,input.shape[1])
+        
+    def _progressive_mean_over_batch(self, input, n_batch, n_batch_log, n_task, progressive):
+        if progressive:
+            temp = [self._mean_over_batch(input, 2**n, n_task) for n in range(n_batch_log+1)]
+            temp = torch.cat(temp[::-1], dim=1)
+        else: 
+            temp = self._mean_over_batch(input, n_batch, n_task)
+        return self._reshape_batch(temp) 
 
+    def forward(self, input, progressive = False):
+        n_task, n_batch, _ = input.shape        
+        n_batch_log = int(torch.tensor(n_batch).float().log2())
+        
+        x = self._reshape_batch(input)
+        x = F.relu(self.fc1(x))
+        x = self._progressive_mean_over_batch(x, n_batch, n_batch_log, n_task, progressive)
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
+        
+        return x
 
+class HSML(nn.Module):
+    def __init__(self, input_dim, n_hidden, tree_hidden_dim, cluster_layer_0, cluster_layer_1):
 
+        # Initialize variables (hidden dim, input dim, output dim, )
+        self.n_context = n_hidden # output dimension of task embedding
+        self.tree_hidden_dim = tree_hidden_dim
 
+        # Initialize parameters for HSML
+        self.cluster_layer_0 = cluster_layer_0
+        self.cluster_layer_1 = cluster_layer_1
+        self._initialize_all()
 
+        # Initialize parameters for part (b)
+        self._construct_cluster()
+
+        self.encoder = Encoder_Core(input_dim, n_hidden)
+
+    def _construct_cluster(self):
+        self.cluster = []
+        self.weight_0 = []
+        self.bias_0 = []
+        for i in range(self.cluster_layer_0):
+            self.cluster.append(torch.nn.Parameter(torch.empty(1,self.n_context)))
+            self.weight_0.append(torch.nn.Parameter(torch.empty(self.n_context,self.tree_hidden_dim)))
+            self.bias_0.append(torch.nn.Parameter(torch.empty(1,self.tree_hidden_dim)))
+
+        self.cluster_weight_1, self.cluster_bias_1 = [], []
+        self.weight_1, self.bias_1 = [], []
+        for i in range(self.cluster_layer_1):
+            self.cluster_weight_1.append(torch.nn.Parameter(torch.empty(self.tree_hidden_dim,1)))
+            self.cluster_bias_1.append(torch.nn.Parameter(torch.empty(1,1)))
+            self.weight_1.append(torch.nn.Parameter(torch.empty(self.tree_hidden_dim,self.tree_hidden_dim)))
+            self.bias_1.append(torch.nn.Parameter(torch.empty(1,self.tree_hidden_dim)))
+
+        self.weight_2 = torch.nn.Parameter(torch.empty(self.tree_hidden_dim,self.tree_hidden_dim))
+        self.bias_2 = torch.nn.Parameter(torch.empty(1,self.tree_hidden_dim))
+
+    def _clustering(self, h): # Part (b)
+        sigma = 2.0
+
+        for idx in range(self.cluster_layer_0):
+            if idx == 0:
+                all_value = torch.exp(-torch.sum((h - self.cluster[idx])**2) / (2.0 * sigma))
+            else:
+                all_value += torch.exp(-torch.sum((h - self.cluster[idx])**2) / (2.0 * sigma))
+
+        h_0 = []
+        for idx in range(self.cluster_layer_0):
+            assignment_idx = torch.exp(-torch.sum((h - self.cluster[idx])**2) / (2.0 * sigma)) / all_value
+            value_u = torch.tanh(torch.mm(h, self.weight_0[idx]) + self.bias_0[idx])
+            value_c = assignment_idx * value_u
+            h_0.append(value_c)
+
+        h_1 = []
+        for idx in range(self.cluster_layer_0):
+            p_0 = []
+            for idx_layer_1 in range(self.cluster_layer_1):
+                p_0.append(torch.mm(h_0[idx], self.cluster_weight_1[idx_layer_1]) + self.cluster_bias_1[idx_layer_1])
+            p_0 = F.softmax(torch.cat(p_0, dim=0), dim=0)
+
+            h_1_temp = []
+            for idx_layer_1 in range(self.cluster_layer_1):
+                h_1_temp.append(p_0[idx_layer_1] * torch.tanh(torch.mm(h_0[idx], self.weight_1[idx_layer_1]) + self.bias_1[idx_layer_1]))
+            h_1.append(torch.cat(h_1_temp, dim=0))
+
+        h_1 = torch.stack(h_1, dim=0)
+        h_1 = h_1.permute(1, 0, 2)
+        h_1 = torch.sum(h_1, dim=1)
+
+        g = []
+        for idx in range(self.cluster_layer_1):
+            g.append(torch.tanh(torch.mm(h_1[idx].unsqueeze(0), self.weight_2) + self.bias_2))
+
+        g = torch.sum(torch.cat(g, axis=0), dim=0)
+
+        return g
+
+    def _initialize_all(self):
+        self._initialize(self.weight_0)
+        self._initialize(self.bias_0)
+
+        self._initialize(self.cluster_weight_1)
+        self._initialize(self.weight_1)
+        self._initialize(self.cluster_bias_1)
+        self._initialize(self.bias_1)
+
+        self.weight_2.data = torch.initialize(self.weight_2)
+        self.bias_2.data = torch.initialize(self.bias_2)
+
+        self._initialize(self.cluster)
+
+    def _initialize(param_list):
+        for par in param_list:
+            par.data = torch.initialize(par)
+
+    def forward(self, input):
+        h = self.encoder.forward(input, progressive = None):
+        g = self._clustering(h)
+        g_embed = torch.cat((h, g), dim=1)
+        return g_embed
