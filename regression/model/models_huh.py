@@ -412,7 +412,7 @@ class HSML(nn.Module):
             par.data = torch.initialize(par)
 
     def forward(self, input):
-        h = self.encoder.forward(input, progressive = None):
+        h = self.encoder.forward(input, progressive = None)
         g = self._clustering(h)
         g_embed = torch.cat((h, g), dim=1)
         return g_embed
