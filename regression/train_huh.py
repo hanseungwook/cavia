@@ -59,10 +59,10 @@ def train(model, dl, epochs, lr, logger):
     for epoch in range(epochs):
         for minibatch in iter(dl):
             loss = model.evaluate(minibatch)
-            print('train minibatch done')
             optim.zero_grad()
             loss.backward()
             optim.step()
+
             # ------------ logging ------------
             logger.update(epoch, loss.detach().cpu().numpy())
             # vis_pca(higher_contexts, task_family, iteration, args)      ## Visualize result
@@ -164,8 +164,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             for minibatch_test in iter(task.get('test')):
                 loss += self.submodel.evaluate(minibatch_test, ctx_high + [self.ctx])     # going 1 level down
 
-        print('eval loss', loss / float(len(minibatch)))
-
         return loss / float(len(minibatch))
 
     def optimize(self, dl, ctx_high):                            # optimize parameter for a given 'task'
@@ -173,16 +171,13 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
 
         cur_iter = 0
-        while True:      
-            # print(self.n_iter)      
+        while True:        
             for minibatch in iter(dl):
                 loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])  
                 optim.zero_grad()
                 optim.backward(loss)
                 optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
                 cur_iter += 1
-
-                # print(cur_iter, loss)
 
                 if cur_iter >= self.n_iter:
                     return False
