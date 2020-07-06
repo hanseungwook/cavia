@@ -13,7 +13,7 @@ import IPython
 from model.models_huh import get_model_type, get_encoder_type
 from task.mixture2 import task_func_list
 from utils import manual_optim
-from dataset import Level0_Dataset, LevelOthers_Dataset
+from dataset import Level0_Dataset, HighLevel_Dataset, HighLevel_DataLoader
 
 
 def get_base_model(args):
@@ -21,7 +21,7 @@ def get_base_model(args):
     model = MODEL_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
     return model
 
-def get_encoder_model(encoder_types):
+def get_encoder_model(encoder_types, args):
     encoders = []
     for encoder_type in encoder_types:
         if encoder_type is None:
@@ -40,21 +40,26 @@ def run(args, logger):
     dataset = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
     
     base_model      = get_base_model(args)
-    encoder_models  = get_encoder_model(args.encoders)
+    encoder_models  = get_encoder_model(args.encoders, args)
     model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
 
     train(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger)     # Train
-    test_loss = model.evaluate(dataset.get('test'))              # Test
+    
+    test_loss = 0
+    for minibatch_test in iter(dataset.get('test')):
+        test_loss += model.evaluate(minibatch_test)
+
     return test_loss, logger
 
 
-def train(model, tasks, epochs, lr, logger):
+def train(model, dl, epochs, lr, logger):
     
     optim = Adam(model.parameters(), lr)
 
     for epoch in range(epochs):
-        for task in iter(tasks):
-            loss = model.evaluate(task)
+        for minibatch in iter(dl):
+            loss = model.evaluate(minibatch)
+            print('train minibatch done')
             optim.zero_grad()
             loss.backward()
             optim.step()
@@ -115,30 +120,13 @@ class Hierarchical_Task():
         else:
             tasks = self.high_level_presampling(K_batch)
             subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]
-            subtask_dataset = LevelOthers_Dataset(x=subtask_list)
+            subtask_dataset = HighLevel_Dataset(x=subtask_list)
             
             # HighLevel_Dataloader returns a mini-batch of Hiearchical Tasks[
             return HighLevel_DataLoader(subtask_dataset, batch_size=N_batch)
     
     def get(self, sample_type):
         return self.data[sample_type]
-
-class HighLevel_DataLoader():
-    def __init__(self, dataset, batch_size):
-        self.dataset = dataset
-        self.batch_size = batch_size
-
-    def __iter__(self):
-        # Create indices of batches
-        batch_idx = list(BatchSampler(RandomSampler(self.dataset), self.batch_size, drop_last=False))
-
-        # Create dataset of minibatches of the form [mini-batch of (hierarchical tasks), ...]
-        mini_dataset = []
-        for mini_batch_idx in batch_idx:
-            mini_batch = [self.dataset[idx] for idx in mini_batch_idx]
-            mini_dataset.append(mini_batch)
-
-        return iter(mini_dataset)
          
 
 ##############################################################################
@@ -167,41 +155,37 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
     def reset_ctx(self):
         self.ctx = torch.zeros(1, self.n_context, requires_grad=True).to(self.device)
 
-    def evaluate(self, tasks, ctx_high = []):
+    def evaluate(self, minibatch, ctx_high = []):
         # assert self.level == tasks[0].level                                               # checking if the model level matches with task level
-        print('eval level', self.level)
         loss = 0
-        print('eval tasks', tasks)
-        for task in iter(tasks):
-            print('eval task', task)
+        for task in minibatch:
             self.adaptation(task.get('train'), ctx_high)                                # adapt self.ctx  given high-level ctx 
-            loss += self.submodel.evaluate(task.get('test'), ctx_high + [self.ctx])     # going 1 level down
+            
+            for minibatch_test in iter(task.get('test')):
+                loss += self.submodel.evaluate(minibatch_test, ctx_high + [self.ctx])     # going 1 level down
 
-        return loss / float(len(tasks))
+        print('eval loss', loss / float(len(minibatch)))
 
-    def optimize(self, tasks, ctx_high):                            # optimize parameter for a given 'task'
+        return loss / float(len(minibatch))
+
+    def optimize(self, dl, ctx_high):                            # optimize parameter for a given 'task'
         self.reset_ctx()
         optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
 
         cur_iter = 0
-        while True:            
-            for task in iter(tasks):
-                print('optimize task', task)
-                for sub_task in task:
-                    print('optimize subtask', sub_task)
-                    print('sub_task level', sub_task.level)
-                    # if self.level == 0:
-                    #     loss = self.submodel.evaluate(sub_task, ctx_high + [self.ctx])
-                    # else:
-                    #     loss = self.submodel.evaluate(sub_task.get('train'), ctx_high + [self.ctx])
-                    loss = self.submodel.evaluate(sub_task.get('train'), ctx_high + [self.ctx])  
-                    optim.zero_grad()
-                    optim.backward(loss)
-                    optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
-                    cur_iter += 1
+        while True:      
+            # print(self.n_iter)      
+            for minibatch in iter(dl):
+                loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])  
+                optim.zero_grad()
+                optim.backward(loss)
+                optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
+                cur_iter += 1
 
-                    if cur_iter > self.n_iter:
-                        break
+                # print(cur_iter, loss)
+
+                if cur_iter >= self.n_iter:
+                    return False
 
     def forward(self, input, ctx_high = []):                                        # assuming ctx is optimized over training tasks already
         return self.submodel(input, ctx_high + [self.ctx])            

@@ -19,7 +19,6 @@ def sample_sin_fnc():
     return regression_input_function, get_sin_function(*get_sin_params())
 
 def sample_linear_fnc():
-    
     return regression_input_function, get_linear_function(*get_linear_params())
 
 def regression_input_function(batch_size):
@@ -125,6 +124,18 @@ def get_linear_function(slope, bias):
 
     return linear_function
 
+
+task_func_list = [sample_sin_fnc, sample_linear_fnc]
+# task_func_list = [sample_img_fnc, sample_sin_fnc, sample_linear_fnc]
+
+
+
+
+
+
+
+
+
 # def get_quadratic_params():
 #     slope1 = np.random.uniform(-0.2, 0.2)
 #     slope2 = np.random.uniform(-2.0, 2.0)
@@ -162,6 +173,3 @@ def get_linear_function(slope, bias):
 #             #  (get_quadratic_params, get_quadratic_function),
 #             #  (get_cubic_params, get_cubic_function),
 #             ]
-
-
-task_func_list = [sample_sin_fnc, sample_linear_fnc]
