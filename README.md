@@ -10,21 +10,25 @@ I used Python 3.7 and PyTorch 1.0.1 for these experiments.
 
 - Running experiments:
     
-    To run the experiment with default settings, execute
+    To run the experiment with default settings (2-level), execute
     ```
-    python3 regression/main.py
+    python3 regression/main_huh.py
     ```
     
-    This will run the sine curve experiment. 
+    This will run the regression of different task families (sine, quadratic, cubic, ...) experiment. 
     To run the CelebA image completion experiment, run 
-    ```
-    python3 regression/main --task celeba --num_context_params 128 --num_hidden_layers 128 128 128 128 128 --k_meta_test 1024
-    ```
-    To change the number of context parameters, use the flag `--num_context_params`.
-    
-    To run MAML with the default settings, run `python3 regression/main.py --maml --num_context_params 0 --lr_inner 0.1`
 
-    For default settings and other argument options, see `classification/arguments.py`
+    ```
+    python3 main_huh.py --n_iters 2 3 1000 --n_contexts 2 1 --log_interval=20
+    ```
+
+    To change the number of context parameters, use the flag `--n_contexts`.
+
+    To change the result log name, use the flag `--log_name`.
+
+    To change the meta-learner to 1-level, change the `--n_iters` to `0 3 1000`. (Setting the most inner loop number of iterations to 0)
+
+    For default settings and other argument options, see `regression/arguments.py`
     
 - CelebA dataset:
 

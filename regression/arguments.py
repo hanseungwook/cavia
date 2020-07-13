@@ -41,6 +41,7 @@ def parse_args():
     parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
 
     parser.add_argument('--log_interval',  type=int, default=100)
+    parser.add_argument('--log_name',  type=str, default='')
 
     args = parser.parse_args()
 
@@ -48,10 +49,11 @@ def parse_args():
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Set args log name
-    args.log_name = \
-        "test::" 
-        # "iter::%s_lr::%sn_batch::%s_n_ctx::%s_prefix::%s" % (
-        #     args.n_iters, args.lrs, args.n_batch_train, len(args.n_contexts), args.prefix)
+    if not args.log_name:
+        args.log_name = \
+            "test::" 
+            # "iter::%s_lr::%sn_batch::%s_n_ctx::%s_prefix::%s" % (
+            #     args.n_iters, args.lrs, args.n_batch_train, len(args.n_contexts), args.prefix)
     # args.log_name = \
     #     "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
     #         args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models, args.prefix)

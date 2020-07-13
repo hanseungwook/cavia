@@ -110,7 +110,7 @@ class Hierarchical_Task():
         if self.level == 0:
             input_gen, target_gen = self.task
             input_data = input_gen(K_batch)
-            target_data = target_gen(input_data) #.view(K_batch,n_output)
+            target_data = target_gen(input_data)
 
             dataset = Level0_Dataset(x=input_data, y=target_data)
 
