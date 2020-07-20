@@ -15,10 +15,10 @@ valid_imgs = []
 test_imgs = []
 img_size = (32, 32, 3)
 
-def sample_sin_fnc():
+def sample_sin_fnc(sample_type):
     return regression_input_function, get_sin_function(*get_sin_params())
 
-def sample_linear_fnc():
+def sample_linear_fnc(sample_type):
     return regression_input_function, get_linear_function(*get_linear_params())
 
 def regression_input_function(batch_size):
@@ -26,6 +26,8 @@ def regression_input_function(batch_size):
 
 def get_img(sample_type):
     img_files = None
+
+    # TODO: Define train_imgs, valid_imgs, test_imgs
     if sample_type == 'train':
         img_files = train_imgs
     elif sample_type == 'valid':
@@ -125,7 +127,8 @@ def get_linear_function(slope, bias):
     return linear_function
 
 
-task_func_list = [sample_sin_fnc, sample_linear_fnc]
+# task_func_list = [sample_sin_fnc, sample_linear_fnc]
+task_func_list = [sample_sin_fnc, sample_img_fnc]
 # task_func_list = [sample_img_fnc, sample_sin_fnc, sample_linear_fnc]
 
 

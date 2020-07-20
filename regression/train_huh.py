@@ -93,20 +93,20 @@ class Hierarchical_Task():
         self.inputs_gen = inputs_gen
 
     def run_pre_sample(self):
-        return {'train': self.pre_sample(self.k_batch['train'], self.n_batch['train']), 
-                'test':  self.pre_sample(self.k_batch['test'], self.n_batch['test'])}
+        return {'train': self.pre_sample(self.k_batch['train'], self.n_batch['train'], sample_type='train'), 
+                'test':  self.pre_sample(self.k_batch['test'], self.n_batch['test'], sample_type='test')}
 
-    def high_level_presampling(self, K_batch):
+    def high_level_presampling(self, K_batch, sample_type):
         if isinstance(self.task, list):
             assert K_batch <= len(self.task)
             tasks = random.sample(self.task, K_batch)
         else:
-            tasks = [self.task() for _ in range(K_batch)]
+            tasks = [self.task(sample_type) for _ in range(K_batch)]
         return tasks
 
     # K_batch: total # of samples
     # N_batch: mini batch # of samples
-    def pre_sample(self, K_batch, N_batch):
+    def pre_sample(self, K_batch, N_batch, sample_type):
         if self.level == 0:
             input_gen, target_gen = self.task
             input_data = input_gen(K_batch)
@@ -118,7 +118,7 @@ class Hierarchical_Task():
             return DataLoader(dataset, batch_size=N_batch, shuffle=True)
 
         else:
-            tasks = self.high_level_presampling(K_batch)
+            tasks = self.high_level_presampling(K_batch, sample_type)
             subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]
             subtask_dataset = HighLevel_Dataset(x=subtask_list)
             
@@ -176,6 +176,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                 loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])  
                 optim.zero_grad()
                 optim.backward(loss)
+                # torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
                 optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
                 cur_iter += 1
 
