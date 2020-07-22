@@ -79,7 +79,9 @@ class manual_optim():
 
     def zero_grad(self):
         for par in self.param_list:
-            par.grad = torch.zeros(par.data.shape, device=par.device)   #             par.grad = par.zeros_like()
+            par.grad = torch.zeros_like(par.data)   #             par.grad = par.zeros_like()
+            assert (par.requires_grad == True)
+            # par.grad = torch.zeros(par.data.shape, device=par.device)   #             par.grad = par.zeros_like()
 
     def backward(self, loss):
         assert len(self.param_list) == 1            # may only work for a list of one?  # shouldn't run autograd multiple times over a graph 
