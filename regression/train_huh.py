@@ -233,7 +233,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
     def optimize(self, dl, ctx_high):                            # optimize parameter for a given 'task'
         self.reset_ctx()
-        optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
+        # optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
 
         cur_iter = 0
         while True:        
@@ -242,10 +242,12 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                     return False
 
                 loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])  
-                optim.zero_grad()
-                optim.backward(loss)
-                # torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-                optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
+                self.ctx += torch.autograd.grad(loss, self.ctx, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
+
+                # optim.zero_grad()
+                # optim.backward(loss)
+                # # torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
+                # optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
                 cur_iter += 1
 
 
