@@ -106,8 +106,8 @@ def debug(model, dl, epochs, lr, logger):
                 t.append(p.grad.view(-1))
             analy_grad = torch.cat(t)
 
-            IPython.embed()
-            
+            # IPython.embed()
+            print('grad error: ', (finite_grad - analy_grad).norm().detach().numpy())
             optim.step()
 
             # ------------ logging ------------
