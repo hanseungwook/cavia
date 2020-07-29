@@ -247,14 +247,13 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                 loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])
                 grad = torch.autograd.grad(loss, [self.ctx], create_graph=True)[0]
                 self.ctx -= self.lr * grad                  # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0] 
-                # IPython.embed()
+                
                 ### DEBUG
                 e = partial(eval_model_lower, self, minibatch, ctx_high)
                 finite_grad = check_grad(e, self.ctx, eps=1e-8, analytic_grad=False)
                 print('level {}: grad error: '.format(self.level), (finite_grad - grad).norm().detach().numpy())
 
                 cur_iter += 1
-        IPython.embed()
 
 
     def forward(self, input, ctx_high = []):                                        # assuming ctx is optimized over training tasks already
