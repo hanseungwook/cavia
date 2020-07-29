@@ -71,6 +71,22 @@ def check_grad(fnc, inputs, eps = 1e-6, analytic_grad = False):
     else:
         return grad_num
 
+def check_grad_inner(fnc, inputs, eps = 1e-6, analytic_grad = False):
+    grad_num = torch.zeros_like(inputs)
+
+    for i in range(inputs[0].shape[0]):
+        in_ = inputs.clone().detach();  in_.requires_grad = True;       in_[0][i] += eps;             loss1 = fnc(in_);    
+        in_ = inputs.clone().detach();  in_.requires_grad = True;       in_[0][i] -= eps;             loss2 = fnc(in_); 
+        grad_num[0][i] = (loss1 - loss2)/2/eps
+    if analytic_grad:
+        in_ = inputs.clone().detach()
+        in_.requires_grad = True
+        assert(in_.requires_grad)
+        loss = fnc(inputs.clone().detach());         loss.backward(); 
+        return grad_num, in_.grad
+    else:
+        return grad_num
+
 
 def eval_model_weight(model, minibatch, weights):
     torch.nn.utils.vector_to_parameters(weights, model.parameters())
@@ -227,9 +243,11 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         # assert self.level == tasks[0].level                                               # checking if the model level matches with task level
         loss = 0
         for task in minibatch:
+            print('train')
             self.adaptation(task.get('train'), ctx_high)                                # adapt self.ctx  given high-level ctx 
             
             for minibatch_test in iter(task.get('test')):
+                print('test')
                 loss += self.submodel.evaluate(minibatch_test, ctx_high + [self.ctx])     # going 1 level down
 
         return loss / float(len(minibatch))
@@ -239,20 +257,26 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         # optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
 
         cur_iter = 0
-        while True:        
+        while True:
+            # IPython.embed()        
             for minibatch in iter(dl):
+                
                 if cur_iter >= self.n_iter:
                     return False
 
                 loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])
                 grad = torch.autograd.grad(loss, [self.ctx], create_graph=True)[0]
                 self.ctx -= self.lr * grad                  # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0] 
-                
+
                 ### DEBUG
                 e = partial(eval_model_lower, self, minibatch, ctx_high)
-                finite_grad = check_grad(e, self.ctx, eps=1e-8, analytic_grad=False)
+                finite_grad = check_grad_inner(e, self.ctx, eps=1e-8, analytic_grad=False)
                 print('level {}: grad error: '.format(self.level), (finite_grad - grad).norm().detach().numpy())
 
+                # if self.level == 1:
+                #     IPython.embed()
+                # print('finite grad: ', finite_grad)
+                # print('analytical grad: ', grad)
                 cur_iter += 1
 
 
