@@ -19,7 +19,7 @@ class Logger():
         self.update_iter = update_iter
     def update(self, iter, loss):
         if not (iter % self.update_iter):
-            
+            # print(iter, self.update_iter)
             self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
             self.tb_writer.add_scalar("Meta loss:", loss, iter)
 

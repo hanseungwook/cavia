@@ -12,7 +12,7 @@ from PIL import Image
 import random
 import IPython
 
-from task.mixture2 import task_func_list
+# from task.mixture2 import task_func_list
 
 
 class Level0_Dataset(Dataset):

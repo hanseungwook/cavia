@@ -17,6 +17,7 @@ from task.mixture2 import task_func_list
 from utils import manual_optim
 from dataset import Level0_Dataset, HighLevel_Dataset, HighLevel_DataLoader
 
+DEBUG_LEVEL = 2 #1 #0 
 
 def get_base_model(args):
     MODEL_TYPE = get_model_type(args.model_type)
@@ -45,9 +46,7 @@ def run(args, logger):
     encoder_models  = get_encoder_model(args.encoders, args)
     model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
 
-    grad_check_flag = True
-    train(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger, grad_check_flag)     # Train
-    # debug(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger)     # Debug with finite diff
+    train(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger)   # Train
     
     test_loss = 0
     for minibatch_test in iter(dataset.get('test')):
@@ -79,26 +78,20 @@ def check_grad(fnc, input, eps = 1e-6, analytic_grad = False):
 
 def eval_model_weight(model, minibatch, input):
     torch.nn.utils.vector_to_parameters(input, model.parameters())
-    return model.evaluate(minibatch)
+    return model.evaluate(minibatch) 
 
 def eval_submodel_weight(submodel, minibatch, ctx_high, ctx):
-    return submodel.evaluate(minibatch, ctx_high + [ctx])
+    return submodel.evaluate(minibatch, ctx_high + [ctx]) 
 
 def print_grad_err(fnc, params, analy_grad = None, level = 0):
     if analy_grad is None:
         analy_grad = torch.cat([p.grad.view(-1) for p in params])
         params = torch.nn.utils.parameters_to_vector(params)
-    # else 
         
     finite_grad = check_grad(fnc, params, eps=1e-8, analytic_grad=False)
-    # IPython.embed()
     print('level', level, ', grad error: ', (finite_grad - analy_grad).norm().detach().numpy())
-    # if level<2:
-    #     print(finite_grad)
-    #     print(analy_grad)
-        # print(params_vec.grad)
 
-def train(model, dl, epochs, lr, logger, grad_check_flag = False):
+def train(model, dl, epochs, lr, logger): 
     model.double()
     params = list(model.parameters()) 
     optim = Adam(params, lr)
@@ -109,7 +102,7 @@ def train(model, dl, epochs, lr, logger, grad_check_flag = False):
             optim.zero_grad()
             loss.backward()
 
-            if grad_check_flag:
+            if DEBUG_LEVEL == 2: 
                 fnc = partial(eval_model_weight, model, minibatch)
                 print_grad_err(fnc, params, level = 2)
             
@@ -208,18 +201,18 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
     def reset_ctx(self):
         self.ctx = torch.zeros(1, self.n_context, requires_grad=True).double().to(self.device)
 
-    def evaluate(self, minibatch, ctx_high = []):
+    def evaluate(self, minibatch, ctx_high = []): 
         # assert self.level == tasks[0].level                                               # checking if the model level matches with task level
         loss = 0
         for task in minibatch:
-            self.adaptation(task.get('train'), ctx_high)                                # adapt self.ctx  given high-level ctx 
+            self.adaptation(task.get('train'), ctx_high)                         # adapt self.ctx  given high-level ctx 
             
             for minibatch_test in iter(task.get('test')):
                 loss += self.submodel.evaluate(minibatch_test, ctx_high + [self.ctx])     # going 1 level down
 
         return loss / float(len(minibatch))
 
-    def optimize(self, dl, ctx_high):                            # optimize parameter for a given 'task'
+    def optimize(self, dl, ctx_high):                          # optimize parameter for a given 'task'
         self.reset_ctx()
         # optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
 
@@ -232,7 +225,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                 loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])  
                 grad = torch.autograd.grad(loss, self.ctx, create_graph=True)[0]  
 
-                if True: #grad_check_flag:
+                if self.level == DEBUG_LEVEL: #grad_check_flag:
                     fnc = partial(eval_submodel_weight, self.submodel, minibatch, ctx_high)
                     print_grad_err(fnc, self.ctx, grad, level = self.level)
                     

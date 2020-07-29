@@ -127,8 +127,8 @@ def get_linear_function(slope, bias):
     return linear_function
 
 
-# task_func_list = [sample_sin_fnc, sample_linear_fnc]
-task_func_list = [sample_sin_fnc, sample_img_fnc]
+task_func_list = [sample_sin_fnc, sample_linear_fnc]
+# task_func_list = [sample_sin_fnc, sample_img_fnc]
 # task_func_list = [sample_img_fnc, sample_sin_fnc, sample_linear_fnc]
 
 
