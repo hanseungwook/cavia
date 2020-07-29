@@ -55,30 +55,31 @@ def run(args, logger):
 
 ### Functions for finite difference method for calculating gradient
 
-def check_grad(fnc, weights, eps = 1e-6, analytic_grad = False):
-    grad_num = torch.zeros_like(weights)
+def check_grad(fnc, inputs, eps = 1e-6, analytic_grad = False):
+    grad_num = torch.zeros_like(inputs)
 
-    for i in range(weights.shape[0]):
-        in_ = weights.clone().detach();  in_.requires_grad = True;       in_[i] += eps;             loss1 = fnc(in_);    
-        in_ = weights.clone().detach(); in_.requires_grad = True;       in_[i] -= eps;             loss2 = fnc(in_)
+    for i in range(inputs.shape[0]):
+        in_ = inputs.clone().detach();  in_.requires_grad = True;       in_[i] += eps;             loss1 = fnc(in_);    
+        in_ = inputs.clone().detach();  in_.requires_grad = True;       in_[i] -= eps;             loss2 = fnc(in_); 
         grad_num[i] = (loss1 - loss2)/2/eps
     if analytic_grad:
-        in_ = weights.clone().detach()
+        in_ = inputs.clone().detach()
         in_.requires_grad = True
         assert(in_.requires_grad)
-        loss = fnc(weights.clone().detach());         loss.backward(); 
+        loss = fnc(inputs.clone().detach());         loss.backward(); 
         return grad_num, in_.grad
     else:
         return grad_num
 
 
 def eval_model_weight(model, minibatch, weights):
-    # print('eval model', weights)
-    # print(list(model.parameters()))
-    # model.linear.weight = torch.nn.Parameter(weight)         #     model.linear.weight.data = weight
     torch.nn.utils.vector_to_parameters(weights, model.parameters())
 
     loss = model.evaluate(minibatch)
+    return loss
+
+def eval_model_lower(model, minibatch, ctx_high, ctx):
+    loss = model.submodel.evaluate(minibatch, ctx_high + [ctx])
     return loss
 
 
@@ -107,7 +108,8 @@ def debug(model, dl, epochs, lr, logger):
             analy_grad = torch.cat(t)
 
             # IPython.embed()
-            print('grad error: ', (finite_grad - analy_grad).norm().detach().numpy())
+            print('outer grad error: ', (finite_grad - analy_grad).norm().detach().numpy())
+            IPython.embed()
             optim.step()
 
             # ------------ logging ------------
@@ -218,6 +220,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         self.reset_ctx()
 
     def reset_ctx(self):
+        # Look if needs to be Parameter
         self.ctx = torch.zeros(1, self.n_context, requires_grad=True).double().to(self.device)
 
     def evaluate(self, minibatch, ctx_high = []):
@@ -241,15 +244,17 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                 if cur_iter >= self.n_iter:
                     return False
 
-                loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])  
-                self.ctx += torch.autograd.grad(loss, self.ctx, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
+                loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])
+                grad = torch.autograd.grad(loss, [self.ctx], create_graph=True)[0]
+                self.ctx -= self.lr * grad                  # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0] 
+                # IPython.embed()
+                ### DEBUG
+                e = partial(eval_model_lower, self, minibatch, ctx_high)
+                finite_grad = check_grad(e, self.ctx, eps=1e-8, analytic_grad=False)
+                print('level {}: grad error: '.format(self.level), (finite_grad - grad).norm().detach().numpy())
 
-                # optim.zero_grad()
-                # optim.backward(loss)
-                # # torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-                # optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
                 cur_iter += 1
-
+        IPython.embed()
 
 
     def forward(self, input, ctx_high = []):                                        # assuming ctx is optimized over training tasks already
