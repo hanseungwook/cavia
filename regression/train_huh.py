@@ -6,7 +6,8 @@ from torch.autograd import gradcheck
 from torch.utils.data.sampler import RandomSampler, BatchSampler
 from torch.utils.data import Subset, DataLoader
 import random
-# import numpy as np
+
+import numpy as np
 from functools import partial
 from inspect import signature
 import IPython
@@ -44,8 +45,9 @@ def run(args, logger):
     encoder_models  = get_encoder_model(args.encoders, args)
     model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
 
-    # train(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger)     # Train
-    debug(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger)     # Debug with finite diff
+    grad_check_flag = True
+    train(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger, grad_check_flag)     # Train
+    # debug(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger)     # Debug with finite diff
     
     test_loss = 0
     for minibatch_test in iter(dataset.get('test')):
@@ -55,76 +57,62 @@ def run(args, logger):
 
 ### Functions for finite difference method for calculating gradient
 
-def check_grad(fnc, weights, eps = 1e-6, analytic_grad = False):
-    grad_num = torch.zeros_like(weights)
+def check_grad(fnc, input, eps = 1e-6, analytic_grad = False):
+    grad_num = torch.zeros_like(input)
 
-    for i in range(weights.shape[0]):
-        in_ = weights.clone().detach();  in_.requires_grad = True;       in_[i] += eps;             loss1 = fnc(in_);    
-        in_ = weights.clone().detach(); in_.requires_grad = True;       in_[i] -= eps;             loss2 = fnc(in_)
-        grad_num[i] = (loss1 - loss2)/2/eps
+    for i in range(input.numel()):
+        idx = np.unravel_index(i, input.shape)
+
+        in_ = input.clone().detach();  in_.requires_grad = True;       in_[idx] += eps;           loss1 = fnc(in_)
+        in_ = input.clone().detach();  in_.requires_grad = True;       in_[idx] -= eps;           loss2 = fnc(in_)
+        grad_num[idx] = (loss1 - loss2)/2/eps
+
     if analytic_grad:
-        in_ = weights.clone().detach()
+        in_ = input.clone().detach()
         in_.requires_grad = True
         assert(in_.requires_grad)
-        loss = fnc(weights.clone().detach());         loss.backward(); 
+        loss = fnc(input.clone().detach());         loss.backward(); 
         return grad_num, in_.grad
     else:
         return grad_num
 
 
-def eval_model_weight(model, minibatch, weights):
-    # print('eval model', weights)
-    # print(list(model.parameters()))
-    # model.linear.weight = torch.nn.Parameter(weight)         #     model.linear.weight.data = weight
-    torch.nn.utils.vector_to_parameters(weights, model.parameters())
+def eval_model_weight(model, minibatch, input):
+    torch.nn.utils.vector_to_parameters(input, model.parameters())
+    return model.evaluate(minibatch)
 
-    loss = model.evaluate(minibatch)
-    return loss
+def eval_submodel_weight(submodel, minibatch, ctx_high, ctx):
+    return submodel.evaluate(minibatch, ctx_high + [ctx])
 
+def print_grad_err(fnc, params, analy_grad = None, level = 0):
+    if analy_grad is None:
+        analy_grad = torch.cat([p.grad.view(-1) for p in params])
+        params = torch.nn.utils.parameters_to_vector(params)
+    # else 
+        
+    finite_grad = check_grad(fnc, params, eps=1e-8, analytic_grad=False)
+    # IPython.embed()
+    print('level', level, ', grad error: ', (finite_grad - analy_grad).norm().detach().numpy())
+    # if level<2:
+    #     print(finite_grad)
+    #     print(analy_grad)
+        # print(params_vec.grad)
 
-def debug(model, dl, epochs, lr, logger):
-    
-    optim = Adam(model.parameters(), lr)
-    # optim = torch.optim.SGD(model.parameters(), lr)
-
-    # Getting all parameters
+def train(model, dl, epochs, lr, logger, grad_check_flag = False):
     model.double()
+    params = list(model.parameters()) 
+    optim = Adam(params, lr)
 
     for epoch in range(epochs):
         for minibatch in iter(dl):
             loss = model.evaluate(minibatch)
-            
             optim.zero_grad()
             loss.backward()
 
+            if grad_check_flag:
+                fnc = partial(eval_model_weight, model, minibatch)
+                print_grad_err(fnc, params, level = 2)
             
-            e = partial(eval_model_weight, model, minibatch)
-            finite_grad = check_grad(e, torch.nn.utils.parameters_to_vector(model.parameters()), eps=1e-8, analytic_grad=False)
-
-            t = []
-            for p in model.parameters():
-                t.append(p.grad.view(-1))
-            analy_grad = torch.cat(t)
-
-            # IPython.embed()
-            print('grad error: ', (finite_grad - analy_grad).norm().detach().numpy())
-            optim.step()
-
-            # ------------ logging ------------
-            logger.update(epoch, loss.detach().cpu().numpy())
-            # vis_pca(higher_contexts, task_family, iteration, args)      ## Visualize result
-
-def train(model, dl, epochs, lr, logger):
-    
-    optim = Adam(model.parameters(), lr)
-    # optim = torch.optim.SGD(model.parameters(), lr)
-
-    for epoch in range(epochs):
-        for minibatch in iter(dl):
-            loss = model.evaluate(minibatch)
-            
-            optim.zero_grad()
-            loss.backward()
             optim.step()
 
             # ------------ logging ------------
@@ -236,13 +224,22 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         # optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
 
         cur_iter = 0
-        while True:        
+        while True:
             for minibatch in iter(dl):
                 if cur_iter >= self.n_iter:
                     return False
 
                 loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])  
-                self.ctx += torch.autograd.grad(loss, self.ctx, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
+                grad = torch.autograd.grad(loss, self.ctx, create_graph=True)[0]  
+
+                if True: #grad_check_flag:
+                    fnc = partial(eval_submodel_weight, self.submodel, minibatch, ctx_high)
+                    print_grad_err(fnc, self.ctx, grad, level = self.level)
+                    
+
+                self.ctx -= self.lr * grad               # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
+
+
 
                 # optim.zero_grad()
                 # optim.backward(loss)
