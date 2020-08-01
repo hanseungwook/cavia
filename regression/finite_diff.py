@@ -8,7 +8,8 @@ def debug_top(model, minibatch, params):
     fnc = partial(eval_model_weight, model, minibatch)
     print_grad_err(fnc, params, level = 2)
 
-def debug_lower(model, minibatch, ctx_high, ctx, grad, level):
+def debug_lower(loss, params, model, minibatch, ctx_high, ctx, level):
+    grad = torch.autograd.grad(loss, params, create_graph=True)[0]             #     # print('level', self.level, 'debug')
     fnc = partial(eval_submodel_weight, model, minibatch, ctx_high)
     print_grad_err(fnc, ctx, grad, level = level)
 
@@ -39,7 +40,7 @@ def eval_model_weight(model, minibatch, param_vec):
     return model.evaluate(minibatch) 
 
 def eval_submodel_weight(submodel, minibatch, ctx_high, ctx):
-    return submodel.evaluate(minibatch, ctx_high + [ctx]) 
+    return submodel(minibatch, ctx_high + [ctx]) 
 
 def print_grad_err(fnc, params, analy_grad = None, level = 0):
     if analy_grad is None:
