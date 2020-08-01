@@ -58,14 +58,14 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         for task in minibatch_task:
             # print('level', self.level, 'adapt')
             self.adaptation(task.loader['train'], ctx_high, optimizer=optimizer, reset=reset, grad_clip=grad_clip, logger_update=logger_update)                         # adapt self.ctx  given high-level ctx 
-            
             # print('level', self.level, 'test')
+            
             for minibatch_test in iter(task.loader['test']):
-                loss += self.submodel(minibatch_test, ctx_high + [self.ctx])     # going 1 level down
+                loss += self.submodel(minibatch_test, ctx_high + [self.ctx]) [0]    # going 1 level down
                 count += 1
                 break # break after 1 minibatch
 
-        return loss / count #float(len(minibatch))
+        return loss / count,  None  
 
     def optimize(self, dl, ctx_high, optimizer = manual_optim, reset = True, grad_clip = None, logger_update = None):       # optimize parameter for a given 'task'
         if reset:
@@ -80,7 +80,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             for minibatch in iter(dl):
                 if cur_iter >= self.n_iter: #max_iter:
                     return 
-                loss = self.submodel(minibatch, ctx_high + [self.ctx])  
+                loss = self.submodel(minibatch, ctx_high + [self.ctx]) [0] 
 
                 # if self.level in DEBUG_LEVEL: 
                 #     debug_lower(loss, params, self.submodel, minibatch, ctx_high, self.ctx, level = self.level)

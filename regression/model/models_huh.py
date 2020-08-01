@@ -49,7 +49,7 @@ class BaseModel(nn.Module):
     def forward(self, data, ctx):
         inputs, targets = data
         outputs = self.forward0(inputs, ctx)
-        return self.loss_fnc(outputs, targets) #, outputs
+        return self.loss_fnc(outputs, targets), outputs
 
 ######################################
 
