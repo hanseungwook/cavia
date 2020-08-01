@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument('--n_batch_test',  type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
     parser.add_argument('--n_batch_valid', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
     parser.add_argument('--n_contexts',    type=int, nargs='+', default=[2, 1])                  # number of context variables: phi0, phi1 
-    parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
+    parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
 
     parser.add_argument('--log_interval',  type=int, default=100)
     parser.add_argument('--log_name',  type=str, default='')

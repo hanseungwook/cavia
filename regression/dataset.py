@@ -15,31 +15,38 @@ import IPython
 # from task.mixture2 import task_func_list
 
 
-class Level0_Dataset(Dataset):
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
+# class Level0_Dataset(Dataset):
+#     def __init__(self, x, y):
+#         self.x = x
+#         self.y = y
     
-    def __len__(self):
-        assert len(self.x) == len(self.y)
+#     def __len__(self):
+#         assert len(self.x) == len(self.y)
 
-        return len(self.y)
+#         return len(self.y)
+    
+#     def __getitem__(self, idx):
+#         return self.x[idx], self.y[idx]
+
+class Meta_Dataset(Dataset):
+    def __init__(self, data, target=None):
+        self.data = data
+        self.target = target
+        if target is not None:
+            assert len(data) == len(target)
+            # self.target = target
+
+    def __len__(self):
+        return len(self.data)
     
     def __getitem__(self, idx):
-        return self.x[idx], self.y[idx]
-
-class HighLevel_Dataset(Dataset):
-    def __init__(self, x):
-        self.x = x
-    
-    def __len__(self):
-        return len(self.x)
-    
-    def __getitem__(self, idx):
-        return self.x[idx]
+        if self.target is None:
+            return self.data[idx]
+        else: 
+            return self.data[idx], self.target[idx]
 
 
-class HighLevel_DataLoader():
+class Meta_DataLoader():
     def __init__(self, dataset, batch_size):
         self.dataset = dataset
         self.batch_size = batch_size

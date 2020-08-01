@@ -1,5 +1,5 @@
 import arguments
-import train_huh
+from train_huh import run
 import os
 from utils import set_log, set_seed, Logger
 from tensorboardX import SummaryWriter
@@ -22,4 +22,4 @@ if __name__ == '__main__':
     set_seed(args.seed)
 
     # Start train
-    train_huh.run(args, logger)
+    run(args, logger)

@@ -5,6 +5,8 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+import IPython
+from pdb import set_trace
 
 
 #################################################################################
@@ -73,27 +75,33 @@ def set_seed(seed, cudnn=True):
 # Manual optim :  replace optim.SGD  due to memory leak problem
 
 class manual_optim():
-    def __init__(self, param_list, lr):
+    def __init__(self, param_list, lr, grad_clip = None):
         self.param_list = param_list
         self.lr = lr
+        self.grad_clip = grad_clip
 
     def zero_grad(self):
         for par in self.param_list:
-            par.grad = torch.zeros_like(par.data)   #             par.grad = par.zeros_like()
-            assert (par.requires_grad == True)
-            # par.grad = torch.zeros(par.data.shape, device=par.device)   #             par.grad = par.zeros_like()
+            # assert par.requires_grad #(par.requires_grad == True)
+            par.grad = torch.zeros_like(par.data)               # par.grad = torch.zeros(par.data.shape, device=par.device)   
 
     def backward(self, loss):
+        # set_trace()
+        # print(self.param_list)
         assert len(self.param_list) == 1            # may only work for a list of one?  # shouldn't run autograd multiple times over a graph 
         for par in self.param_list:  
-            par.grad += torch.autograd.grad(loss, par, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
+            par.grad = torch.autograd.grad(loss, par, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
 
     def step(self):
+        # Gradient clipping
+        # if self.grad_clip is not None:
+        #     torch.nn.utils.clip_grad_norm_(self.param_list, self.grad_clip)
+
         for par in self.param_list:
-            par.data = par.data - self.lr * par.grad
-            # par.data -= self.lr * par.grad      # compare these
-            # par = par - self.lr * par.grad      # compare these
-            # par -= par.grad * self.lr           # # compare these... get tiny differences in grad result.
+            # par.data = par.data - self.lr * par.grad  # does not construct computational graph. 
+            # par.data -= self.lr * par.grad            # does not construct computational graph. 
+            # par = par - self.lr * par.grad            # GOOOD !!!
+            par -= par.grad * self.lr                 # # also good
 
 
 

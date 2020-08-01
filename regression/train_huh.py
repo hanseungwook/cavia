@@ -4,24 +4,25 @@ import torch.nn.functional as F
 from torch.optim import Adam, SGD
 from torch.autograd import gradcheck
 from torch.utils.data.sampler import RandomSampler, BatchSampler
-from torch.utils.data import Subset, DataLoader
+from torch.utils.data import DataLoader  #, Subset
 import random
 
 import numpy as np
-from functools import partial
 from inspect import signature
 import IPython
 
 from model.models_huh import get_model_type, get_encoder_type
 from task.mixture2 import task_func_list
 from utils import manual_optim
-from dataset import Level0_Dataset, HighLevel_Dataset, HighLevel_DataLoader
+from dataset import Meta_Dataset, Meta_DataLoader  
+from finite_diff import debug_top, debug_lower
 
-DEBUG_LEVEL = 2 #1 #0 
-
+DEBUG_LEVEL = [] #[0] #None #2 #1 #0 
+DOUBLE_precision = True
 def get_base_model(args):
     MODEL_TYPE = get_model_type(args.model_type)
     model = MODEL_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
+    # model = MODEL_TYPE( n_arch=args.architecture, n_context=args.n_contexts, device=args.device).to(args.device)
     return model
 
 def get_encoder_model(encoder_types, args):
@@ -30,7 +31,7 @@ def get_encoder_model(encoder_types, args):
         if encoder_type is None:
             encoders.append(None)
         else:
-            ENCODER_TYPE = get_encoder_type(encoder_type) # Check if n_hidden is the task embedding dimension in Encoder_Core().
+            ENCODER_TYPE = get_encoder_type(encoder_type)   # Check if n_hidden is the task embedding dimension in Encoder_Core().
             encoder_model = ENCODER_TYPE( input_dim=args.input_dim, n_hidden=args.n_hidden, tree_hidden_dim=args.tree_hidden_dim, 
                                 cluster_layer_0=args.cluster_layer_0, cluster_layer_1=args.cluster_layer_1)
             encoders.append(encoder_model)
@@ -40,77 +41,102 @@ def get_encoder_model(encoder_types, args):
 def run(args, logger):
     k_batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
     n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-    dataset = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
+    task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
     
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders, args)
-    model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters[:-1], args.lrs[:-1], encoder_models)
+    model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models)
 
-    train(model, dataset.get('train'), args.n_iters[-1], args.lrs[-1], logger)   # Train
+    if DOUBLE_precision:
+        model.double()
+
+    test_loss = model.forward( Meta_Dataset(data=[task]), ctx_high = [], optimizer = Adam, reset = False, logger_update = logger.update)
+
+    # return test_loss, logger 
+    ## grad_clip = args.clip 
+
+##############################################################################
+#  Model Hierarchy
+
+def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders):
     
-    test_loss = 0
-    for minibatch_test in iter(dataset.get('test')):
-        test_loss += model.evaluate(minibatch_test)
-
-    return test_loss, logger
-
-### Functions for finite difference method for calculating gradient
-
-def check_grad(fnc, input, eps = 1e-6, analytic_grad = False):
-    grad_num = torch.zeros_like(input)
-
-    for i in range(input.numel()):
-        idx = np.unravel_index(i, input.shape)
-
-        in_ = input.clone().detach();  in_.requires_grad = True;       in_[idx] += eps;           loss1 = fnc(in_)
-        in_ = input.clone().detach();  in_.requires_grad = True;       in_[idx] -= eps;           loss2 = fnc(in_)
-        grad_num[idx] = (loss1 - loss2)/2/eps
-
-    if analytic_grad:
-        in_ = input.clone().detach()
-        in_.requires_grad = True
-        assert(in_.requires_grad)
-        loss = fnc(input.clone().detach());         loss.backward(); 
-        return grad_num, in_.grad
-    else:
-        return grad_num
+    for level, (n_context, n_iter, lr, encoder) in enumerate(zip(n_contexts, n_iters, lrs, encoders)):
+        model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder) #, adaptation_type) 
+        print(level, (n_context, n_iter, lr, encoder))
+    return model
 
 
-def eval_model_weight(model, minibatch, input):
-    torch.nn.utils.vector_to_parameters(input, model.parameters())
-    return model.evaluate(minibatch) 
+class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
+    def __init__(self, decoder_model, level, n_context, n_iter, lr, encoder_model = None): 
+        super().__init__()
+        assert hasattr  (decoder_model, 'forward')    # submodel has a built-in forward() method 
 
-def eval_submodel_weight(submodel, minibatch, ctx_high, ctx):
-    return submodel.evaluate(minibatch, ctx_high + [ctx]) 
+        self.level     = level                        #  useful for debugging/experimenting
+        self.submodel  = decoder_model 
+        # self.parameter  = list(decoder_model.modules_list[-1].parameters()) #decoder_model.parameter_list_next[-1] 
+        # self.modules_list = decoder_model.modules_list[:-1]  #[self.base_modules, ctx1, ctx0]
+        self.n_context = n_context
+        self.n_iter    = n_iter
+        self.lr        = lr
+        self.device    = decoder_model.device
 
-def print_grad_err(fnc, params, analy_grad = None, level = 0):
-    if analy_grad is None:
-        analy_grad = torch.cat([p.grad.view(-1) for p in params])
-        params = torch.nn.utils.parameters_to_vector(params)
-        
-    finite_grad = check_grad(fnc, params, eps=1e-8, analytic_grad=False)
-    print('level', level, ', grad error: ', (finite_grad - analy_grad).norm().detach().numpy())
+        self.adaptation = self.optimize if encoder_model is None else encoder_model 
 
-def train(model, dl, epochs, lr, logger): 
-    model.double()
-    params = list(model.parameters()) 
-    optim = Adam(params, lr)
+        self.reset_ctx()
 
-    for epoch in range(epochs):
-        for minibatch in iter(dl):
-            loss = model.evaluate(minibatch)
-            optim.zero_grad()
-            loss.backward()
+    def reset_ctx(self):
+        if DOUBLE_precision:
+            self.ctx = torch.zeros(1, self.n_context, requires_grad=True).double().to(self.device)
+        else:
+            self.ctx = torch.zeros(1, self.n_context, requires_grad=True).double().float().to(self.device)
 
-            if DEBUG_LEVEL == 2: 
-                fnc = partial(eval_model_weight, model, minibatch)
-                print_grad_err(fnc, params, level = 2)
+    def forward(self, minibatch_task, ctx_high = [], optimizer = manual_optim, reset = True, grad_clip = None, logger_update = None): 
+        # assert self.level == tasks[0].level                                               # checking if the model level matches with task level
+        loss = 0
+        count = 0
+        for task in minibatch_task:
+            # print('level', self.level, 'adapt')
+            self.adaptation(task.loader['train'], ctx_high, optimizer=optimizer, reset=reset, grad_clip=grad_clip, logger_update=logger_update)                         # adapt self.ctx  given high-level ctx 
             
-            optim.step()
+            # print('level', self.level, 'test')
+            for minibatch_test in iter(task.loader['test']):
+                loss += self.submodel.forward(minibatch_test, ctx_high + [self.ctx])     # going 1 level down
+                count += 1
+                break # break after 1 minibatch
+
+        return loss / count #float(len(minibatch))
+
+    def optimize(self, dl, ctx_high, optimizer = manual_optim, reset = True, grad_clip = None, logger_update = None):       # optimize parameter for a given 'task'
+        if reset:
+            self.reset_ctx()
+            params = [self.ctx]                  # inner-loop parameters: context variables 
+        else: 
+            params = self.parameters()           # outer-loop parameters: model.parameters()
+        optim = optimizer(params, self.lr) #, grad_clip)   
+
+        cur_iter = 0
+        while True:
+            for minibatch in iter(dl):
+                if cur_iter >= self.n_iter: #max_iter:
+                    return 
+                loss = self.submodel.forward(minibatch, ctx_high + [self.ctx])  
+
+                # if self.level in DEBUG_LEVEL: 
+                #     grad = torch.autograd.grad(loss, params, create_graph=True)[0]             #     # print('level', self.level, 'debug')
+                #     debug_lower(self.submodel, minibatch, ctx_high, self.ctx, grad, level = self.level)
+
+                optim.zero_grad()
+                if hasattr(optim, 'backward'):
+                    optim.backward(loss)
+                else:
+                    loss.backward()
+                optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
+                cur_iter += 1   
 
             # ------------ logging ------------
-            logger.update(epoch, loss.detach().cpu().numpy())
-            # vis_pca(higher_contexts, task_family, iteration, args)      ## Visualize result
+            if logger_update is not None:
+                logger_update(cur_iter, loss.detach().cpu().numpy())
+
 
 
 ##############################################################################
@@ -125,123 +151,56 @@ def train(model, dl, epochs, lr, logger):
 def make_batch_dict(n_trains, n_tests, n_valids):
     return [{'train': n_train, 'test': n_test, 'valid': n_valid} for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids)]
 
+# class Hierarchical_Task_TOP():
+#     def __init__(self, task): 
+#         self.dataset = Meta_Dataset(data=[task])
+#         self.dataloader =   Meta_DataLoader(self.dataset, batch_size=1)
+
 
 class Hierarchical_Task():
-    def __init__(self, task, batch_dict, inputs_gen=None):
-        k_batch_dict, n_batch_dict = batch_dict
+    def __init__(self, task, batch_dict): 
+        total_batch_dict, mini_batch_dict = batch_dict
         self.task = task
-        self.level = len(k_batch_dict) - 1
-        self.k_batch = k_batch_dict[-1]
-        self.n_batch = n_batch_dict[-1]
-        self.batch_dict_next = (k_batch_dict[:-1], n_batch_dict[:-1])
-        self.data = self.run_pre_sample()
-        self.inputs_gen = inputs_gen
+        self.level = len(total_batch_dict) - 1
+        # print(self.level, total_batch_dict)
+        self.total_batch = total_batch_dict[-1]
+        self.mini_batch = mini_batch_dict[-1]
+        self.batch_dict_next = (total_batch_dict[:-1], mini_batch_dict[:-1])
+        self.loader = self.run_pre_sample()
 
     def run_pre_sample(self):
-        return {'train': self.pre_sample(self.k_batch['train'], self.n_batch['train'], sample_type='train'), 
-                'test':  self.pre_sample(self.k_batch['test'], self.n_batch['test'], sample_type='test')}
+        return {'train': self.pre_sample(self.total_batch['train'], self.mini_batch['train'], sample_type='train'), 
+                'test':  self.pre_sample(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test')}
 
-    def high_level_presampling(self, K_batch, sample_type):
+    def high_level_presampling(self, total_batch, sample_type):
         if isinstance(self.task, list):
-            assert K_batch <= len(self.task)
-            tasks = random.sample(self.task, K_batch)
+            assert total_batch <= len(self.task)
+            tasks = random.sample(self.task, total_batch)
         else:
-            tasks = [self.task(sample_type) for _ in range(K_batch)]
+            tasks = [self.task(sample_type) for _ in range(total_batch)]
         return tasks
 
-    # K_batch: total # of samples
-    # N_batch: mini batch # of samples
-    def pre_sample(self, K_batch, N_batch, sample_type):
+    # total_batch: total # of samples
+    # mini_batch: mini batch # of samples
+    def pre_sample(self, total_batch, mini_batch, sample_type):
         if self.level == 0:
             input_gen, target_gen = self.task
-            input_data = input_gen(K_batch)
+            input_data = input_gen(total_batch)
             target_data = target_gen(input_data)
-            # IPython.embed()
 
-            dataset = Level0_Dataset(x=input_data.double(), y=target_data.double())
+            if DOUBLE_precision:
+                input_data = input_data.double();  target_data=target_data.double()
 
-            # DataLoader returns tensors
-            return DataLoader(dataset, batch_size=N_batch, shuffle=True)
+            dataset = Meta_Dataset(data=input_data, target=target_data)
+            return DataLoader(dataset, batch_size=mini_batch, shuffle=True)                # returns tensors
 
         else:
-            tasks = self.high_level_presampling(K_batch, sample_type)
-            subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]
-            subtask_dataset = HighLevel_Dataset(x=subtask_list)
-            
-            # HighLevel_Dataloader returns a mini-batch of Hiearchical Tasks[
-            return HighLevel_DataLoader(subtask_dataset, batch_size=N_batch)
+            tasks = self.high_level_presampling(total_batch, sample_type)
+            subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]  # recursive
+            subtask_dataset = Meta_Dataset(data=subtask_list)
+            return Meta_DataLoader(subtask_dataset, batch_size=mini_batch)            #   returns a mini-batch of Hiearchical Tasks[
     
-    def get(self, sample_type):
-        return self.data[sample_type]
+    # def get(self, sample_type):
+    #     return self.dataloader[sample_type]
          
-
-##############################################################################
-#  Model Hierarchy
-
-def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders):
-    for level, (n_context, n_iter, lr, encoder) in enumerate(zip(n_contexts, n_iters, lrs, encoders)):
-        model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder) #, adaptation_type) 
-    return model
-
-
-class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, decoder_model, level, n_context, n_iter, lr, encoder_model = None): 
-        super().__init__()
-        assert hasattr  (decoder_model, 'evaluate')    # submodel has evaluate() method built-in
-        self.submodel  = decoder_model 
-        self.level     = level                  # could be useful for debugging/experimenting
-        self.n_context = n_context
-        self.n_iter    = n_iter
-        self.lr        = lr
-        self.device    = decoder_model.device
-
-        self.adaptation = self.optimize if encoder_model is None else encoder_model 
-        self.reset_ctx()
-
-    def reset_ctx(self):
-        self.ctx = torch.zeros(1, self.n_context, requires_grad=True).double().to(self.device)
-
-    def evaluate(self, minibatch, ctx_high = []): 
-        # assert self.level == tasks[0].level                                               # checking if the model level matches with task level
-        loss = 0
-        for task in minibatch:
-            self.adaptation(task.get('train'), ctx_high)                         # adapt self.ctx  given high-level ctx 
-            
-            for minibatch_test in iter(task.get('test')):
-                loss += self.submodel.evaluate(minibatch_test, ctx_high + [self.ctx])     # going 1 level down
-
-        return loss / float(len(minibatch))
-
-    def optimize(self, dl, ctx_high):                          # optimize parameter for a given 'task'
-        self.reset_ctx()
-        # optim = manual_optim([self.ctx], self.lr)                   # manual optim.SGD.  check for memory leak
-
-        cur_iter = 0
-        while True:
-            for minibatch in iter(dl):
-                if cur_iter >= self.n_iter:
-                    return False
-
-                loss = self.submodel.evaluate(minibatch, ctx_high + [self.ctx])  
-                grad = torch.autograd.grad(loss, self.ctx, create_graph=True)[0]  
-
-                if self.level == DEBUG_LEVEL: #grad_check_flag:
-                    fnc = partial(eval_submodel_weight, self.submodel, minibatch, ctx_high)
-                    print_grad_err(fnc, self.ctx, grad, level = self.level)
-                    
-
-                self.ctx -= self.lr * grad               # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
-
-
-
-                # optim.zero_grad()
-                # optim.backward(loss)
-                # # torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-                # optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
-                cur_iter += 1
-
-
-
-    def forward(self, input, ctx_high = []):                                        # assuming ctx is optimized over training tasks already
-        return self.submodel(input, ctx_high + [self.ctx])            
 
