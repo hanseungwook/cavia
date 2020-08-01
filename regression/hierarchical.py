@@ -10,6 +10,9 @@ from dataset import Meta_Dataset, Meta_DataLoader
 import random
 
 
+DOUBLE_precision = True
+
+# DEBUG_LEVEL = [1]  # [1] #[0] # []
 
 
 ##############################################################################
@@ -19,7 +22,7 @@ def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders):
     
     for level, (n_context, n_iter, lr, encoder) in enumerate(zip(n_contexts, n_iters, lrs, encoders)):
         model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder) #, adaptation_type) 
-        print(level, (n_context, n_iter, lr, encoder))
+        print('level', level, '(n_context, n_iter, lr, encoder)', (n_context, n_iter, lr, encoder))
     return model
 
 
@@ -108,8 +111,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 #     def __init__(self, task): 
 #         self.dataset = Meta_Dataset(data=[task])
 #         self.dataloader =   Meta_DataLoader(self.dataset, batch_size=1)
-
-DOUBLE_precision = True
 
 class Hierarchical_Task():
     def __init__(self, task, batch_dict): 

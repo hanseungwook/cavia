@@ -8,7 +8,6 @@ from dataset import Meta_Dataset, Meta_DataLoader
 from hierarchical import make_hierarhical_model, Hierarchical_Task
 
 
-# DEBUG_LEVEL = [1]  # [1] #[0] # []
 DOUBLE_precision = True
 
 
