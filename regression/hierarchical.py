@@ -108,11 +108,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 # lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., ., task_idx)]
 # lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
 
-# class Hierarchical_Task_TOP():
-#     def __init__(self, task): 
-#         self.dataset = Meta_Dataset(data=[task])
-#         self.dataloader =   Meta_DataLoader(self.dataset, batch_size=1)
-
 
 class Hierarchical_Task():
     def __init__(self, task, batch_dict): 
