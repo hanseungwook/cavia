@@ -1,14 +1,15 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader  #, Subset
+import random
 
 from utils import manual_optim
 from dataset import Meta_Dataset, Meta_DataLoader  
 # from finite_diff import debug_top, debug_lower
 # from torch.autograd import gradcheck
 
-import random
 
+# from pdb import set_trace
 
 DOUBLE_precision = True
 
@@ -112,6 +113,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 #         self.dataset = Meta_Dataset(data=[task])
 #         self.dataloader =   Meta_DataLoader(self.dataset, batch_size=1)
 
+
 class Hierarchical_Task():
     def __init__(self, task, batch_dict): 
         total_batch_dict, mini_batch_dict = batch_dict
@@ -121,23 +123,15 @@ class Hierarchical_Task():
         self.total_batch = total_batch_dict[-1]
         self.mini_batch = mini_batch_dict[-1]
         self.batch_dict_next = (total_batch_dict[:-1], mini_batch_dict[:-1])
-        self.loader = self.run_pre_sample()
+        self.loader = self.get_dataloader_dict()
 
-    def run_pre_sample(self):
-        return {'train': self.pre_sample(self.total_batch['train'], self.mini_batch['train'], sample_type='train'), 
-                'test':  self.pre_sample(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test')}
+    def get_dataloader_dict(self):
+        return {'train': self.get_dataloader(self.total_batch['train'], self.mini_batch['train'], sample_type='train'), 
+                'test':  self.get_dataloader(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test')}
 
-    def high_level_presampling(self, total_batch, sample_type):
-        if isinstance(self.task, list):
-            assert total_batch <= len(self.task)
-            tasks = random.sample(self.task, total_batch)
-        else:
-            tasks = [self.task(sample_type) for _ in range(total_batch)]
-        return tasks
 
-    # total_batch: total # of samples
-    # mini_batch: mini batch # of samples
-    def pre_sample(self, total_batch, mini_batch, sample_type):
+    # total_batch: total # of samples /  mini_batch: mini batch # of samples
+    def get_dataloader(self, total_batch, mini_batch, sample_type):
         if self.level == 0:
             input_gen, target_gen = self.task
             input_data = input_gen(total_batch)
@@ -150,12 +144,18 @@ class Hierarchical_Task():
             return DataLoader(dataset, batch_size=mini_batch, shuffle=True)                # returns tensors
 
         else:
-            tasks = self.high_level_presampling(total_batch, sample_type)
+            tasks = get_samples(self.task, total_batch, sample_type)
             subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]  # recursive
             subtask_dataset = Meta_Dataset(data=subtask_list)
             return Meta_DataLoader(subtask_dataset, batch_size=mini_batch)            #   returns a mini-batch of Hiearchical Tasks[
     
-    # def get(self, sample_type):
-    #     return self.dataloader[sample_type]
-         
+
+def get_samples(task, total_batch, sample_type):
+    if isinstance(task, list):
+        assert total_batch <= len(task)
+        tasks = random.sample(task, total_batch)
+    else:
+        tasks = [task(sample_type) for _ in range(total_batch)]
+    return tasks
+
 
