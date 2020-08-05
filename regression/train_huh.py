@@ -1,11 +1,7 @@
-# from inspect import signature
-# import IPython
-
 from torch.optim import Adam, SGD
 from model.models_huh import get_model_type, get_encoder_type
-from task.mixture2 import task_func_list
-from dataset import Meta_Dataset, Meta_DataLoader  
-from hierarchical import make_hierarhical_model, Hierarchical_Task
+from task.mixture2 import task_func_list                             ### FIX THIS 
+from hierarchical import make_hierarhical_model, get_hierarhical_task 
 
 
 DOUBLE_precision = True
@@ -29,23 +25,22 @@ def get_encoder_model(encoder_types, args):
             encoders.append(encoder_model)
     return encoders
 
-
 def make_batch_dict(n_trains, n_tests, n_valids):
     return [{'train': n_train, 'test': n_test, 'valid': n_valid} for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids)]
 
-def run(args, logger):
+
+def run(args, logger_maker):
     k_batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
     n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-    task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
+    task = get_hierarhical_task(task_func_list, k_batch_dict, n_batch_dict)    ### FIX THIS : task_func_list
     
     base_model      = get_base_model(args)
-    encoder_models  = get_encoder_model(args.encoders, args)
-    model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models)
+    encoder_models  = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML
+    loggers         = [None, None, logger_maker()]                             # For 2-level problems.  FIX THIS
+    model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
 
     if DOUBLE_precision:
         model.double()
 
-    test_loss = model( Meta_Dataset(data=[task]), ctx_high = [], optimizer = Adam, reset = False, logger_update = logger.update)
-
+    test_loss = model( task, ctx_high = [], optimizer = Adam, outerloop = True)   # grad_clip = args.clip )
     # return test_loss, logger 
-    ## grad_clip = args.clip 

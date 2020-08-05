@@ -1,4 +1,6 @@
 import logging
+from tensorboardX import SummaryWriter
+
 import os
 import random
 import torch
@@ -14,16 +16,28 @@ from pdb import set_trace
 #################################################################################
 
 class Logger():
-    def __init__(self, log, tb_writer, log_name, update_iter):
-        self.log = log
-        self.tb_writer = tb_writer
-        self.log_name = log_name
-        self.update_iter = update_iter
+    def __init__(self, args, additional_name = None):
+        self.log         = set_log(args)
+        self.log_name    = args.log_name
+        self.update_iter = args.log_interval
+        self.tb_writer   = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
+
     def update(self, iter, loss):
         if not (iter % self.update_iter):
             # print(iter, self.update_iter)
             self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
             self.tb_writer.add_scalar("Meta loss:", loss, iter)
+
+
+def set_log(args):
+    log = {}
+    set_logger(logger_name=args.log_name,   log_file=r'{0}{1}'.format("./logs/",  args.log_name))  
+    log[args.log_name] = logging.getLogger(args.log_name)
+
+    for arg, value in sorted(vars(args).items()):
+        log[args.log_name].info("%s: %r", arg, value)
+
+    return log
 
 
 def set_logger(logger_name, log_file, level=logging.INFO):
@@ -37,19 +51,6 @@ def set_logger(logger_name, log_file, level=logging.INFO):
     log.setLevel(level)
     log.addHandler(fileHandler)
     log.addHandler(streamHandler)
-
-
-def set_log(args):
-    log = {}
-    set_logger(
-        logger_name=args.log_name,
-        log_file=r'{0}{1}'.format("./logs/", args.log_name))
-    log[args.log_name] = logging.getLogger(args.log_name)
-
-    for arg, value in sorted(vars(args).items()):
-        log[args.log_name].info("%s: %r", arg, value)
-
-    return log
 
 
 

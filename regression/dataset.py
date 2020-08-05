@@ -62,3 +62,13 @@ class Meta_DataLoader():
             mini_dataset.append(mini_batch)
 
         return iter(mini_dataset)
+
+
+
+def get_samples(task, total_batch, sample_type):
+    if isinstance(task, list):
+        assert total_batch <= len(task)
+        tasks = random.sample(task, total_batch)
+    else:
+        tasks = [task(sample_type) for _ in range(total_batch)]
+    return tasks
