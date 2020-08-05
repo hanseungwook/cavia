@@ -26,7 +26,10 @@ def get_encoder_model(encoder_types, args):
     return encoders
 
 def make_batch_dict(n_trains, n_tests, n_valids):
-    return [{'train': n_train, 'test': n_test, 'valid': n_valid} for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids)]
+    return [
+            {'train': n_train, 'test': n_test, 'valid': n_valid} 
+            for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids)
+            ]
 
 
 def run(args, logger_maker):

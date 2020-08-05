@@ -9,22 +9,14 @@ from finite_diff import debug_lower   #debug_top
 # from torch.autograd import gradcheck
 
 
-# from pdb import set_trace
-
 DOUBLE_precision = True
-
 DEBUG_LEVELs = []  # [1] #[0]  #[2]
+
+
+# TO DO: set self.ctx as parameters 
 
 ##############################################################################
 #  Model Hierarchy
-
-def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders, loggers):
-    
-    for level, (n_context, n_iter, lr, encoder, logger) in enumerate(zip(n_contexts, n_iters, lrs, encoders, loggers)):
-        model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder, logger) #, adaptation_type) 
-        print('level', level, '(n_context, n_iter, lr, encoder, logger)', (n_context, n_iter, lr, encoder, logger))
-    return model
-
 
 class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
     def __init__(self, decoder_model, level, n_context, n_iter, lr, encoder_model = None, logger = None): 
@@ -49,7 +41,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         if DOUBLE_precision:
             self.ctx = torch.zeros(1, self.n_context, requires_grad=True).double().to(self.device)
         else:
-            self.ctx = torch.zeros(1, self.n_context, requires_grad=True).double().float().to(self.device)
+            self.ctx = torch.zeros(1, self.n_context, requires_grad=True).double().float().to(self.device)    # somehow needed for manual_optim to work.... otherwise get leaf node error. 
 
     def forward(self, minibatch_task, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
         # assert self.level == tasks[0].level                                # checking if the model level matches with task level
@@ -67,11 +59,10 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         return loss / count,  None  
 
     def optimize(self, dl, ctx_high, optimizer, outerloop, grad_clip):       # optimize parameter for a given 'task'
-    # def optimize(self, dl, ctx_high, optimizer = manual_optim, outerloop = False, grad_clip = None, logger_update = None):       # optimize parameter for a given 'task'
         if outerloop:
             params = self.parameters()           # outer-loop parameters: model.parameters()
         else: 
-            self.reset_ctx()
+            self.reset_ctx()                     # TO DO: set ctx as parameters 
             params = [self.ctx]                  # inner-loop parameters: context variables 
 
         optim = optimizer(params, self.lr) #, grad_clip)   
@@ -80,19 +71,20 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         while True:
             for minibatch in dl:
                 if cur_iter >= self.max_iter:    # train/optimize up to max_iter minibatches
-                    return 
-                loss = self.submodel(minibatch, ctx_high + [self.ctx]) [0] 
-
-                if self.level in DEBUG_LEVELs: 
-                    debug_lower(self.submodel, params, minibatch, loss, ctx_high, level = self.level)
+                    return None
+                else:
+                    cur_iter += 1   
 
                 optim.zero_grad()
+                loss = self.submodel(minibatch, ctx_high + [self.ctx]) [0] 
+                # if self.level in DEBUG_LEVELs: 
+                #     debug_lower(self.submodel, params, minibatch, loss, ctx_high, level = self.level)
+
                 if hasattr(optim, 'backward'):   # manual_optim case  # cannot call loss.backward() in inner-loops
                     optim.backward(loss)
                 else:
                     loss.backward()
                 optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
-                cur_iter += 1   
 
             # ------------ logging ------------
             if self.logger is not None:
@@ -108,11 +100,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 # lv 2: task = super-duper-task,   subtasks  = super-tasks                        [f(., ., task_idx=None)]
 # lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., ., task_idx)]
 # lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
-
-
-def get_hierarhical_task(task_func_list, k_batch_dict, n_batch_dict):
-    task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
-    return Meta_Dataset(data=[task])
 
 
 class Hierarchical_Task():
@@ -150,3 +137,18 @@ class Hierarchical_Task():
             subtask_dataset = Meta_Dataset(data=subtask_list)
             return Meta_DataLoader(subtask_dataset, batch_size=mini_batch)            #   returns a mini-batch of Hiearchical Tasks[
     
+
+###################################
+
+def make_hierarhical_model(model, n_contexts, n_iters, lrs, encoders, loggers):   
+    for level, (n_context, n_iter, lr, encoder, logger) in enumerate(zip(n_contexts, n_iters, lrs, encoders, loggers)):
+        model = Hierarchical_Model(model, level, n_context, n_iter, lr, encoder, logger) #, adaptation_type) 
+        print('level', level, '(n_context, n_iter, lr, encoder, logger)', (n_context, n_iter, lr, encoder, logger))
+    return model
+
+
+
+def get_hierarhical_task(task_func_list, k_batch_dict, n_batch_dict):
+    task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
+    return Meta_Dataset(data=[task])
+

@@ -48,7 +48,7 @@ class BaseModel(nn.Module):
 
     def forward(self, data, ctx):
         inputs, targets = data
-        outputs = self.forward0(inputs, ctx)
+        outputs = self._forward(inputs, ctx)
         return self.loss_fnc(outputs, targets), outputs
 
 ######################################
@@ -61,7 +61,7 @@ class Cavia(BaseModel):
         super().__init__(n_arch, n_context, nonlin, loss_fnc, device, FC_module = nn.Linear)
 
 
-    def forward0(self, x, ctx_list):
+    def _forward(self, x, ctx_list):
         ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
         x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
         for i, module in enumerate(self.module_list):
@@ -86,7 +86,7 @@ class Model_Active(BaseModel):
         super().__init__(n_arch, n_context, nonlin, loss_fnc, device, FC_module = Linear_Active_)
 
 
-    def forward0(self, x, ctx_list):
+    def _forward(self, x, ctx_list):
         ctx = torch.cat(ctx_list, dim=1) 
 
         for i, module in enumerate(self.module_list):
@@ -117,7 +117,7 @@ class Linear_Active(nn.Module):
             
         self.active_type = active_type(n_input, n_output, n_context, gain_w, gain_b) #, passive)
         
-    def forward0(self, x, context):
+    def _forward(self, x, context):
         weight, bias = self.active_type(context)
         batch_size = context.shape[0]
         
@@ -180,7 +180,7 @@ class Multive_Weight(Active_Weight):
             self.b_active = Parameter(torch.stack(b_all, dim=1))
 
             
-    def forward0(self, context):
+    def _forward(self, context):
         batch_size = context.shape[0]
         o_w = F.linear(context, self.w_active, self.w_passive).view(batch_size, self.n_output, self.n_input)
         o_b = F.linear(context, self.b_active, self.b_passive).view(batch_size, self.n_output)
@@ -216,7 +216,7 @@ class Additive_Weight(Active_Weight):
             self.b_active = Parameter(torch.stack(b_all, dim=1))
 
             
-    def forward0(self, context):
+    def _forward(self, context):
         batch_size = context.shape[0]
         d_w = F.linear(context, self.w_active, torch.zeros(1)).view(batch_size, self.n_output, self.n_input)
         d_b = F.linear(context, self.b_active, torch.zeros(1)).view(batch_size, self.n_output)
@@ -261,7 +261,7 @@ class Add_Multive_Weight(Active_Weight):
         self.w_multiplicative = Parameter(torch.stack(w_all, dim=2).view(-1, n_context))
         self.b_multiplicative = Parameter(torch.stack(b_all, dim=1))
             
-    def forward0(self, context):
+    def _forward(self, context):
         batch_size = context.shape[0]
         o_w = F.linear(context, self.w_multiplicative, self.w_passive).view(batch_size, self.n_output, self.n_input)
         o_b = F.linear(context, self.b_multiplicative, self.b_passive).view(batch_size, self.n_output)
@@ -304,7 +304,7 @@ class Encoder_Core(nn.Module):
             temp = self._mean_over_batch(input, n_batch, n_task)
         return self._reshape_batch(temp) 
 
-    def forward0(self, input, progressive = False):
+    def _forward(self, input, progressive = False):
         n_task, n_batch, _ = input.shape        
         n_batch_log = int(torch.tensor(n_batch).float().log2())
         
@@ -411,7 +411,7 @@ class HSML(nn.Module):
         for par in param_list:
             par.data = torch.initialize(par)
 
-    def forward0(self, input):
+    def _forward(self, input):
         h = self.encoder.forward(input, progressive = None)
         g = self._clustering(h)
         g_embed = torch.cat((h, g), dim=1)
