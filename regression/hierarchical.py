@@ -59,7 +59,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             self.adaptation(task.loader['train'], ctx_high, optimizer=optimizer, outerloop=outerloop, grad_clip=grad_clip)                         # adapt self.ctx  given high-level ctx 
             # print('level', self.level, 'test')
             
-            for minibatch_test in iter(task.loader['test']):
+            for minibatch_test in task.loader['test']:
                 loss += self.submodel(minibatch_test, ctx_high + [self.ctx]) [0]    # going 1 level down
                 count += 1
                 break                            # test only 1 minibatch
@@ -78,7 +78,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         cur_iter = 0
 
         while True:
-            for minibatch in iter(dl):
+            for minibatch in dl:
                 if cur_iter >= self.max_iter:    # train/optimize up to max_iter minibatches
                     return 
                 loss = self.submodel(minibatch, ctx_high + [self.ctx]) [0] 
