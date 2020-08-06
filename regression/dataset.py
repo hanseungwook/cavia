@@ -62,6 +62,7 @@ class Meta_DataLoader():
             mini_dataset.append(mini_batch)
 
         return iter(mini_dataset)
+        # return mini_dataset
 
 
 

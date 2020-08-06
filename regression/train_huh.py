@@ -4,8 +4,6 @@ from task.mixture2 import task_func_list                             ### FIX THI
 from hierarchical import make_hierarhical_model, get_hierarhical_task 
 
 
-DOUBLE_precision = True
-
 
 def get_base_model(args):
     MODEL_TYPE = get_model_type(args.model_type)
@@ -41,9 +39,6 @@ def run(args, logger_maker):
     encoder_models  = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML
     loggers         = [None, None, logger_maker()]                             # For 2-level problems.  FIX THIS
     model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
-
-    if DOUBLE_precision:
-        model.double()
 
     test_loss = model( task, ctx_high = [], optimizer = Adam, outerloop = True)   # grad_clip = args.clip )
     # return test_loss, logger 

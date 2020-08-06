@@ -7,8 +7,14 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+
+from finite_diff import debug_lower, debug_top
+
+
 import IPython
 from pdb import set_trace
+
+DEBUG_LEVELs = []  # [1] #[0]  #[2]
 
 
 #################################################################################
@@ -71,12 +77,51 @@ def set_seed(seed, cudnn=True):
     if (seed is not None) and cudnn:
         torch.backends.cudnn.deterministic = True
 
+####################################
+
+    # def optimize(self, dataloader, ctx_high, optimizer, outerloop, grad_clip):       # optimize parameter for a given 'task'
+def optimize(model, params, dataloader, ctx, optimizer, optim_args):       # optimize parameter for a given 'task'
+    '''
+    model: takes maps task_batch to loss
+    params: parameters to be optimized
+    '''
+    level, lr, max_iter, logger, grad_clip = optim_args
+    optim = optimizer(params, lr) #, grad_clip)   
+    cur_iter = 0; #loss_all = []
+    while True:
+        for task_batch in dataloader:
+            if cur_iter >= max_iter:    # train/optimize up to max_iter # of batches
+                return #loss_all   # Loss-profile
+
+            loss = model(task_batch, ctx) [0] 
+            optim_backward_step(optim, loss)
+            cur_iter += 1   
+
+            # ------------ debug ------------
+            if level in DEBUG_LEVELs:     
+                
+                # analy_grad = torch.cat([p.grad.view(-1) for p in model.parameters()])
+                # debug_top(model, params, task_batch, analy_grad)
+                debug_lower(model, params, task_batch, loss, ctx, level = level)
+            # ------------ logging ------------
+            if logger is not None:
+                logger.update(cur_iter, loss.detach().cpu().numpy())
+
+#######################################
+def optim_backward_step(optim, loss):
+    optim.zero_grad()
+    if hasattr(optim, 'backward'):   # manual_optim case  # cannot call loss.backward() in inner-loops
+        optim.backward(loss)
+    else:
+        loss.backward()
+    optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
+
 
 #####################################
 # Manual optim :  replace optim.SGD  due to memory leak problem
 
 class manual_optim():
-    def __init__(self, param_list, lr, grad_clip = None):
+    def __init__(self, param_list, lr, grad_clip = None, first_order = False):
         self.param_list = param_list
         self.lr = lr
         self.grad_clip = grad_clip
@@ -93,6 +138,11 @@ class manual_optim():
         for par in self.param_list:  
             par.grad = torch.autograd.grad(loss, par, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
 
+        # params = OrderedDict(self.named_parameters())
+        # grads = torch.autograd.grad(loss, params.values(),  create_graph=not first_order)
+        # for (name, par), grad in zip(params.items(), grads):
+        #     par.grad = grad                      # updated_params[name] = param - step_size * grad  
+
     def step(self):
         # Gradient clipping
         # if self.grad_clip is not None:
@@ -104,6 +154,13 @@ class manual_optim():
             # par = par - self.lr * par.grad            # GOOOD !!!
             par -= par.grad * self.lr                 # # also good
 
+
+###############################
+def send_to(input, device, DOUBLE_precision):
+    if DOUBLE_precision:
+        return input.double().to(device)
+    else:
+        return input.double().float().to(device)    # somehow needed for manual_optim to work.... otherwise get leaf node error. 
 
 
 #################################################################################

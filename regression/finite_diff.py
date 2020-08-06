@@ -1,26 +1,31 @@
 from functools import partial
 import torch
 import numpy as np
+import pdb
 
 ### Functions for finite difference method for calculating gradient
 
-# def debug_top(model, params, minibatch):
-#     fnc = partial(eval_model_weight, model, minibatch)
-#     print_grad_err(fnc, params, analy_grad = None, level = 2)
+def debug_top(model, params, minibatch, analy_grad):
+    # print(list(params))
+    # print(analy_grad)
+    fnc = partial(eval_model_weight, model, minibatch)
+    print_grad_err(fnc, params, analy_grad = analy_grad, level = 2)
 
-def debug_lower(model, params, minibatch, loss, ctx_high, level):
+def debug_lower(model, params, minibatch, loss, ctx, level):
     grad = torch.autograd.grad(loss, params, create_graph=True)[0]             #     # print('level', self.level, 'debug')
-    fnc = partial(eval_submodel_weight, model, minibatch, ctx_high)
+    fnc = partial(eval_submodel_weight, model, minibatch, [])
     print_grad_err(fnc, params[0], analy_grad = grad, level = level)   # params[0] = ctx
 
 
 
 def print_grad_err(fnc, params, analy_grad = None, level = 0):
-    if analy_grad is None:
-        analy_grad = torch.cat([p.grad.view(-1) for p in params])
-        params = torch.nn.utils.parameters_to_vector(params)
+    params = torch.nn.utils.parameters_to_vector(params)
         
     finite_grad = check_grad(fnc, params, eps=1e-8, analytic_grad=False)
+
+    # if analy_grad is None:
+    # analy_grad = torch.cat([p.grad.view(-1) for p in params])
+
     print('level', level, ', grad error: ', (finite_grad - analy_grad).norm().detach().numpy())
 
 
@@ -45,9 +50,9 @@ def check_grad(fnc, input, eps = 1e-6, analytic_grad = False):
     return grad_num
 
 
-# def eval_model_weight(model, minibatch, input):  # for outerloop
-#     torch.nn.utils.vector_to_parameters(input, model.parameters())
-#     return model(minibatch) 
+def eval_model_weight(model, minibatch, input):  # for outerloop
+    torch.nn.utils.vector_to_parameters(input, model.parameters())
+    return model(minibatch) 
 
 def eval_submodel_weight(submodel, minibatch, ctx_high, ctx):
     return submodel(minibatch, ctx_high + [ctx]) 

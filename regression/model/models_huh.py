@@ -31,6 +31,10 @@ def get_model_type(model_type):
     return MODEL
 
 
+# def const_ctx(n):
+#      return torch.empty(1,n)
+
+
 class BaseModel(nn.Module):
     """     Feed-forward neural network with context    """
     def __init__(self, n_arch, n_context, nonlin, loss_fnc, device, FC_module):
@@ -41,15 +45,23 @@ class BaseModel(nn.Module):
         self.nonlin = nonlin
         self.loss_fnc = loss_fnc
         self.n_arch = n_arch
+
+        # self.ctx1 = const_ctx(n_context[0])
+        # self.ctx2 = const_ctx(n_context[1])
+
         
         self.module_list = nn.ModuleList()
         for i in range(len(n_arch) - 1):
             self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]))    # Fully connected layers
 
-    def forward(self, data, ctx):
-        inputs, targets = data
+    def forward(self, data_batch, ctx):
+        '''
+        args: minibatch of data_points
+        returns:  mean_test_loss, mean_train_loss, outputs
+        '''
+        inputs, targets = data_batch
         outputs = self._forward(inputs, ctx)
-        return self.loss_fnc(outputs, targets), outputs
+        return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
 
 ######################################
 
