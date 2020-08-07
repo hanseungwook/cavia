@@ -77,45 +77,6 @@ def set_seed(seed, cudnn=True):
     if (seed is not None) and cudnn:
         torch.backends.cudnn.deterministic = True
 
-####################################
-
-    # def optimize(self, dataloader, ctx_high, optimizer, outerloop, grad_clip):       # optimize parameter for a given 'task'
-def optimize(model, params, dataloader, ctx, optimizer, optim_args):       # optimize parameter for a given 'task'
-    '''
-    model: takes maps task_batch to loss
-    params: parameters to be optimized
-    '''
-    level, lr, max_iter, logger, grad_clip = optim_args
-    optim = optimizer(params, lr) #, grad_clip)   
-    cur_iter = 0; #loss_all = []
-    while True:
-        for task_batch in dataloader:
-            if cur_iter >= max_iter:    # train/optimize up to max_iter # of batches
-                return #loss_all   # Loss-profile
-
-            loss = model(task_batch, ctx) [0] 
-            optim_backward_step(optim, loss)
-            cur_iter += 1   
-
-            # ------------ debug ------------
-            if level in DEBUG_LEVELs:     
-                
-                # analy_grad = torch.cat([p.grad.view(-1) for p in model.parameters()])
-                # debug_top(model, params, task_batch, analy_grad)
-                debug_lower(model, params, task_batch, loss, ctx, level = level)
-            # ------------ logging ------------
-            if logger is not None:
-                logger.update(cur_iter, loss.detach().cpu().numpy())
-
-#######################################
-def optim_backward_step(optim, loss):
-    optim.zero_grad()
-    if hasattr(optim, 'backward'):   # manual_optim case  # cannot call loss.backward() in inner-loops
-        optim.backward(loss)
-    else:
-        loss.backward()
-    optim.step()             #  check for memory leak                                                         # model.ctx[level] = model.ctx[level] - args.lr[level] * grad            # if memory_leak:
-
 
 #####################################
 # Manual optim :  replace optim.SGD  due to memory leak problem
@@ -132,16 +93,9 @@ class manual_optim():
             par.grad = torch.zeros_like(par.data)               # par.grad = torch.zeros(par.data.shape, device=par.device)   
 
     def backward(self, loss):
-        # set_trace()
-        # print(self.param_list)
-        assert len(self.param_list) == 1            # may only work for a list of one?  # shouldn't run autograd multiple times over a graph 
-        for par in self.param_list:  
-            par.grad = torch.autograd.grad(loss, par, create_graph=True)[0]                 # grad = torch.autograd.grad(loss, model.ctx[level], create_graph=True)[0]                 # create_graph= not args.first_order)[0]
-
-        # params = OrderedDict(self.named_parameters())
-        # grads = torch.autograd.grad(loss, params.values(),  create_graph=not first_order)
-        # for (name, par), grad in zip(params.items(), grads):
-        #     par.grad = grad                      # updated_params[name] = param - step_size * grad  
+        grad_list = torch.autograd.grad(loss, self.param_list, create_graph=True)
+        for par, grad in zip(self.param_list, grad_list):
+            par.grad = grad
 
     def step(self):
         # Gradient clipping

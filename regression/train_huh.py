@@ -1,14 +1,14 @@
 from torch.optim import Adam, SGD
 from model.models_huh import get_model_type, get_encoder_type
 from task.mixture2 import task_func_list                             ### FIX THIS 
-from hierarchical import make_hierarhical_model, get_hierarhical_task 
+from hierarchical import Hierarchical_Model,  get_hierarhical_task   # make_hierarhical_model,
 
-
+from pdb import set_trace
 
 def get_base_model(args):
     MODEL_TYPE = get_model_type(args.model_type)
-    model = MODEL_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
-    # model = MODEL_TYPE( n_arch=args.architecture, n_context=args.n_contexts, device=args.device).to(args.device)
+    # model = MODEL_TYPE( n_arch=args.architecture, n_context=sum(args.n_contexts), device=args.device).to(args.device)
+    model = MODEL_TYPE( n_arch=args.architecture, n_contexts=args.n_contexts, device=args.device).to(args.device)
     return model
 
 def get_encoder_model(encoder_types, args):
@@ -38,7 +38,8 @@ def run(args, logger_maker):
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML
     loggers         = [None, None, logger_maker()]                             # For 2-level problems.  FIX THIS
-    model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
-
-    test_loss = model( task, ctx_high = [], optimizer = Adam, outerloop = True)   # grad_clip = args.clip )
+    # model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
+    model   = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
+    # set_trace()
+    test_loss = model( task, optimizer = Adam, reset = False) #outerloop = True)   # grad_clip = args.clip )
     # return test_loss, logger 
