@@ -34,43 +34,82 @@ def get_model_type(model_type):
 # def const_ctx(n):
 #      return torch.empty(1,n)
 
+def make_ctx(n):
+    # if DOUBLE_precision:
+    #     return torch.zeros(1,n, requires_grad=True).double()
+    # else:
+        return torch.zeros(1,n, requires_grad=True)
 
-class BaseModel(nn.Module):
-    """     Feed-forward neural network with context    """
-    def __init__(self, n_arch, n_context, nonlin, loss_fnc, device, FC_module):
+
+#######################
+
+class BaseModel2_CAVIA(nn.Module):
+
+    def __init__(self, n_ctx, *layers):
         super().__init__()
 
-        self.device = device if device is not None else 'cpu'
-        self.n_context = n_context #sum(n_context)  # Concatenate all high-level ctx into one. 
-        self.nonlin = nonlin
-        self.loss_fnc = loss_fnc
-        self.n_arch = n_arch
+        self.layers = nn.ModuleList(list(layers))        
+        self.parameters_all = [make_ctx(n) for n in n_ctx] + [self.layers.parameters]
+        self.nonlin = nn.ReLU()
+        self.loss_fnc = nn.MSELoss()
 
-        # self.ctx1 = const_ctx(n_context[0])
-        # self.ctx2 = const_ctx(n_context[1])
+    def forward(self, data_batch):
+        inputs, targets = data_batch
+        ctx_all = self.parameters_all[:-1]
+        outputs = self._forward(inputs, ctx_all)
+        return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
 
-        
+    def _forward(self, x, ctx_all):
+        ctx = torch.cat(ctx_all, dim=1)         
+        x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)
+
+        for i, layer in enumerate(self.layers):
+            x = layer(x)
+            x = self.nonlin(x)  if i<len(self.layers)-1 else x
+        return x 
+
+###################
+class BaseModel(nn.Module):
+    """     Feed-forward neural network with context    """
+    def __init__(self, n_arch, n_contexts, nonlin, loss_fnc, device, FC_module):
+        super().__init__()
+
         self.module_list = nn.ModuleList()
         for i in range(len(n_arch) - 1):
             self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]))    # Fully connected layers
 
-    def forward(self, data_batch, ctx):
-        '''
-        args: minibatch of data_points
-        returns:  mean_test_loss, mean_train_loss, outputs
-        '''
+        self.parameters_all = [make_ctx(n) for n in n_contexts] + [self.module_list.parameters]
+
+        self.device = device if device is not None else 'cpu'
+        self.n_contexts = n_contexts #sum(n_context)  # Concatenate all high-level ctx into one. 
+        self.nonlin = nonlin
+        self.loss_fnc = loss_fnc
+        self.n_arch = n_arch
+
+
+    # def forward(self, data_batch, ctx):
+    #     '''
+    #     args: minibatch of data_points
+    #     returns:  mean_test_loss, mean_train_loss, outputs
+    #     '''
+    #     inputs, targets = data_batch
+    #     outputs = self._forward(inputs, ctx)
+    #     return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
+
+    def forward(self, data_batch):
         inputs, targets = data_batch
-        outputs = self._forward(inputs, ctx)
+        ctx_all = self.parameters_all[:-1]
+        outputs = self._forward(inputs, ctx_all)
         return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
 
 ######################################
 
 class Cavia(BaseModel):
-    def __init__(self, n_arch, n_context, nonlin=nn.ReLU(), loss_fnc = nn.MSELoss(), device = None):
+    def __init__(self, n_arch, n_contexts, nonlin=nn.ReLU(), loss_fnc = nn.MSELoss(), device = None):
 
-        n_arch[0] += n_context  # add n_context to n_input 
+        n_arch[0] += sum(n_contexts)  # add n_context to n_input 
 
-        super().__init__(n_arch, n_context, nonlin, loss_fnc, device, FC_module = nn.Linear)
+        super().__init__(n_arch, n_contexts, nonlin, loss_fnc, device, FC_module = nn.Linear)
 
 
     def _forward(self, x, ctx_list):
@@ -85,7 +124,7 @@ class Cavia(BaseModel):
 ######################################
 
 class Model_Active(BaseModel):
-    def __init__(self, n_arch, n_context, weight_type, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), loss_fnc = nn.MSELoss(), passive=True, device=None): 
+    def __init__(self, n_arch, n_contexts, weight_type, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), loss_fnc = nn.MSELoss(), passive=True, device=None): 
         if weight_type == 'additive':
             active_type = Additive_Weight
         elif weight_type == 'multiplicative':
@@ -93,9 +132,9 @@ class Model_Active(BaseModel):
         elif weight_type == 'add_multiplicative':
             active_type = Add_Multive_Weight
 
-        Linear_Active_ = partial(Linear_Active, active_type = active_type, n_context = n_context, gain_w = gain_w, gain_b = gain_b, passive = passive)
+        Linear_Active_ = partial(Linear_Active, active_type = active_type, n_contexts = n_contexts, gain_w = gain_w, gain_b = gain_b, passive = passive)
 
-        super().__init__(n_arch, n_context, nonlin, loss_fnc, device, FC_module = Linear_Active_)
+        super().__init__(n_arch, n_contexts, nonlin, loss_fnc, device, FC_module = Linear_Active_)
 
 
     def _forward(self, x, ctx_list):
@@ -110,24 +149,24 @@ class Model_Active(BaseModel):
 
 
 class Model_Additive(Model_Active):
-    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
-        super().__init__(n_arch, n_context, weight_type = 'additive', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
+    def __init__(self, n_arch, n_contexts, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
+        super().__init__(n_arch, n_contexts, weight_type = 'additive', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
 
 class Model_Multiplicative(Model_Active):
-    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
-        super().__init__(n_arch, n_context, weight_type = 'multiplicative', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
+    def __init__(self, n_arch, n_contexts, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
+        super().__init__(n_arch, n_contexts, weight_type = 'multiplicative', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
 
 class Model_Add_Multiplicative(Model_Active):
-    def __init__(self, n_arch, n_context, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
-        super().__init__(n_arch, n_context, weight_type = 'add_multiplicative', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
+    def __init__(self, n_arch, n_contexts, gain_w = 1, gain_b = 1, nonlin=nn.ReLU(), passive=True, device=None): 
+        super().__init__(n_arch, n_contexts, weight_type = 'add_multiplicative', gain_w = gain_w, gain_b = gain_b, nonlin=nonlin, passive=passive, device=device)
 
 ######################################
 
 class Linear_Active(nn.Module):
-    def __init__(self, n_input, n_output, active_type, n_context, gain_w, gain_b, passive): 
+    def __init__(self, n_input, n_output, active_type, n_contexts, gain_w, gain_b, passive): 
         super().__init__()
             
-        self.active_type = active_type(n_input, n_output, n_context, gain_w, gain_b) #, passive)
+        self.active_type = active_type(n_input, n_output, n_contexts, gain_w, gain_b) #, passive)
         
     def _forward(self, x, context):
         weight, bias = self.active_type(context)
@@ -166,7 +205,7 @@ class Active_Weight(nn.Module):
 
 
 class Multive_Weight(Active_Weight):
-    def __init__(self, n_input, n_output, n_context, gain_active=1, gain_passive=1): # passive=True):  
+    def __init__(self, n_input, n_output, n_contexts, gain_active=1, gain_passive=1): # passive=True):  
         super().__init__()
 
         self.n_input = n_input
@@ -181,7 +220,7 @@ class Multive_Weight(Active_Weight):
         w, b = self.initialize(n_input, n_output, gain_passive)
         self.w_passive = Parameter(w.view(-1))
         self.b_passive = Parameter(b)
-
+        n_context = sum(n_contexts)
         if n_context > 0:
             w_all, b_all = [], []
             for i in range(n_context):
@@ -207,7 +246,7 @@ class Multive_Weight(Active_Weight):
 
     
 class Additive_Weight(Active_Weight):
-    def __init__(self, n_input, n_output, n_context, gain_active=1, gain_passive=1): #, passive=True): 
+    def __init__(self, n_input, n_output, n_contexts, gain_active=1, gain_passive=1): #, passive=True): 
         super().__init__()
 
         self.n_input = n_input
@@ -217,6 +256,8 @@ class Additive_Weight(Active_Weight):
         w0, b0 = self.initialize(n_input, n_output, gain_passive)
         self.w0        = Parameter(w0)
         self.b0        = Parameter(b0)
+
+        n_context = sum(n_contexts)
 
         if n_context > 0:
             w_all, b_all = [], []
@@ -243,7 +284,7 @@ class Additive_Weight(Active_Weight):
 
 
 class Add_Multive_Weight(Active_Weight):
-    def __init__(self, n_input, n_output, n_context, gain_active=1, gain_passive=1): # passive=True):  
+    def __init__(self, n_input, n_output, n_contexts, gain_active=1, gain_passive=1): # passive=True):  
         super().__init__()
 
         self.n_input = n_input
@@ -258,6 +299,8 @@ class Add_Multive_Weight(Active_Weight):
         self.b_passive = Parameter(b)
 
         w_all, b_all = [], []
+
+        n_context = sum(n_contexts)
         for i in range(n_context):
             w, b = self.initialize(n_input, n_output, gain_active)
             w_all.append(w)
