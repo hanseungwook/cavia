@@ -2,12 +2,16 @@
 # Parameter and task sampling functions
 
 import os
+from functools import partial 
 import copy
 import csv
 import numpy as np
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
+
+import IPython
+
 
 img_root = None
 train_imgs = []
@@ -24,10 +28,13 @@ def sample_linear_fnc(sample_type):
 def regression_input_function(batch_size):
     return torch.randn(batch_size, 1)
 
-def get_img(sample_type):
+def get_celeba_img(sample_type):
     img_files = None
 
-    # TODO: Define train_imgs, valid_imgs, test_imgs
+    if not (train_imgs and valid_imgs and test_imgs):
+        load_celeba_img_list('/Users/seungwook.han@ibm.com/Documents/Projects/data/Celeba/Img/img_align_celeba', '/Users/seungwook.han@ibm.com/Documents/Projects/data/Celeba/Eval/list_eval_partition.txt')
+        
+    # Read from global variables
     if sample_type == 'train':
         img_files = train_imgs
     elif sample_type == 'valid':
@@ -51,37 +58,75 @@ def get_img(sample_type):
 
     return img
 
-def sample_img_fnc(sample_type):
-    img = get_img(sample_type)
+def get_cifar10_img(sample_type, label):
+    imgs = None
+
+    if not (train_imgs and test_imgs):
+        load_cifar10_imgs('/Users/seungwook.han@ibm.com/Documents/Projects/data/cifar-10-batches-py')
+        
+    # Read from global variables
+    if sample_type == 'train':
+        imgs = train_imgs
+    elif sample_type == 'test':
+        imgs = test_imgs
+    else:
+        raise Exception('Wrong sampling type')
+
     
-    def input_function(batch_size, order_pixels=False):
-        if order_pixels:
+    # Define transforms
+    transform = transforms.Compose([transforms.ToTensor()])
+    
+    # Randomly choose image given class label, load and return
+    imgs = imgs[label]
+    img_idx = np.random.randint(low=0, high=imgs.shape[0])
+    
+    img = imgs[img_idx]
+    img = img.transpose(1, 2, 0)
+    img = transform(img).float()
+    img = img.permute(1, 2, 0)
+
+    return img
+
+def img_input_function(batch_size, order_pixels=False):
+    if order_pixels:
             flattened_indices = list(range(img_size[0] * img_size[1]))[:batch_size]
-        else:
-            flattened_indices = np.random.choice(list(range(img_size[0] * img_size[1])), batch_size, replace=False)
-        
-        x, y = np.unravel_index(flattened_indices, (img_size[0], img_size[1]))
-        coordinates = np.vstack((x, y)).T
-        coordinates = torch.from_numpy(coordinates).float()
-        
-        # Normalize coordinates
-        coordinates[:, 0] /= img_size[0]
-        coordinates[:, 1] /= img_size[1]
-        return coordinates
+    else:
+        flattened_indices = np.random.choice(list(range(img_size[0] * img_size[1])), batch_size, replace=False)
+    
+    x, y = np.unravel_index(flattened_indices, (img_size[0], img_size[1]))
+    coordinates = np.vstack((x, y)).T
+    coordinates = torch.from_numpy(coordinates).float()
+    
+    # Normalize coordinates
+    coordinates[:, 0] /= img_size[0]
+    coordinates[:, 1] /= img_size[1]
+    return coordinates
+
+def img_target_function(img, coordinates):
+    c = copy.deepcopy(coordinates)
+    
+    # Denormalize coordinates
+    c[:, 0] *= img_size[0]
+    c[:, 1] *= img_size[1]
+    pixel_values = img[c[:, 0].long(), c[:, 1].long(), :]
+    return pixel_values
+
+def sample_cifar10_img_fnc(sample_type):
+    label = np.random.randint(low=0, high=10)
+    img = get_cifar10_img(sample_type, label)
+    t_fn = partial(img_target_function, img)
+
+    return img_input_function, t_fn
 
 
-    def target_function(coordinates):
-        c = copy.deepcopy(coordinates)
-        
-        # Denormalize coordinates
-        c[:, 0] *= img_size[0]
-        c[:, 1] *= img_size[1]
-        pixel_values = img[c[:, 0].long(), c[:, 1].long(), :]
-        return pixel_values
+def sample_celeba_img_fnc(sample_type):
+    img = get_celeba_img(sample_type)
+    t_fn = partial(img_target_function, img)
 
-    return input_function, target_function
+    return img_input_function, t_fn
 
-def load_img_list(data_root, data_split_file):
+
+def load_celeba_img_list(data_root, data_split_file):
     global train_imgs, valid_imgs, test_imgs, img_root
 
     # Root directory for images
@@ -100,6 +145,12 @@ def load_img_list(data_root, data_split_file):
                 valid_imgs.append(row[0])
             elif row[1] == '2':
                 test_imgs.append(row[0])
+
+def load_cifar10_imgs(data_root):
+    global train_imgs, test_imgs
+
+    train_imgs = np.load(os.path.join(data_root, 'cifar10_train.npz'), allow_pickle=True)['imgs'].item()
+    test_imgs = np.load(os.path.join(data_root, 'cifar10_test.npz'), allow_pickle=True)['imgs'].item()
 
 
 def get_sin_params():
@@ -127,7 +178,8 @@ def get_linear_function(slope, bias):
     return linear_function
 
 ### Fix this part: write a function to return task_func_list depending on task_type: mixture of functions / mixture of images 
-task_func_list = [sample_sin_fnc, sample_linear_fnc]
+task_func_list = [sample_cifar10_img_fnc]
+# task_func_list = [sample_sin_fnc, sample_linear_fnc]
 # task_func_list = [sample_sin_fnc, sample_img_fnc]
 # task_func_list = [sample_img_fnc, sample_sin_fnc, sample_linear_fnc]
 
