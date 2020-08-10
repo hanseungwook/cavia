@@ -28,7 +28,7 @@ DOUBLE_precision = False #True
 
 
 
-def get_hierarhical_task(task_func_list, k_batch_dict, n_batch_dict):
+def get_hierarchical_task(task_func_list, k_batch_dict, n_batch_dict):
     task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
     return Meta_Dataset(data=[task])
 
