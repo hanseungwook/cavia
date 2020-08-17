@@ -21,14 +21,5 @@ pip3 install -r requirements.txt
 cd $DIR
 for seed in {1..1}
 do
-    python3.6 main.py \
-    --task mixture \
-    --model-type CAVIA \
-    --lr-inner 0.001 \
-    --lr-meta 0.001 \
-    --k-meta-train 5 \
-    --k-meta-test 5 \
-    --n-context-models 2 \
-    --n-inner 5 \
-    --prefix ""
+    python3.6 simple_meta_example.py
 done

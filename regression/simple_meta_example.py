@@ -7,7 +7,7 @@ from torch.optim import Adam, SGD
 from torch.nn.utils import parameters_to_vector, vector_to_parameters
 
 
-max_iter_list = [3, 3, 20]
+max_iter_list = [3, 3, 20]  # Level 0, level 1, level 2
 n_ctx = [2, 3]
 n_input = 1 + sum(n_ctx)
 debug_level = 3
@@ -49,7 +49,7 @@ class BaseModel(nn.Module):
         return self.loss_fnc(outputs, targets)
 
 
-class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
+class Hierarchical_Model(nn.Module):
     def __init__(self, submodel): 
         super().__init__()
         self.submodel = submodel 
@@ -62,7 +62,13 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         if level == 0:
             return self.submodel(data)
         else:
-            optimize(self, data, level - 1, max_iter_list[level - 1], optimizer=optimizer, reset=reset)
+            optimize(
+                model=self, 
+                data=data, 
+                level=level - 1, 
+                max_iter=max_iter_list[level - 1], 
+                optimizer=optimizer, 
+                reset=reset)
             test_loss = self(data, level - 1)
 
         if level == self.level_max - 1:
@@ -73,6 +79,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
 def optimize(model, data, level, max_iter, optimizer, reset):      
     param_all = model.submodel.parameters_all
+
     if reset:
         param_all[level] = torch.zeros_like(param_all[level], requires_grad=True)
         optimizer = SGD
