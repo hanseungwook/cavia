@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from linear_baseline import LinearFeatureBaseline
+from linear_baseline import LinearFeatureBaseline, get_return
 from torch.distributions.categorical import Categorical
 from torch.optim import Adam, SGD
 from gym_minigrid.wrappers import VectorObsWrapper
@@ -70,8 +70,13 @@ def get_inner_loss(base_model, task):
 
     # Get baseline
     value = baseline(obs, reward, mask)
-    print("value.shape:", value.shape)
-    raise ValueError()
+
+    # Get REINFORCE loss with baseline
+    logprob = torch.stack(logprob, dim=1)
+    return_ = get_return(reward, mask)
+    loss = torch.mean(torch.sum(logprob * (return_ - value), dim=1))
+
+    return -loss
 
 
 def make_ctx(n):

@@ -4,8 +4,7 @@ import numpy as np
 
 
 def get_return(reward, mask):
-    reward = torch.stack(reward, dim=0).unsqueeze(0) * mask
-    print("reward.shape:", reward.shape)
+    reward = torch.stack(reward, dim=0).float().unsqueeze(0) * mask
 
     R, return_ = 0., []
     for timestep in reversed(range(reward.shape[-1])):
@@ -41,8 +40,6 @@ class LinearFeatureBaseline(nn.Module):
 
     def _feature(self, obs, mask):
         batch_size, sequence_length, _ = obs.shape
-        print("batch_size:", batch_size)
-        print("sequence_length:", sequence_length)
         ones = torch.ones((sequence_length, batch_size, 1))
         obs = obs.transpose_(0, 1)
         time_step = torch.arange(sequence_length).view(-1, 1, 1) * ones / 100.0
@@ -60,11 +57,9 @@ class LinearFeatureBaseline(nn.Module):
     def fit(self, obs, return_, mask):
         # Shape: sequence_length * batch_size x feature_size
         featmat = self._feature(obs, mask).view(-1, self.feature_size)
-        print("featmat.shape:", featmat.shape)
 
         # Shape: sequence_length * batch_size x 1
         returns = return_.view(-1, 1)
-        print("returns.shape:", returns.shape)
 
         reg_coeff = self._reg_coeff
         XT_y = torch.matmul(featmat.t(), returns)
@@ -88,11 +83,9 @@ class LinearFeatureBaseline(nn.Module):
         obs = torch.from_numpy(np.stack(obs, axis=0)).float().unsqueeze(0)  # TODO Change axis=1 and unsqueeze
         obs_mask = torch.repeat_interleave(mask, repeats=obs.shape[-1], dim=1).view(obs.shape)
         obs = obs * obs_mask
-        print("obs.shape:", obs.shape)
 
         # Get return
         return_ = get_return(reward, mask)
-        print("return_.shape:", return_.shape)
 
         # Fit linear feature baseline
         self.fit(obs, return_, mask)
