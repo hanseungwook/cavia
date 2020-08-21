@@ -4,7 +4,7 @@ import numpy as np
 
 
 def get_return(reward, mask):
-    reward = torch.stack(reward, dim=0).float().unsqueeze(0) * mask
+    reward = torch.stack(reward, dim=1).float() * mask
 
     R, return_ = 0., []
     for timestep in reversed(range(reward.shape[-1])):
@@ -80,7 +80,7 @@ class LinearFeatureBaseline(nn.Module):
 
     def forward(self, obs, reward, mask):
         # Apply mask to obs
-        obs = torch.from_numpy(np.stack(obs, axis=0)).float().unsqueeze(0)  # TODO Change axis=1 and unsqueeze
+        obs = torch.from_numpy(np.stack(obs, axis=1)).float()
         obs_mask = torch.repeat_interleave(mask, repeats=obs.shape[-1], dim=1).view(obs.shape)
         obs = obs * obs_mask
 

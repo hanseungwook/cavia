@@ -10,34 +10,45 @@ from torch.distributions.categorical import Categorical
 from torch.optim import Adam, SGD
 from gym_minigrid.wrappers import VectorObsWrapper
 from replay_memory import ReplayMemory
+from multiprocessing_env import SubprocVecEnv
+from tensorboardX import SummaryWriter
+
+traj_batch_size = 15
+ep_max_timestep = 20
+
+tb_writer = SummaryWriter('./logs/tb_{0}'.format("rl_merge"))
 
 
 def make_env(env_name):
     def _make_env():
         env = gym.make(env_name)
-        env.max_steps = min(env.max_steps, 20)  # TODO Set horizon from config file
+        env.max_steps = min(env.max_steps, ep_max_timestep)  # TODO Set horizon from config file
+        env.reset_task(task=(4, 4))  # TODO Eliminate same task
         return VectorObsWrapper(env)        
     return _make_env
 
 
-max_iter_list = [3, 3, 20]  # Level 0, level 1, level 2
-n_ctx = [2, 3]
-n_input = 6 + sum(n_ctx)
-lr = 0.01
-layers = nn.Linear(n_input, 32), nn.Linear(32, 32), nn.Linear(32, 7)
+max_iter_list = [3, 3, 500]  # Level 0, level 1, level 2
+n_ctx = [3, 3]
+n_input = 6 + sum(n_ctx)  # TODO Remove hard-coding
+lr = 0.005
+layers = nn.Linear(n_input, 64), nn.Linear(64, 64), nn.Linear(64, 7)  # TODO Remove hard-coding
 data = torch.randn(10, 1), torch.randn(10, 1)
-env = make_env("MiniGrid-Unlock-Easy-v0")()
-env.unwrapped.reset_task(task=(4, 4))
-baseline = LinearFeatureBaseline(6)
+env = SubprocVecEnv([make_env("MiniGrid-Unlock-Easy-v0") for _ in range(traj_batch_size)])
+linear_baseline = LinearFeatureBaseline(6)  # TODO Remove hard-coding
+counter = 0
 
 
 def collect_trajectory(base_model):
+    global counter
+
     # Initialize memory
     memory = ReplayMemory()
 
     obs = env.reset()
+    score = 0.
 
-    for timestep in range(20):
+    for timestep in range(ep_max_timestep):
         # Get action and logprob
         probs = base_model(obs)
         categorical = Categorical(probs=probs)
@@ -55,11 +66,15 @@ def collect_trajectory(base_model):
             reward=reward,
             done=done)
 
+        # For logging
+        score += np.mean(reward)
+
         # For next timestep
         obs = next_obs
 
-        if done:
-            break
+    print("score:", score)
+    counter += 1
+    tb_writer.add_scalar("score", score, counter)
 
     return memory
 
@@ -69,10 +84,10 @@ def get_inner_loss(base_model, task):
     obs, logprob, reward, mask = memory.sample()
 
     # Get baseline
-    value = baseline(obs, reward, mask)
+    value = linear_baseline(obs, reward, mask)
 
     # Get REINFORCE loss with baseline
-    logprob = torch.stack(logprob, dim=1)
+    logprob = torch.stack(logprob, dim=1) * mask
     return_ = get_return(reward, mask)
     loss = torch.mean(torch.sum(logprob * (return_ - value), dim=1))
 
@@ -93,7 +108,7 @@ class BaseModel(nn.Module):
 
     def forward(self, x):
         if isinstance(x, np.ndarray):
-            x = torch.from_numpy(x).float().unsqueeze(0)
+            x = torch.from_numpy(x).float()
 
         ctx = torch.cat(self.parameters_all[:-1], dim=1)
         x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)
@@ -102,7 +117,7 @@ class BaseModel(nn.Module):
             x = layer(x)
             x = self.nonlin(x) if i < len(self.layers) - 1 else x
 
-        return F.softmax(x)
+        return F.softmax(x, dim=1)
 
 
 class Hierarchical_Model(nn.Module):
@@ -147,7 +162,6 @@ def optimize(model, data, level, max_iter, optimizer, reset):
 
     for _ in range(max_iter):
         loss = model(data, level)
-        print("loss:", loss)
 
         if reset:
             param_all[level], = optim.step(loss, params=[param_all[level]])
