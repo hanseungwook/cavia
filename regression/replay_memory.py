@@ -5,6 +5,7 @@ import numpy as np
 class ReplayMemory():
     def __init__(self):
         self.obs = []
+        self.action = []
         self.logprob = []
         self.reward = []
         self.done = []
@@ -17,11 +18,12 @@ class ReplayMemory():
         mask = 1. - done
         return mask
 
-    def add(self, obs, logprob, reward, done):
+    def add(self, obs, action, logprob, reward, done):
         self.obs.append(obs)
+        self.action.append(action)
         self.logprob.append(logprob)
         self.reward.append(torch.from_numpy(np.array(reward)))
         self.done.append(torch.FloatTensor(done.astype(float)))
 
     def sample(self):
-        return self.obs, self.logprob, self.reward, self._get_mask(self.done)
+        return self.obs, self.action, self.logprob, self.reward, self._get_mask(self.done)
