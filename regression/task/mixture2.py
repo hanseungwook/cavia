@@ -62,6 +62,7 @@ def get_cifar10_img(sample_type, label):
     imgs = None
 
     if not (train_imgs and test_imgs):
+        ### TODO: download & re-organize functions
         load_cifar10_imgs('/Users/seungwook.han@ibm.com/Documents/Projects/data/cifar-10-batches-py')
         
     # Read from global variables
@@ -111,6 +112,8 @@ def img_target_function(img, coordinates):
     pixel_values = img[c[:, 0].long(), c[:, 1].long(), :]
     return pixel_values
 
+### TODO: Can we make k_batch, n_batch automatic?
+### TODO: Can we make the sampling of classes mutually exclusive?
 def sample_cifar10_img_fnc(sample_type):
     label = np.random.randint(low=0, high=10)
     img = get_cifar10_img(sample_type, label)
@@ -121,6 +124,39 @@ def sample_cifar10_img_fnc(sample_type):
 
 def sample_celeba_img_fnc(sample_type):
     img = get_celeba_img(sample_type)
+    t_fn = partial(img_target_function, img)
+
+    return img_input_function, t_fn
+
+def create_hier_imagenet_supertasks(data_dir, info_dir, level=2):
+    from robustness.tools.breeds_helpers import ClassHierarchy
+
+    hier = ClassHierarchy(info_dir)
+    superclasses = hier.get_nodes_at_level(level)
+
+    supertasks = [partial(sample_hier_imagenet_img_fnc, hier, data_dir, info_dir, s) for s in superclasses]
+
+    return supertasks
+
+
+def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, sample_type):
+    from robustness.tools.breeds_helpers import BreedsDatasetGenerator
+    from robustness import datasets
+
+    DG = BreedsDatasetGenerator(info_dir)
+    
+    for i in range(10, 0, -2):
+        try:
+            subclass_split = DG.split_superclass(superclass_id, i, True, 'rand', np.random.RandomState(2))
+        except:
+            continue
+
+        break
+
+    sample_idx = 0 if sample_type == 'train' else 1
+    subclasses = subclass_split[sample_idx]
+    dataset = datasets.CustomImageNet(data_dir, subclasses)
+    img = dataset[np.random.randint(0, len(dataset))]
     t_fn = partial(img_target_function, img)
 
     return img_input_function, t_fn
@@ -177,18 +213,16 @@ def get_linear_function(slope, bias):
 
     return linear_function
 
+### TODO: visualize images
+
+
 ### Fix this part: write a function to return task_func_list depending on task_type: mixture of functions / mixture of images 
 task_func_list = [sample_cifar10_img_fnc]
 # task_func_list = [sample_sin_fnc, sample_linear_fnc]
 # task_func_list = [sample_sin_fnc, sample_img_fnc]
 # task_func_list = [sample_img_fnc, sample_sin_fnc, sample_linear_fnc]
 
-
-
-
-
-
-
+### TODO: bash script for running script
 
 
 # def get_quadratic_params():
