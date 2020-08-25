@@ -6,6 +6,7 @@ from torch.optim import Adam, SGD
 
 # from utils import optimize, manual_optim, send_to
 from dataset import Meta_Dataset, Meta_DataLoader, get_samples  
+from task.mixture2 import sample_sin_fnc, sample_linear_fnc, sample_celeba_img_fnc, sample_cifar10_img_fnc, create_hier_imagenet_supertasks
 # from torch.autograd import gradcheck
 
 import higher 
@@ -37,6 +38,8 @@ def make_tasks(task_names):
             task_func_list.append(sample_celeba_img_fnc)
         elif task == 'cifar10':
             task_func_list.append(sample_cifar10_img_fnc)
+        elif task == 'hier-imagenet':
+            task_func_list = create_hier_imagenet_supertasks
         else:
             raise Exeption('Task not implemented/undefined')
 
