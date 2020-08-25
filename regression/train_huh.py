@@ -1,6 +1,5 @@
 from torch.optim import Adam, SGD
 from model.models_huh import get_model_type, get_encoder_type
-from task.mixture2 import task_func_list                             ### FIX THIS 
 from hierarchical import Hierarchical_Model,  get_hierarchical_task   # make_hierarhical_model,
 
 from pdb import set_trace
@@ -29,11 +28,10 @@ def make_batch_dict(n_trains, n_tests, n_valids):
             for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids)
             ]
 
-
 def run(args, logger_maker):
     k_batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
     n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-    task = get_hierarchical_task(task_func_list, k_batch_dict, n_batch_dict)    ### FIX THIS : task_func_list
+    task = get_hierarchical_task(args.task, k_batch_dict, n_batch_dict)    ### FIX THIS : task_func_list
     
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML
