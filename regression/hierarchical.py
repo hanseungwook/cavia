@@ -26,9 +26,24 @@ DOUBLE_precision = False #True
 
 ###################################
 
+def make_tasks(task_names):
+    task_func_list = []
+    for task in task_names:
+        if task == 'sine':
+            task_func_list.append(sample_sin_fnc)
+        elif task == 'linear':
+            task_func_list.append(sample_linear_fnc)
+        elif task == 'celeba':
+            task_func_list.append(sample_celeba_img_fnc)
+        elif task == 'cifar10':
+            task_func_list.append(sample_cifar10_img_fnc)
+        else:
+            raise Exeption('Task not implemented/undefined')
 
+    return task_func_list
 
-def get_hierarchical_task(task_func_list, k_batch_dict, n_batch_dict):
+def get_hierarchical_task(task_list, k_batch_dict, n_batch_dict):
+    task_func_list = make_tasks(task_list)
     task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
     return Meta_Dataset(data=[task])
 
