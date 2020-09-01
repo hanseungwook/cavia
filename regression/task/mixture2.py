@@ -109,7 +109,7 @@ def img_target_function(img, coordinates):
     # Denormalize coordinates
     c[:, 0] *= img_size[0]
     c[:, 1] *= img_size[1]
-    pixel_values = img[c[:, 0].long(), c[:, 1].long(), :]
+    pixel_values = img[:, c[:, 0].long(), c[:, 1].long()]
     return pixel_values
 
 ### TODO: Can we make k_batch, n_batch automatic?
