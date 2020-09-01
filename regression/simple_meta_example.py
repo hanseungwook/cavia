@@ -15,7 +15,7 @@ from torch.nn.utils.convert_parameters import parameters_to_vector
 from torch.distributions.kl import kl_divergence
 
 
-traj_batch_size = 2
+traj_batch_size = 5
 ep_max_timestep = 20
 
 tb_writer = SummaryWriter('./logs/tb_{0}'.format("rl_merge"))
@@ -38,7 +38,7 @@ def make_env(env_name):
     return _make_env
 
 
-max_iter_list = [3, 3, 500]  # Level 0, level 1, level 2
+max_iter_list = [3, 2, 500]  # Level 0, level 1, level 2
 n_ctx = [3, 3]
 n_input = 6 + sum(n_ctx)  # TODO Remove hard-coding
 lr = 0.001
@@ -47,6 +47,31 @@ data = torch.randn(10, 1), torch.randn(10, 1)
 env = SubprocVecEnv([make_env("MiniGrid-Unlock-Easy-v0") for _ in range(traj_batch_size)])
 linear_baseline = LinearFeatureBaseline(6)  # TODO Remove hard-coding
 counter = 0
+
+
+class Hierarchical_Memory(object):
+    def __init__(self):
+        # self.memories = {}
+        self.memories = []
+
+    def summary(self):
+        # LEVEL 0: Level0 iter(Level1 iter + 1)
+        for level in self.memories.keys():
+            print("At level {}, size is: {}".format(level, len(self.memories[level])))
+
+    # def add(self, level, memory):
+    #     if level not in self.memories.keys():
+    #         self.memories[level] = []
+    #     self.memories[level].append(memory)
+
+    def add(self, memory):
+        self.memories.append(memory)
+
+    def clear(self):
+        self.memories.clear()
+
+
+hierarchical_memory = Hierarchical_Memory()
 
 
 def collect_trajectory(base_model):
@@ -89,15 +114,24 @@ def collect_trajectory(base_model):
     return memory
 
 
-def get_inner_loss(base_model, task):
-    memory = collect_trajectory(base_model)  # TODO Collect multiple trajectories
-    obs, action, logprob, reward, mask = memory.sample()
+def get_inner_loss(base_model, task, pointer=None):
+    if pointer is None:
+        memory = collect_trajectory(base_model)
+        obs, action, logprob, reward, mask = memory.sample()
+        logprob = torch.stack(logprob, dim=1)
+    else:
+        print("pointer:", pointer)
+        memory = hierarchical_memory.memories[pointer]
+        obs, action, logprob, reward, mask = memory.sample()
+        categorical = base_model(torch.from_numpy(np.stack(obs, axis=1)).float())
+        action = torch.from_numpy(np.stack(action, axis=1)).float()
+        logprob = categorical.log_prob(action)  # NOTE Replace logprob
 
     # Get baseline
     value = linear_baseline(obs, reward, mask)
 
     # Get REINFORCE loss with baseline
-    logprob = torch.stack(logprob, dim=1) * mask
+    logprob = logprob * mask
     return_ = get_return(reward, mask)
     loss = torch.mean(torch.sum(logprob * (return_ - value), dim=1))
 
@@ -116,15 +150,20 @@ class BaseModel(nn.Module):
         self.parameters_all = [make_ctx(n) for n in n_ctx] + [self.layers.parameters]
         self.nonlin = nn.ReLU()
 
-    def forward(self, x, layers=None):
+    def forward(self, x, layers=None, ctx_=None):
         if isinstance(x, np.ndarray):
             x = torch.from_numpy(x).float()
 
+        if ctx_ is None:
+            ctx = self.parameters_all[:-1]
+        else:
+            ctx = ctx_
+
         if len(x.shape) == 3:
-            ctx = torch.cat(self.parameters_all[:-1], dim=1)
+            ctx = torch.cat(ctx, dim=1)
             x = torch.cat((x, ctx.expand(x.shape[0], x.shape[1], -1)), dim=-1)
         else:
-            ctx = torch.cat(self.parameters_all[:-1], dim=1)
+            ctx = torch.cat(ctx, dim=1)
             x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)
 
         layers_ = self.layers if layers is None else layers
@@ -135,6 +174,10 @@ class BaseModel(nn.Module):
 
         return Categorical(logits=x)
 
+    def reset_context(self):
+        print("[INFO] reset context ...")
+        self.parameters_all = [make_ctx(n) for n in n_ctx] + [self.layers.parameters]
+
 
 class Hierarchical_Model(nn.Module):
     def __init__(self, submodel): 
@@ -142,6 +185,7 @@ class Hierarchical_Model(nn.Module):
 
         self.submodel = submodel 
         self.level_max = len(submodel.parameters_all)
+        self.pointer = -1
 
     def forward(self, data, level=None, optimizer=None, reset=True): 
         if level is None:
@@ -159,22 +203,49 @@ class Hierarchical_Model(nn.Module):
                 reset=reset)
             test_loss, memory = self(data, level - 1)
 
-        if level == self.level_max - 1:
-            print('[DEBUG] level', level, test_loss.item())
+        print("Return test_loss ...", test_loss, level)
+        # print(hierarchical_memory.summary())
 
-        print("Return test_loss ...", test_loss)
+        return test_loss, memory
+
+    def adapt(self, data, level=None, optimizer=None, reset=True): 
+        if level is None:
+            level = self.level_max
+
+        if level == 0:
+            print("pointer:", self.pointer)
+            self.pointer += 1
+            return get_inner_loss(self.submodel, data, self.pointer)
+        else:
+            optimize_for_context(
+                model=self, 
+                data=data, 
+                level=level - 1, 
+                max_iter=max_iter_list[level - 1], 
+                optimizer=optimizer, 
+                reset=reset)
+
+            if level < self.level_max:
+                test_loss, memory = self.adapt(data, level - 1)
+            else:
+                test_loss, memory = None, None
+
+        print("[ADAPT] Return test_loss ...", test_loss, level)
+
         return test_loss, memory
 
 
 def surrogate_loss(memory, model, old_pi=None):
-    # params = self.adapt(train_futures, first_order=first_order)
+    # TODO RESET CONTEXT
+    print("======================GETTING NEW CONTEXT")
+    model.submodel.reset_context()
+    model.adapt(data, reset=False)
+    ctx = model.submodel.parameters_all[:-1]
+    model.pointer = -1  # Reset pointer back to origin
 
     with torch.set_grad_enabled(old_pi is None):
-        # valid_episodes = valid_futures
-        # pi = self.policy(valid_episodes.observations, params=params)
-
         obs, action, logprob, reward, mask = memory.sample()
-        pi = model.submodel(torch.from_numpy(np.stack(obs, axis=1)).float())
+        pi = model.submodel(torch.from_numpy(np.stack(obs, axis=1)).float(), ctx_=ctx)
 
         if old_pi is None:
             old_pi = detach_distribution(pi)
@@ -257,10 +328,12 @@ def optimize(model, data, level, max_iter, optimizer, reset):
 
     for _ in range(max_iter):
         loss, memory = model(data, level)
+        hierarchical_memory.add(memory)
 
         if reset:
             param_all[level], = optim.step(loss, params=[param_all[level]])
         else:
+            print("[INFO] Length of memory:", len(hierarchical_memory.memories))
             old_loss, old_kl, old_pi = surrogate_loss(memory, model, old_pi=None)
             grads = torch.autograd.grad(old_loss, param_all[level](), retain_graph=True)
             grads = parameters_to_vector(grads)
@@ -281,10 +354,39 @@ def optimize(model, data, level, max_iter, optimizer, reset):
             step_size = 1.0
             for _ in range(10):
                 vector_to_parameters(old_params - step_size * step, model.submodel.parameters_all[2]())
-                # TODO More than one step?
-                break
+                losses, kls, _ = surrogate_loss(memory, model, old_pi=old_pi)
+                improve = losses - old_loss
+                kl = kls
+                if (improve.item() < 0.0) and (kl.item() < 1e-3):
+                    break
+                step_size *= 0.5
+
+            else:
+                vector_to_parameters(old_params, model.submodel.parameters_all[2]())
+
+            hierarchical_memory.clear()
 
     print("Finished optimizing level", level, "\n")
+
+
+def optimize_for_context(model, data, level, max_iter, optimizer, reset):      
+    param_all = model.submodel.parameters_all
+
+    if reset:
+        param_all[level] = torch.zeros_like(param_all[level], requires_grad=True)
+        optimizer = SGD
+        optim = optimizer([param_all[level]], lr=lr)
+        optim = higher.get_diff_optim(optim, [param_all[level]])
+
+    for _ in range(max_iter):
+        loss, memory = model.adapt(data, level)
+
+        if reset:
+            param_all[level], = optim.step(loss, params=[param_all[level]])
+        else:
+            return
+
+    print("[ADAPT] Finished optimizing level", level, "\n")
 
 
 basemodel = BaseModel(n_ctx, *layers)
