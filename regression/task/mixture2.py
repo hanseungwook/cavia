@@ -129,32 +129,33 @@ def sample_celeba_img_fnc(sample_type):
     return img_input_function, t_fn
 
 def create_hier_imagenet_supertasks(data_dir, info_dir, level=2):
-    from robustness.tools.breeds_helpers import ClassHierarchy
+    from robustness.tools.breeds_helpers import BreedsDatasetGenerator
 
-    hier = ClassHierarchy(info_dir)
-    superclasses = hier.get_nodes_at_level(level)
+    # Selects all superclasses with at least Nsubclasses # of subclasses
+    DG = BreedsDatasetGenerator(info_dir)
+    superclasses, _, _ = DG.get_superclasses(level=4, Nsubclasses=20, split='rand', ancestor=None, balanced=False, random_seed=2, verbose=False)
 
-    supertasks = [partial(sample_hier_imagenet_img_fnc, hier, data_dir, info_dir, s) for s in superclasses]
+    # Creates supertasks of those superclasses that fit the criterion above
+    supertasks = [partial(sample_hier_imagenet_img_fnc, hier, data_dir, info_dir, s, Nsubclasses) for s in superclasses]
 
     return supertasks
 
 
-def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, sample_type):
-    from robustness.tools.breeds_helpers import BreedsDatasetGenerator
+def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubclasses, sample_type):
+    from robustness.tools.breeds_helpers import ClassHierarchy
     from robustness import datasets
 
-    DG = BreedsDatasetGenerator(info_dir)
+    hier = ClassHierarchy(info_dir)    
+    rng = np.random.RandomState(2)
     
-    for i in range(10, 0, -2):
-        try:
-            subclass_split = DG.split_superclass(superclass_id, i, True, 'rand', np.random.RandomState(2))
-        except:
-            continue
+    # Get all subclasses (level 1 classes) and split into train and test (deterministically given a random seed)
+    total_subclasses = hier.leaves_reachable(superclass_id)
+    rng.shuffle(total_subclasses)
+    
+    # Re-define train/test split
+    split_idx = len(total_subclasses) // 2
+    subclasses = total_subclasses[:split_idx] if sample_type == 'train' else total_subclasses[split_idx:]
 
-        break
-
-    sample_idx = 0 if sample_type == 'train' else 1
-    subclasses = subclass_split[sample_idx]
     dataset = datasets.CustomImageNet(data_dir, subclasses)
     img = dataset[np.random.randint(0, len(dataset))]
     t_fn = partial(img_target_function, img)
