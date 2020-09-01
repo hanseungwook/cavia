@@ -130,6 +130,7 @@ def sample_celeba_img_fnc(sample_type):
 
 def create_hier_imagenet_supertasks(data_dir, info_dir, level=4):
     from robustness.tools.breeds_helpers import BreedsDatasetGenerator
+    from robustness.tools.breeds_helpers import setup_breeds
 
     # Set up class hierarchy info, if not exist
     if not (os.path.exists(info_dir) and len(os.listdir(info_dir))):
