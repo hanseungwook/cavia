@@ -166,7 +166,8 @@ def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubcl
     subclasses = total_subclasses[:split_idx] if sample_type == 'train' else total_subclasses[split_idx:]
 
     dataset = datasets.CustomImageNet(data_dir, subclasses)
-    img = dataset[np.random.randint(0, len(dataset))]
+    loader = dataset.make_loaders(workers=4, batch_size=1)[0]
+    img = next(loader)
     t_fn = partial(img_target_function, img)
 
     return img_input_function, t_fn
