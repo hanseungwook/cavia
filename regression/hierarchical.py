@@ -39,7 +39,7 @@ def make_tasks(task_names):
         elif task == 'cifar10':
             task_func_list.append(sample_cifar10_img_fnc)
         elif task == 'hier-imagenet':
-            task_func_list = create_hier_imagenet_supertasks
+            task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
         else:
             raise Exeption('Task not implemented/undefined')
 
