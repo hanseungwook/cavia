@@ -164,6 +164,7 @@ def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubcl
     # Re-define train/test split
     split_idx = len(total_subclasses) // 2
     subclasses = total_subclasses[:split_idx] if sample_type == 'train' else total_subclasses[split_idx:]
+    subclasses = [[s] for s in subclasses]
 
     dataset = datasets.CustomImageNet(data_dir, subclasses)
     loader = dataset.make_loaders(workers=4, batch_size=1)[0]
