@@ -109,7 +109,14 @@ def img_target_function(img, coordinates):
     # Denormalize coordinates
     c[:, 0] *= img_size[0]
     c[:, 1] *= img_size[1]
-    pixel_values = img[:, c[:, 0].long(), c[:, 1].long()]
+
+    # Usual H x W x C img dimensions
+    if img.shape[0] == 3:
+        pixel_values = img[c[:, 0].long(), c[:, 1].long(), :]    
+    # Pytorch C x H x W img dimensions
+    elif img.shape[2] == 3:
+        pixel_values = img[:, c[:, 0].long(), c[:, 1].long()].permute(1, 0) 
+
     return pixel_values
 
 ### TODO: Can we make k_batch, n_batch automatic?
