@@ -158,7 +158,7 @@ def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubcl
     rng = np.random.RandomState(2)
     
     # Get all subclasses (level 1 classes) and split into train and test (deterministically given a random seed)
-    total_subclasses = hier.leaves_reachable(superclass_id)
+    total_subclasses = list(hier.leaves_reachable(superclass_id))
     rng.shuffle(total_subclasses)
     
     # Re-define train/test split
