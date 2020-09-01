@@ -168,7 +168,7 @@ def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubcl
 
     dataset = datasets.CustomImageNet(data_dir, subclasses)
     loader = dataset.make_loaders(workers=4, batch_size=1)[0]
-    img = next(iter(loader))
+    img = next(iter(loader))[0]
     t_fn = partial(img_target_function, img)
 
     return img_input_function, t_fn
@@ -226,13 +226,6 @@ def get_linear_function(slope, bias):
     return linear_function
 
 ### TODO: visualize images
-
-
-### Fix this part: write a function to return task_func_list depending on task_type: mixture of functions / mixture of images 
-task_func_list = [sample_cifar10_img_fnc]
-# task_func_list = [sample_sin_fnc, sample_linear_fnc]
-# task_func_list = [sample_sin_fnc, sample_img_fnc]
-# task_func_list = [sample_img_fnc, sample_sin_fnc, sample_linear_fnc]
 
 ### TODO: bash script for running script
 
