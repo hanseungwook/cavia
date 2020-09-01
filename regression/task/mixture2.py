@@ -111,10 +111,10 @@ def img_target_function(img, coordinates):
     c[:, 1] *= img_size[1]
 
     # Usual H x W x C img dimensions
-    if img.shape[0] == 3:
+    if img.shape[2] == 3:
         pixel_values = img[c[:, 0].long(), c[:, 1].long(), :]    
     # Pytorch C x H x W img dimensions
-    elif img.shape[2] == 3:
+    elif img.shape[0] == 3:
         pixel_values = img[:, c[:, 0].long(), c[:, 1].long()].permute(1, 0) 
 
     return pixel_values
