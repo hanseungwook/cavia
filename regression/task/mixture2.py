@@ -128,7 +128,7 @@ def sample_celeba_img_fnc(sample_type):
 
     return img_input_function, t_fn
 
-def create_hier_imagenet_supertasks(data_dir, info_dir, level=4):
+def create_hier_imagenet_supertasks(data_dir, info_dir, level=4, Nsubclasses=20):
     from robustness.tools.breeds_helpers import BreedsDatasetGenerator
     from robustness.tools.breeds_helpers import setup_breeds
     from robustness.tools.breeds_helpers import ClassHierarchy
@@ -140,8 +140,8 @@ def create_hier_imagenet_supertasks(data_dir, info_dir, level=4):
 
     # Selects all superclasses with at least Nsubclasses # of subclasses
     DG = BreedsDatasetGenerator(info_dir)
-    superclasses, _, _ = DG.get_superclasses(level, Nsubclasses=20, split='rand', ancestor=None, balanced=False, random_seed=2, verbose=False)
-    
+    superclasses, _, _ = DG.get_superclasses(level, Nsubclasses, split='rand', ancestor=None, balanced=False, random_seed=2, verbose=False)
+
     hier = ClassHierarchy(info_dir)
 
     # Creates supertasks of those superclasses that fit the criterion above
