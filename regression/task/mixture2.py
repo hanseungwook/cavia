@@ -151,6 +151,7 @@ def create_hier_imagenet_supertasks(data_dir, info_dir, level=4, Nsubclasses=20)
 
 
 def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubclasses, sample_type):
+    from robustness.tools.breeds_helpers import BreedsDatasetGenerator
     from robustness.tools.breeds_helpers import ClassHierarchy
     from robustness import datasets
 
@@ -158,17 +159,16 @@ def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubcl
     rng = np.random.RandomState(2)
     
     # Get all subclasses (level 1 classes) and split into train and test (deterministically given a random seed)
-    total_subclasses = list(hier.leaves_reachable(superclass_id))
-    rng.shuffle(total_subclasses)
+    DG = BreedsDatasetGenerator(info_dir)
+    total_subclasses = DG.split_superclass(superclass_id, Nsubclasses, True, 'rand', rng)
     
-    # Re-define train/test split
-    split_idx = len(total_subclasses) // 2
-    subclasses = total_subclasses[:split_idx] if sample_type == 'train' else total_subclasses[split_idx:]
+    # Choose between train and valid/test
+    subclasses = total_subclasses[0] if sample_type == 'train' else total_subclasses[1]
     subclasses = [[s] for s in subclasses]
 
     dataset = datasets.CustomImageNet(data_dir, subclasses)
     loader = dataset.make_loaders(workers=4, batch_size=1)[0]
-    img = next(loader)
+    img = next(iter(loader))
     t_fn = partial(img_target_function, img)
 
     return img_input_function, t_fn
