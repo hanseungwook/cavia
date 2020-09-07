@@ -130,9 +130,10 @@ class Hierarchical_Model(nn.Module):
 
             return mean_test_loss, outputs
 
-    def reset(self):
-        print("reset iter_counter")
-        raise NotImplementedError()
+    def clear(self):
+        self.status_monitor = {}
+        self.status_monitor["cur_iter"] = [0 for _ in range(self.level_max)]
+        self.status_monitor["i_task"] = [0 for _ in range(self.level_max)]
 
 
 def optimize(model, dataloader, level, args_dict, optimizer, reset, status_monitor, is_rl=True):
@@ -171,7 +172,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status_monit
             else:
                 if is_rl:
                     trpo_optimization(outputs, model)
-                    status_monitor.clear()
+                    model.clear()
                     hierarchical_memory.clear()
                 else:
                     optim.zero_grad()
