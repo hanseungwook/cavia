@@ -24,8 +24,11 @@ class LinearFeatureBaseline(nn.Module):
         (https://arxiv.org/abs/1604.06778)
     Ref: https://github.com/tristandeleu/pytorch-maml-rl/blob/master/maml_rl/baseline.py
     """
-    def __init__(self, input_size, reg_coeff=1e-5):
+    def __init__(self, obs, reg_coeff=1e-5):
         super(LinearFeatureBaseline, self).__init__()
+
+        obs = torch.from_numpy(np.stack(obs, axis=1)).float()
+        _, _, input_size = obs.shape
 
         self.input_size = input_size
         self._reg_coeff = reg_coeff

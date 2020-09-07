@@ -1,5 +1,4 @@
 from rl_utils import make_env
-from torch.optim import Adam
 from model.models_huh import get_model_type, get_encoder_type
 from task.mixture2 import task_func_list  # FIX THIS 
 from hierarchical import Hierarchical_Model, get_hierarchical_task
@@ -12,7 +11,9 @@ def get_base_model(args):
     # Change last layer of the architecture according to the action space of the environment
     # Note that we put a dummy env and task only to get the action space of the environment
     env = make_env(args=args)()
+    input_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
+    args.architecture[0] = input_dim
     args.architecture[-1] = action_dim
     env.close()
 
@@ -44,15 +45,12 @@ def make_batch_dict(n_trains, n_tests, n_valids):
 
 
 def run(args, logger_maker):
-    # k_batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
-    # n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-    # task = get_hierarchical_task(task_func_list, k_batch_dict, n_batch_dict)  # TODO FIX THIS : task_func_list
+    k_batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
+    n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
+    task = get_hierarchical_task(task_func_list, k_batch_dict, n_batch_dict)  # FIX THIS : task_func_list
     
     base_model = get_base_model(args)
-    import sys
-    sys.exit()
-    encoder_models = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML
-    loggers = [None, None, logger_maker()]                             # For 2-level problems.  FIX THIS
-    model = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
-    test_loss = model(task, optimizer=Adam, reset=False)
+    loggers = [None, None, logger_maker()]
+    model = Hierarchical_Model(base_model, None, loggers, is_rl=True, args=args, task=task)
+    test_loss = model(task, reset=False)  # TODO Pass TRPO instead of Adam
     return test_loss

@@ -34,9 +34,9 @@ def parse_args():
     parser.add_argument('--k_batch_train', type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks 
     parser.add_argument('--k_batch_test',  type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks
     parser.add_argument('--k_batch_valid', type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks
-    parser.add_argument('--n_batch_train', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks 
-    parser.add_argument('--n_batch_test',  type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
-    parser.add_argument('--n_batch_valid', type=int, nargs='+', default=[30, 15, 2])              # number of datapoints, tasks, super-tasks
+    parser.add_argument('--n_batch_train', type=int, nargs='+', default=[30, 2, 2])              # number of datapoints, tasks, super-tasks 
+    parser.add_argument('--n_batch_test',  type=int, nargs='+', default=[30, 2, 2])              # number of datapoints, tasks, super-tasks
+    parser.add_argument('--n_batch_valid', type=int, nargs='+', default=[30, 2, 2])              # number of datapoints, tasks, super-tasks
     parser.add_argument('--n_contexts',    type=int, nargs='+', default=[2, 1])                  # number of context variables: phi0, phi1 
     parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
 

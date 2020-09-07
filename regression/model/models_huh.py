@@ -2,20 +2,15 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 from torch.nn import Parameter
 from torch.nn import init
 from functools import partial
 from torch.distributions import Categorical
 
-# from pdb import set_trace
-
 
 def get_encoder_type(encoder_type):
-    if encoder_type == "HSML":
-        MODEL = HSML
-    else:
-        raise ValueError()
-    return ENCODER
+    raise NotImplementedError()
 
 
 def get_model_type(model_type, is_rl=False):
@@ -43,7 +38,7 @@ def make_ctx(n):
     # if DOUBLE_precision:
     #     return torch.zeros(1,n, requires_grad=True).double()
     # else:
-        return torch.zeros(1,n, requires_grad=True)
+    return torch.zeros(1, n, requires_grad=True)
 
 
 #######################
@@ -70,36 +65,24 @@ class BaseModel2_CAVIA(nn.Module):
 
         for i, layer in enumerate(self.layers):
             x = layer(x)
-            x = self.nonlin(x)  if i<len(self.layers)-1 else x
+            x = self.nonlin(x) if i < len(self.layers) - 1 else x
         return x 
 
-###################
+
 class BaseModel(nn.Module):
-    """     Feed-forward neural network with context    """
+    """Feed-forward neural network with context"""
     def __init__(self, n_arch, n_contexts, nonlin, loss_fnc, device, FC_module):
         super().__init__()
 
         self.module_list = nn.ModuleList()
         for i in range(len(n_arch) - 1):
             self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]))    # Fully connected layers
-
         self.parameters_all = [make_ctx(n) for n in n_contexts] + [self.module_list.parameters]
-
         self.device = device if device is not None else 'cpu'
-        self.n_contexts = n_contexts #sum(n_context)  # Concatenate all high-level ctx into one. 
+        self.n_contexts = n_contexts
         self.nonlin = nonlin
         self.loss_fnc = loss_fnc
         self.n_arch = n_arch
-
-
-    # def forward(self, data_batch, ctx):
-    #     '''
-    #     args: minibatch of data_points
-    #     returns:  mean_test_loss, mean_train_loss, outputs
-    #     '''
-    #     inputs, targets = data_batch
-    #     outputs = self._forward(inputs, ctx)
-    #     return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
 
     def forward(self, data_batch):
         inputs, targets = data_batch
@@ -107,18 +90,14 @@ class BaseModel(nn.Module):
         outputs = self._forward(inputs, ctx_all)
         return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
 
-######################################
 
 class Cavia(BaseModel):
     def __init__(self, n_arch, n_contexts, nonlin=nn.ReLU(), loss_fnc=nn.MSELoss(), device=None):
 
         n_arch[0] += sum(n_contexts)  # add n_context to n_input 
-
-        super().__init__(n_arch, n_contexts, nonlin, loss_fnc, device, FC_module = nn.Linear)
-
+        super().__init__(n_arch, n_contexts, nonlin, loss_fnc, device, FC_module=nn.Linear)
 
     def _forward(self, x, ctx_list):
-        raise ValueError("Categorical distribution")
         ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
         x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
         for i, module in enumerate(self.module_list):
@@ -128,20 +107,69 @@ class Cavia(BaseModel):
         return x
 
 
-class CaviaRL(BaseModel):
+class BaseModelRL(nn.Module):
+    """Feed-forward neural network with context"""
+    def __init__(self, n_arch, n_contexts, nonlin, loss_fnc, device, FC_module):
+        super().__init__()
+
+        self.module_list = nn.ModuleList()
+        for i in range(len(n_arch) - 1):
+            self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]))    # Fully connected layers
+        self.parameters_all = [make_ctx(n) for n in n_contexts] + [self.module_list.parameters]
+        self.device = device if device is not None else 'cpu'
+        self.n_contexts = n_contexts #sum(n_context)  # Concatenate all high-level ctx into one. 
+        self.nonlin = nonlin
+        self.loss_fnc = loss_fnc
+        self.n_arch = n_arch
+
+    def forward(self, env):
+        raise NotImplementedError()
+
+    def reset_context(self):
+        self.parameters_all = [make_ctx(n) for n in self.n_contexts] + [self.module_list.parameters]
+
+
+class CaviaRL(BaseModelRL):
     def __init__(self, n_arch, n_contexts, nonlin=nn.ReLU(), loss_fnc=None, device=None):
         n_arch[0] += sum(n_contexts)  # add n_context to n_input 
+
         super(CaviaRL, self).__init__(n_arch, n_contexts, nonlin, loss_fnc, device, FC_module=nn.Linear)
 
-    def _forward(self, x, ctx_list):
-        raise ValueError("Categorical distribution")
-        ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
-        x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
-        for i, module in enumerate(self.module_list):
-            x = module(x)
-            if i < len(self.module_list) - 1:  
-                x = self.nonlin(x)
-        return x
+    def forward(self, x, layers=None, ctx_=None):
+        if isinstance(x, np.ndarray):
+            x = torch.from_numpy(x).float()
+
+        # Concatenate input with context
+        if ctx_ is None:
+            ctx = self.parameters_all[:-1]
+        else:
+            ctx = ctx_
+
+        if len(x.shape) == 3:
+            ctx = torch.cat(ctx, dim=1)
+            x = torch.cat((x, ctx.expand(x.shape[0], x.shape[1], -1)), dim=-1)
+        else:
+            ctx = torch.cat(ctx, dim=1)
+            x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)
+
+        # Get categorical distribution
+        layers_ = self.module_list if layers is None else layers
+    
+        for i, layer in enumerate(layers_):
+            x = layer(x)
+            x = self.nonlin(x) if i < len(layers_) - 1 else x
+    
+        return Categorical(logits=x)
+
+
+    # def _forward(self, x, ctx_list):
+    #     ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
+    #     x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
+    #     for i, module in enumerate(self.module_list):
+    #         x = module(x)
+    #         if i < len(self.module_list) - 1:  
+    #             x = self.nonlin(x)
+    #     return x
 
 ######################################
 
