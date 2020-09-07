@@ -178,8 +178,8 @@ def get_linear_function(slope, bias):
     return linear_function
 
 ### Fix this part: write a function to return task_func_list depending on task_type: mixture of functions / mixture of images 
-task_func_list = [sample_cifar10_img_fnc]
-# task_func_list = [sample_sin_fnc, sample_linear_fnc]
+# task_func_list = [sample_cifar10_img_fnc]
+task_func_list = [sample_sin_fnc, sample_linear_fnc]
 # task_func_list = [sample_sin_fnc, sample_img_fnc]
 # task_func_list = [sample_img_fnc, sample_sin_fnc, sample_linear_fnc]
 

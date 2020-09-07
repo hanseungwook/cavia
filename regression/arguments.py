@@ -43,6 +43,11 @@ def parse_args():
     parser.add_argument('--log_interval',  type=int, default=100)
     parser.add_argument('--log_name',  type=str, default='')
 
+    # Arguments for reinforcement learning settings
+    parser.add_argument(
+        '--ep-max-timestep', type=int, default=20, 
+        help="Episode horizon")
+
     args = parser.parse_args()
 
     # use the GPU if available

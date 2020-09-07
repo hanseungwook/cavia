@@ -5,8 +5,10 @@ import torch.nn.functional as F
 from torch.nn import Parameter
 from torch.nn import init
 from functools import partial
+from torch.distributions import Categorical
 
 # from pdb import set_trace
+
 
 def get_encoder_type(encoder_type):
     if encoder_type == "HSML":
@@ -15,10 +17,13 @@ def get_encoder_type(encoder_type):
         raise ValueError()
     return ENCODER
 
-def get_model_type(model_type):
 
+def get_model_type(model_type, is_rl=False):
     if model_type == "CAVIA":
-        MODEL = Cavia
+        if is_rl:
+            MODEL = CaviaRL
+        else:
+            MODEL = Cavia
     elif model_type == "ADDITIVE":
         MODEL = Model_Additive
     elif model_type == "MULTIPLICATIVE":
@@ -105,7 +110,7 @@ class BaseModel(nn.Module):
 ######################################
 
 class Cavia(BaseModel):
-    def __init__(self, n_arch, n_contexts, nonlin=nn.ReLU(), loss_fnc = nn.MSELoss(), device = None):
+    def __init__(self, n_arch, n_contexts, nonlin=nn.ReLU(), loss_fnc=nn.MSELoss(), device=None):
 
         n_arch[0] += sum(n_contexts)  # add n_context to n_input 
 
@@ -113,6 +118,23 @@ class Cavia(BaseModel):
 
 
     def _forward(self, x, ctx_list):
+        raise ValueError("Categorical distribution")
+        ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
+        x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
+        for i, module in enumerate(self.module_list):
+            x = module(x)
+            if i < len(self.module_list) - 1:  
+                x = self.nonlin(x)
+        return x
+
+
+class CaviaRL(BaseModel):
+    def __init__(self, n_arch, n_contexts, nonlin=nn.ReLU(), loss_fnc=None, device=None):
+        n_arch[0] += sum(n_contexts)  # add n_context to n_input 
+        super(CaviaRL, self).__init__(n_arch, n_contexts, nonlin, loss_fnc, device, FC_module=nn.Linear)
+
+    def _forward(self, x, ctx_list):
+        raise ValueError("Categorical distribution")
         ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
         x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
         for i, module in enumerate(self.module_list):

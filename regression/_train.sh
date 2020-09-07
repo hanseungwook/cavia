@@ -24,5 +24,6 @@ export PYTHONPATH=/home/dongki/research/lids/git/gym-minigrid:$PYTHONPATH
 cd $DIR
 for seed in {1..1}
 do
-    python3.6 simple_meta_example.py
+    # python3.6 simple_meta_example.py
+    python3.6 main_huh.py
 done

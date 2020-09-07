@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader  #, Subset
+from torch.utils.data import DataLoader
 import random
 from torch.optim import Adam, SGD
 
@@ -98,7 +98,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 # lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
 
 
-class Hierarchical_Task():
+class Hierarchical_Task(object):
     def __init__(self, task, batch_dict): 
         total_batch_dict, mini_batch_dict = batch_dict
         self.task = task
@@ -109,8 +109,9 @@ class Hierarchical_Task():
         self.loader = self.get_dataloader_dict()
 
     def get_dataloader_dict(self):
-        return {'train': self.get_dataloader(self.total_batch['train'], self.mini_batch['train'], sample_type='train'), 
-                'test':  self.get_dataloader(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test')}
+        return {
+            'train': self.get_dataloader(self.total_batch['train'], self.mini_batch['train'], sample_type='train'), 
+            'test':  self.get_dataloader(self.total_batch['test'], self.mini_batch['test'], sample_type='test')}
 
     # total_batch: total # of samples  //  mini_batch: mini batch # of samples
     def get_dataloader(self, total_batchsize, mini_batchsize, sample_type):
@@ -126,6 +127,7 @@ class Hierarchical_Task():
             return DataLoader(dataset, batch_size=mini_batchsize, shuffle=True)                # returns tensors
 
         else:
+            print("self.task:", self.task)
             tasks = get_samples(self.task, total_batchsize, sample_type)
             subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]  # recursive
             subtask_dataset = Meta_Dataset(data=subtask_list)
