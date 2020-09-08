@@ -55,7 +55,7 @@ def get_hierarchical_task(task_list, k_batch_dict, n_batch_dict):
 #  Model Hierarchy
 
 class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, decoder_model, n_contexts, max_iters, lrs, encoders, loggers): 
+    def __init__(self, decoder_model, n_contexts, max_iters, lrs, encoders, loggers, test_loggers): 
         super().__init__()
         # assert hasattr  (decoder_model, 'forward')    # submodel has a built-in forward() method 
 
@@ -64,6 +64,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         self.args_dict = {'max_iters' : max_iters,
                           'lrs'       : lrs,
                           'loggers'   : loggers,
+                          'test_loggers': test_loggers
                           }
         self.device     = decoder_model.device
 
@@ -95,6 +96,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                 Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset = reset)
                 test_batch = next(iter(task.loader['test']))
                 l, outputs = self(test_batch, level-1)      # test only 1 minibatch
+                self.args_dict['test_loggers'][level].update(l) # Update test logger for respective level
                 test_loss  += l;       test_count += 1
 
             mean_test_loss = test_loss / test_count
@@ -190,6 +192,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset):       # opt
                 logger.update(cur_iter, loss.detach().cpu().numpy())
 
         # return cur_iter  # completed  the batch
+
 
 #######################################
 

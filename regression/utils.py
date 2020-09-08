@@ -22,16 +22,19 @@ DEBUG_LEVELs = []  # [1] #[0]  #[2]
 #################################################################################
 
 class Logger():
-    def __init__(self, args, additional_name = None):
+    def __init__(self, args, additional_name='', no_print=False):
         self.log         = set_log(args)
         self.log_name    = args.log_name
         self.update_iter = args.log_interval
-        self.tb_writer   = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
+        self.tb_writer   = SummaryWriter('./logs/tb_{}_{}'.format(args.log_name, additional_name))
+        self.no_print = no_print
 
     def update(self, iter, loss):
         if not (iter % self.update_iter):
             # print(iter, self.update_iter)
-            self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
+            if not self.no_print:
+                self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
+
             self.tb_writer.add_scalar("Meta loss:", loss, iter)
 
 

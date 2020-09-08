@@ -35,9 +35,10 @@ def run(args, logger_maker):
     
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML
-    loggers         = [None, None, logger_maker()]                             # For 2-level problems.  FIX THIS
+    loggers         = [logger_maker(additional_name='2', no_print=True), logger_maker(additional_name='1', no_print=True), logger_maker(additional_name='0', no_print=False)]
+    test_loggers         = [logger_maker(additional_name='2', no_print=True), logger_maker(additional_name='1', no_print=True), logger_maker(additional_name='0', no_print=False)]
     # model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
-    model   = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
+    model   = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers, test_loggers)
     # set_trace()
-    test_loss = model( task, optimizer = Adam, reset = False) #outerloop = True)   # grad_clip = args.clip )
+    test_loss = model(task, optimizer = Adam, reset = False) #outerloop = True)   # grad_clip = args.clip )
     # return test_loss, logger 

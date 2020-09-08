@@ -15,5 +15,5 @@ if __name__ == '__main__':
 
     set_seed(args.seed)       # Set random seed
     # logger  = Logger(args)    # Set log
-    logger  = partial(Logger,args)    # Set log
+    logger  = partial(Logger, args)    # Set log
     run(args, logger)         # Start train

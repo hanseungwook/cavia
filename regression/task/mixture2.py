@@ -136,6 +136,11 @@ def sample_celeba_img_fnc(sample_type):
     return img_input_function, t_fn
 
 def create_hier_imagenet_supertasks(data_dir, info_dir, level=4, Nsubclasses=20):
+    # Setting global parameters for hierarchical imagenet supertask
+    global img_size
+    # Check if we want these dimensions
+    img_size = (256, 256, 3)
+
     from robustness.tools.breeds_helpers import BreedsDatasetGenerator
     from robustness.tools.breeds_helpers import setup_breeds
     from robustness.tools.breeds_helpers import ClassHierarchy
