@@ -75,6 +75,8 @@ class Hierarchical_Model(nn.Module):
             
         if level == 0:
             if self.is_rl:
+                # TODO task_batch should be in format of:
+                # env_name (level 2) and goal location (level 1)
                 return get_inner_loss(self.decoder_model, task_batch, self.args)
             else:
                 return self.decoder_model(task_batch)
