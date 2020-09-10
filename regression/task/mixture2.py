@@ -103,6 +103,17 @@ def img_input_function(batch_size, order_pixels=False):
     coordinates[:, 1] /= img_size[1]
     return coordinates
 
+def get_img_full_input(img_size=img_size):
+    flattened_indices = range(img_size[0] * img_size[1])
+    x, y = np.unravel_index(flattened_indices, (img_size[0], img_size[1]))
+    coordinates = np.vstack((x, y)).T
+    coordinates = torch.from_numpy(coordinates).float()
+    # normalise coordinates
+    coordinates[:, 0] /= img_size[0]
+    coordinates[:, 1] /= img_size[1]
+
+    return coordinates
+
 def img_target_function(img, coordinates):
     c = copy.deepcopy(coordinates)
     
@@ -178,7 +189,22 @@ def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubcl
     subclasses = total_subclasses[0] if sample_type == 'train' else total_subclasses[1]
     subclasses = [[s] for s in subclasses]
 
-    dataset = datasets.CustomImageNet(data_dir, subclasses)
+    # Define dataset transforms
+    # Special transforms for ImageNet(s)
+    train_transforms = transforms.Compose([
+            transforms.Resize(img_size[0]),
+            transforms.CenterCrop(img_size[0]),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+        ])
+
+    test_transforms = transforms.Compose([
+        transforms.Resize(img_size[0]),
+        transforms.CenterCrop(img_size[0]),
+        transforms.ToTensor(),
+    ])
+
+    dataset = datasets.CustomImageNet(data_dir, subclasses, transform_train=train_transforms, transform_test=test_transforms)
     loader = dataset.make_loaders(workers=4, batch_size=1)[0]
     img = next(iter(loader))[0].squeeze()
     t_fn = partial(img_target_function, img)
@@ -206,6 +232,7 @@ def load_celeba_img_list(data_root, data_split_file):
             elif row[1] == '2':
                 test_imgs.append(row[0])
 
+# TODO: Add download/sort code for CIFAR10 dataset
 def load_cifar10_imgs(data_root):
     global train_imgs, test_imgs
 
@@ -236,6 +263,7 @@ def get_linear_function(slope, bias):
         return slope * x + bias
 
     return linear_function
+
 
 ### TODO: visualize images
 

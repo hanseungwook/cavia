@@ -40,5 +40,5 @@ def run(args, logger_maker):
     # model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
     model   = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers, test_loggers)
     # set_trace()
-    test_loss = model(task, optimizer = Adam, reset = False) #outerloop = True)   # grad_clip = args.clip )
+    test_loss = model(task, optimizer = Adam, reset = False) #outerloop = True)   # grad_clip = args.clip ) #TODO: gradient clipping?
     # return test_loss, logger 

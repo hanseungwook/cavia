@@ -4,11 +4,14 @@ from tensorboardX import SummaryWriter
 import os
 import random
 import torch
+from torch.optim import Adam, SGD
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
 from finite_diff import debug_lower, debug_top
+from hierarchical import optimize
+from task.mixture2 import get_img_full_input
 
 
 import IPython
@@ -158,3 +161,35 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function, 
 
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
     plt.close()
+
+def vis_img_recon(model, task, level):    
+    # From higher levels, recurse all the way down to level 0
+    while level > 0:
+        train_loader = task.loader['train']
+        task = next(iter(train_loader))
+        level -= 1
+    
+    # Input and target generator functions for a specific task from train (level 0)
+    input_gen, target_gen = task.task
+
+    # Get full input range of image
+    img_full_inputs = get_img_full_input()
+
+    # Get real and predicted image
+    img_real = target_gen(img_full_inputs).view(mixture2.img_size).numpy()
+    _, img_pred = model.decoder_model(img_full_inputs).view(mixture2.img_size).detach().numpy()
+
+    # Forcing all predictions beyond image value range into (0, 1)
+    img_pred[img_pred < 0] = 0
+    img_pred[img_pred > 1] = 1
+
+    # Plotting real and predicted images
+    fig = plt.figure(figsize=(16, 16))
+    fig.add_subplot(1, 2, 1)
+    plt.imshow(img_real)
+
+    fig.add_subplot(1, 2, 2)
+    plt.imshow(img_pred)
+
+    plt.show()
+
