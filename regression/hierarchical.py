@@ -7,6 +7,7 @@ from torch.optim import Adam, SGD
 # from utils import optimize, manual_optim, send_to
 from dataset import Meta_Dataset, Meta_DataLoader, get_samples  
 from task.mixture2 import sample_sin_fnc, sample_linear_fnc, sample_celeba_img_fnc, sample_cifar10_img_fnc, create_hier_imagenet_supertasks
+from utils import vis_img_recon, get_args
 # from torch.autograd import gradcheck
 
 import higher 
@@ -91,13 +92,24 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             return self.decoder_model(task_batch)
         else:
             test_loss,  test_count = 0, 0
-            for task in task_batch: 
+            # TODO: Maybe save models after all of training / every n outer loop iterations
+            # TODO: do diff inner loop optimization steps
 
+            for task in task_batch: 
+                # TODO: How can we calculate test loss on outer loop every j iterations? (to check progress)
                 Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset = reset)
                 test_batch = next(iter(task.loader['test']))
+                # TODO: Test on Cifar10 or imagenet hierarchical (get image from each hierarchy's train & test and need to be able to plot them)
                 l, outputs = self(test_batch, level-1)      # test only 1 minibatch
-                self.args_dict['test_loggers'][level].update(l) # Update test logger for respective level
+                # TODO: Call visualize
+                # self.args_dict['test_loggers'][level].update(l) # Update test logger for respective level
                 test_loss  += l;       test_count += 1
+
+                # if level == 2:
+                #     vis_img_recon(self, task, level-1)
+
+            
+                    
 
             mean_test_loss = test_loss / test_count
             outputs = None
@@ -105,7 +117,30 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             # if level == self.level_max - 1: #in [2,3]:
             #     print('level', level, mean_test_loss.item())
 
-            return mean_test_loss, outputs 
+            return mean_test_loss, outputs
+    
+    def forward_viz(self, task_batch, level = None, optimizer = SGD, reset = True):        # def forward(self, task_batch, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
+        '''
+        args: minibatch of tasks 
+        returns:  mean_test_loss, mean_train_loss, outputs
+
+        Encoder(Adaptation) + Decoder model:
+        Takes train_samples, adapt to them, then 
+        Applies adaptation on train-tasks and then evaluates the generalization loss on test-tasks 
+        '''
+
+        if level is None:
+            level = self.level_max
+
+        # assert level == task_batch[0].level + 1                 # check if the level matches with task level        # print('level', level , task_batch[0].level  )
+
+        if level == 0:
+            return self.decoder_model(task_batch)
+        else:
+            for task in task_batch: 
+                Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset = reset)
+
+            return None  
 
 
 ##############################################################################
@@ -130,13 +165,13 @@ class Hierarchical_Task():
 
     def get_dataloader_dict(self):
         return {'train': self.get_dataloader(self.total_batch['train'], self.mini_batch['train'], sample_type='train'), 
-                'test':  self.get_dataloader(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test')}
+                'test':  self.get_dataloader(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test', full=True)}
 
     # total_batch: total # of samples  //  mini_batch: mini batch # of samples
-    def get_dataloader(self, total_batchsize, mini_batchsize, sample_type):
+    def get_dataloader(self, total_batchsize, mini_batchsize, sample_type, full=False):
         if self.level == 0:
             input_gen, target_gen = self.task
-            input_data  = input_gen(total_batchsize)
+            input_data  = input_gen(total_batchsize, full)
             target_data = target_gen(input_data)
 
             if DOUBLE_precision:
@@ -196,9 +231,4 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset):       # opt
 
 #######################################
 
-def get_args(args_dict, level):
-    # return (arg[name][level] for arg, name in args_dict.items())
-    lr = args_dict['lrs'][level] 
-    max_iter = args_dict['max_iters'][level] 
-    logger = args_dict['loggers'][level] 
-    return lr, max_iter, logger
+
