@@ -97,10 +97,21 @@ class BaseModel(nn.Module):
     #     return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
 
     def forward(self, data_batch):
-        inputs, targets = data_batch
-        ctx_all = self.parameters_all[:-1]
-        outputs = self._forward(inputs, ctx_all)
-        return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
+        # Only inputs given for testing
+        if len(data_batch) == 1:
+            inputs = data_batch[0]
+            ctx_all = self.parameters_all[:-1]
+            outputs = self._forward(inputs, ctx_all)
+
+            return outputs
+        
+        # Inputs and targets both given for training
+        elif len(data_batch) == 2:
+            inputs, targets = data_batch
+            ctx_all = self.parameters_all[:-1]
+            outputs = self._forward(inputs, ctx_all)
+
+            return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
 
 ######################################
 

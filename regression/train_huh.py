@@ -1,6 +1,8 @@
+import torch
 from torch.optim import Adam, SGD
 from model.models_huh import get_model_type, get_encoder_type
 from hierarchical import Hierarchical_Model,  get_hierarchical_task   # make_hierarhical_model,
+from utils import get_vis_fn
 
 from pdb import set_trace
 
@@ -36,9 +38,24 @@ def run(args, logger_maker):
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML
     loggers         = [logger_maker(additional_name='2', no_print=True), logger_maker(additional_name='1', no_print=True), logger_maker(additional_name='0', no_print=False)]
-    test_loggers         = [logger_maker(additional_name='2', no_print=True), logger_maker(additional_name='1', no_print=True), logger_maker(additional_name='0', no_print=False)]
+    test_loggers         = [logger_maker(additional_name='2', no_print=True), logger_maker(additional_name='1', no_print=True), logger_maker(additional_name='0', no_print=True)]
     # model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
     model   = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers, test_loggers)
     # set_trace()
-    test_loss = model(task, optimizer = Adam, reset = False) #outerloop = True)   # grad_clip = args.clip ) #TODO: gradient clipping?
+
+    if args.viz:
+        print('Loading model')
+        checkpoint = torch.load('./model.pth')
+        model.load_state_dict(checkpoint['model_state_dict'])
+        del checkpoint
+
+        vis_fn = get_vis_fn(args.task)
+        vis_fn(model, task)
+        
+    else:
+        test_loss = model(task, optimizer = Adam, reset = False) #outerloop = True)   # grad_clip = args.clip ) #TODO: gradient clipping?
+
+        print('Saving model')
+        torch.save({'model_state_dict': model.state_dict()}, 'model.pth')
+    
     # return test_loss, logger 

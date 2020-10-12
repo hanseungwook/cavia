@@ -8,10 +8,14 @@ from torch.optim import Adam, SGD
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+import higher
 
 from finite_diff import debug_lower, debug_top
-from hierarchical import optimize
+# from hierarchical import optimize
 from task.mixture2 import get_img_full_input
+from task import mixture2
+
+
 
 
 import IPython
@@ -122,10 +126,23 @@ def send_to(input, device, DOUBLE_precision):
     else:
         return input.double().float().to(device)    # somehow needed for manual_optim to work.... otherwise get leaf node error. 
 
+###############################
+def get_args(args_dict, level):
+    # return (arg[name][level] for arg, name in args_dict.items())
+    lr = args_dict['lrs'][level] 
+    max_iter = args_dict['max_iters'][level] 
+    logger = args_dict['loggers'][level] 
+    return lr, max_iter, logger
+
 
 #################################################################################
 # VISUALIZATION
 #################################################################################
+def get_vis_fn(tasks):
+    for task in tasks:
+        if task == 'cifar10':
+            return vis_img_recon
+
 def vis_pca(higher_contexts, task_family, iteration, args):
     pca = PCA(n_components=2)
     higher_contexts = torch.stack(higher_contexts).detach().cpu().numpy()
@@ -162,26 +179,64 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function, 
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
     plt.close()
 
-def vis_img_recon(model, task, level):    
+def vis_img_recon(model, task):    
+    task = task[0]
+    max_level = task.level
+    level = max_level
+    
     # From higher levels, recurse all the way down to level 0
     while level > 0:
+        print(task)
         train_loader = task.loader['train']
-        task = next(iter(train_loader))
+        task = next(iter(train_loader))[0]
         level -= 1
     
     # Input and target generator functions for a specific task from train (level 0)
     input_gen, target_gen = task.task
+    img_inputs, img_targets = next(iter(task.loader['train']))
 
+    # Inner loop optimizations
+    level = max_level - 1
+    reset = True
+
+    # 0-level optimization is fine, but for 1-level optimization, usually we give a batch of images (coordinates and targets) that's in the same class,
+    # but here, we only give 1 image from 1 class => is this problematic?
+    while level >= 0:
+        lr, max_iter, logger = get_args(model.args_dict, level)
+        param_all = model.decoder_model.parameters_all
+
+        ## Initialize param & optim
+        if reset:
+            param_all[level] = torch.zeros_like(param_all[level], requires_grad= True)   # Reset
+            optim = SGD([param_all[level]], lr=lr)
+            optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
+        
+        cur_iter = 0
+        while True:
+            print('cur iter / max iter', cur_iter, max_iter)
+            if cur_iter >= max_iter:    
+                break
+
+            loss, _ = model.decoder_model((img_inputs, img_targets))
+
+            ## loss.backward() & optim.step()
+            if reset:
+                new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
+                param_all[level] = new_param
+
+            cur_iter += 1   
+        
+        level -= 1
+    
     # Get full input range of image
     img_full_inputs = get_img_full_input()
 
     # Get real and predicted image
     img_real = target_gen(img_full_inputs).view(mixture2.img_size).numpy()
-    _, img_pred = model.decoder_model(img_full_inputs).view(mixture2.img_size).detach().numpy()
+    img_pred = model.decoder_model((img_full_inputs, )).view(mixture2.img_size).detach().numpy()
 
     # Forcing all predictions beyond image value range into (0, 1)
-    img_pred[img_pred < 0] = 0
-    img_pred[img_pred > 1] = 1
+    img_pred = np.clip(img_pred, 0, 1)
 
     # Plotting real and predicted images
     fig = plt.figure(figsize=(16, 16))
