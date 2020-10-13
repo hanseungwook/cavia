@@ -36,14 +36,16 @@ class Logger():
         self.update_iter = args.log_interval
         self.tb_writer   = SummaryWriter('./logs/tb_{}_{}'.format(args.log_name, additional_name))
         self.no_print = no_print
+        self.iter = 0
 
-    def update(self, iter, loss):
-        if not (iter % self.update_iter):
+    def update(self, loss):
+        if not (self.iter % self.update_iter):
             # print(iter, self.update_iter)
             if not self.no_print:
-                self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
+                self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
 
-            self.tb_writer.add_scalar("Meta loss:", loss)
+            self.tb_writer.add_scalar("Meta loss:", loss, self.iter)
+            self.iter += 1
 
 
 def set_log(args):
@@ -180,7 +182,10 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function, 
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
     plt.close()
 
-def vis_img_recon(model, task):    
+def vis_img_recon(model, task):
+    # Do inner-loop optimizations (outer-loop set to 0)    
+    test_loss = model(task, optimizer = Adam, reset = False)
+    
     task = task[0]
     max_level = task.level
     level = max_level
@@ -196,39 +201,6 @@ def vis_img_recon(model, task):
     input_gen, target_gen = task.task
     img_inputs, img_targets = next(iter(task.loader['train']))
 
-    # Inner loop optimizations
-    level = max_level - 1
-    reset = True
-
-    # 0-level optimization is fine, but for 1-level optimization, usually we give a batch of images (coordinates and targets) that's in the same class,
-    # but here, we only give 1 image from 1 class => is this problematic?
-    while level >= 0:
-        lr, max_iter, logger = get_args(model.args_dict, level)
-        param_all = model.decoder_model.parameters_all
-
-        ## Initialize param & optim
-        if reset:
-            param_all[level] = torch.zeros_like(param_all[level], requires_grad= True)   # Reset
-            optim = SGD([param_all[level]], lr=lr)
-            optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
-        
-        cur_iter = 0
-        while True:
-            print('cur iter / max iter', cur_iter, max_iter)
-            if cur_iter >= max_iter:    
-                break
-
-            loss, _ = model.decoder_model((img_inputs, img_targets))
-
-            ## loss.backward() & optim.step()
-            if reset:
-                new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
-                param_all[level] = new_param
-
-            cur_iter += 1   
-        
-        level -= 1
-    
     # Get full input range of image
     img_full_inputs = get_img_full_input()
 
@@ -241,7 +213,7 @@ def vis_img_recon(model, task):
     print('Loss: {}'.format(mse_loss(torch.from_numpy(img_pred), torch.from_numpy(img_real))))
 
     # Plotting real and predicted images
-    fig = plt.figure(figsize=(16, 16))
+    fig = plt.figure(figsize=(8, 8))
     fig.add_subplot(1, 2, 1)
     plt.imshow(img_real)
 
@@ -249,4 +221,39 @@ def vis_img_recon(model, task):
     plt.imshow(img_pred)
 
     plt.show()
+
+    # # Inner loop optimizations
+    # level = max_level - 1
+    # reset = True
+
+    # # 0-level optimization is fine, but for 1-level optimization, usually we give a batch of images (coordinates and targets) that's in the same class,
+    # # but here, we only give 1 image from 1 class => is this problematic?
+    # while level >= 0:
+    #     lr, max_iter, logger = get_args(model.args_dict, level)
+    #     param_all = model.decoder_model.parameters_all
+
+    #     ## Initialize param & optim
+    #     if reset:
+    #         param_all[level] = torch.zeros_like(param_all[level], requires_grad= True)   # Reset
+    #         optim = SGD([param_all[level]], lr=lr)
+    #         optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
+        
+    #     cur_iter = 0
+    #     while True:
+    #         print('cur iter / max iter', cur_iter, max_iter)
+    #         if cur_iter >= max_iter:    
+    #             break
+
+    #         loss, _ = model.decoder_model((img_inputs, img_targets))
+
+    #         ## loss.backward() & optim.step()
+    #         if reset:
+    #             new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
+    #             param_all[level] = new_param
+
+    #         cur_iter += 1   
+        
+    #     level -= 1
+    
+
 
