@@ -92,24 +92,16 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             return self.decoder_model(task_batch)
         else:
             test_loss,  test_count = 0, 0
-            # TODO: Maybe save models after all of training / every n outer loop iterations
-            # TODO: do diff inner loop optimization steps
 
             for task in task_batch: 
-                # TODO: How can we calculate test loss on outer loop every j iterations? (to check progress)
+                # TODO: ? How can we calculate test loss on outer loop every j iterations? (to check progress)
                 Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset = reset)
                 test_batch = next(iter(task.loader['test']))
                 # TODO: Test on Cifar10 or imagenet hierarchical (get image from each hierarchy's train & test and need to be able to plot them)
                 l, outputs = self(test_batch, level-1)      # test only 1 minibatch
-                # TODO: Call visualize
-                # self.args_dict['test_loggers'][level].update(l) # Update test logger for respective level
-                test_loss  += l;       test_count += 1
-
-                # if level == 2:
-                #     vis_img_recon(self, task, level-1)
-
-            
-                    
+                self.args_dict['test_loggers'][level-1].update(l) # Update test logger for respective level
+                test_loss  += l
+                test_count += 1
 
             mean_test_loss = test_loss / test_count
             outputs = None
@@ -118,29 +110,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             #     print('level', level, mean_test_loss.item())
 
             return mean_test_loss, outputs
-    
-    def forward_viz(self, task_batch, level = None, optimizer = SGD, reset = True):        # def forward(self, task_batch, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
-        '''
-        args: minibatch of tasks 
-        returns:  mean_test_loss, mean_train_loss, outputs
-
-        Encoder(Adaptation) + Decoder model:
-        Takes train_samples, adapt to them, then 
-        Applies adaptation on train-tasks and then evaluates the generalization loss on test-tasks 
-        '''
-
-        if level is None:
-            level = self.level_max
-
-        # assert level == task_batch[0].level + 1                 # check if the level matches with task level        # print('level', level , task_batch[0].level  )
-
-        if level == 0:
-            return self.decoder_model(task_batch)
-        else:
-            for task in task_batch: 
-                Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset = reset)
-
-            return None  
 
 
 ##############################################################################
@@ -203,10 +172,10 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset):       # opt
     cur_iter = 0; 
     while True:
         for task_batch in dataloader:
+            loss = model(task_batch, level)[0]     # Loss to be optimized
+
             if cur_iter >= max_iter:    # train/optimize up to max_iter # of batches
                 return False #loss_all   # Loss-profile
-
-            loss = model(task_batch, level) [0]     # Loss to be optimized
 
             ## loss.backward() & optim.step()
             if reset:
@@ -224,7 +193,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset):       # opt
 
             # ------------ logging ------------
             if logger is not None:
-                logger.update(cur_iter, loss.detach().cpu().numpy())
+                logger.update(loss.detach().cpu().numpy())
 
         # return cur_iter  # completed  the batch
 

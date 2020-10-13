@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 import higher
+from torch.nn.functional import mse_loss
 
 from finite_diff import debug_lower, debug_top
 # from hierarchical import optimize
@@ -21,7 +22,7 @@ from task import mixture2
 import IPython
 from pdb import set_trace
 
-DEBUG_LEVELs = []  # [1] #[0]  #[2]
+DEBUG_LEVELS = []  # [1] #[0]  #[2]
 
 
 #################################################################################
@@ -42,7 +43,7 @@ class Logger():
             if not self.no_print:
                 self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
 
-            self.tb_writer.add_scalar("Meta loss:", loss, iter)
+            self.tb_writer.add_scalar("Meta loss:", loss)
 
 
 def set_log(args):
@@ -237,6 +238,7 @@ def vis_img_recon(model, task):
 
     # Forcing all predictions beyond image value range into (0, 1)
     img_pred = np.clip(img_pred, 0, 1)
+    print('Loss: {}'.format(mse_loss(torch.from_numpy(img_pred), torch.from_numpy(img_real))))
 
     # Plotting real and predicted images
     fig = plt.figure(figsize=(16, 16))
