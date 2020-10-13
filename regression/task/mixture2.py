@@ -17,7 +17,10 @@ img_root = None
 train_imgs = []
 valid_imgs = []
 test_imgs = []
+train_classes = []
+test_classes = []
 img_size = (32, 32, 3)
+seed = 2020
 
 def sample_sin_fnc(sample_type):
     return regression_input_function, get_sin_function(*get_sin_params())
@@ -131,10 +134,23 @@ def img_target_function(img, coordinates):
 
     return pixel_values
 
+def setup_cifar10_dataset():
+    np.random.seed(seed)
+    global train_classes, test_classes
+    train_classes = np.random.choice(range(1,10), 7, replace=False)
+    test_classes = [l for l in range(1,10) if l not in train_classes]
+
 ### TODO: Can we make k_batch, n_batch automatic?
 ### TODO: Can we make the sampling of classes mutually exclusive?
 def sample_cifar10_img_fnc(sample_type):
-    label = np.random.randint(low=0, high=10)
+    if not (len(train_classes) > 0 and len(test_classes) > 0):
+        setup_cifar10_dataset()
+    
+    labels = train_classes if 'train' in sample_type else test_classes
+    label = np.random.choice(labels, 1)[0]
+    
+    # To make labels non-overlapping, remove label after selection at level 1
+    # labels.remove(label)
     img = get_cifar10_img(sample_type, label)
     t_fn = partial(img_target_function, img)
 
@@ -180,7 +196,7 @@ def sample_hier_imagenet_img_fnc(hier, data_dir, info_dir, superclass_id, Nsubcl
     from robustness import datasets
 
     hier = ClassHierarchy(info_dir)    
-    rng = np.random.RandomState(2)
+    rng = np.random.RandomState(seed)
     
     # Get all subclasses (level 1 classes) and split into train and test (deterministically given a random seed)
     DG = BreedsDatasetGenerator(info_dir)
