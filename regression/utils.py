@@ -8,36 +8,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
-from finite_diff import debug_lower, debug_top
 
-
-import IPython
-from pdb import set_trace
-
-DEBUG_LEVELs = []  # [1] #[0]  #[2]
-
-
-#################################################################################
-# LOGGING
-#################################################################################
-
-class Logger():
-    def __init__(self, args, additional_name = None):
-        self.log         = set_log(args)
-        self.log_name    = args.log_name
-        self.update_iter = args.log_interval
-        self.tb_writer   = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
+class Logger(object):
+    def __init__(self, args, additional_name=None):
+        self.args = args
+        self.log = set_log(args)
+        self.log_name = args.log_name
+        self.tb_writer = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
 
     def update(self, iter, loss):
-        if not (iter % self.update_iter):
-            # print(iter, self.update_iter)
-            self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format( iter, loss))
+        if not (iter % self.args.log_interval):
+            self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(iter, loss))
             self.tb_writer.add_scalar("Meta loss:", loss, iter)
 
 
 def set_log(args):
     log = {}
-    set_logger(logger_name=args.log_name,   log_file=r'{0}{1}'.format("./logs/",  args.log_name))  
+    set_logger(logger_name=args.log_name, log_file=r'{0}{1}'.format("./logs/", args.log_name))  
     log[args.log_name] = logging.getLogger(args.log_name)
 
     for arg, value in sorted(vars(args).items()):
@@ -59,21 +46,14 @@ def set_logger(logger_name, log_file, level=logging.INFO):
     log.addHandler(streamHandler)
 
 
-
-##########################
-
 def set_seed(seed, cudnn=True):
-    """
-    Seed everything we can!
-    Note that gym environments might need additional seeding (env.seed(seed)),
-    and num_workers needs to be set to 1.
-    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.random.manual_seed(seed)
     torch.cuda.manual_seed(seed)
-    # note: the below slows down the code but makes it reproducible
+
+    # NOTE Below slows down the code but makes it reproducible
     if (seed is not None) and cudnn:
         torch.backends.cudnn.deterministic = True
 
