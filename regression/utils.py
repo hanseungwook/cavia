@@ -10,15 +10,14 @@ from sklearn.decomposition import PCA
 
 
 class Logger(object):
-    def __init__(self, args, additional_name=None):
+    def __init__(self, args):
         self.args = args
         self.log = set_log(args)
-        self.log_name = args.log_name
         self.tb_writer = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
 
     def update(self, iter, loss):
         if not (iter % self.args.log_interval):
-            self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(iter, loss))
+            self.log[self.args.log_name].info("At iteration {}, meta-loss: {:.3f}".format(iter, loss))
             self.tb_writer.add_scalar("Meta loss:", loss, iter)
 
 

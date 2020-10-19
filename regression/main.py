@@ -2,7 +2,6 @@ import os
 import arguments
 from train import run
 from utils import set_seed, Logger
-from functools import partial
 
 
 if __name__ == '__main__':
@@ -15,7 +14,7 @@ if __name__ == '__main__':
     # Create logger
     if not os.path.exists("./logs"):
         os.makedirs("./logs")
-    logger = partial(Logger, args)    # Set log
+    logger = Logger(args=args)
 
     # Start train
     run(args, logger)

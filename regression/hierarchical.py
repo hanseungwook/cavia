@@ -8,22 +8,15 @@ from dataset import Meta_Dataset, Meta_DataLoader, get_samples
 from rl_utils import get_inner_loss
 from trpo import trpo_optimization
 
-DOUBLE_precision = False
-
 
 def get_hierarchical_task(task_func_list, k_batch_dict, n_batch_dict):
     task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
     return Meta_Dataset(data=[task])
 
 
-##############################################################################
-# HIERARCHICAL MEMORY
-##############################################################################
-# lv 2: task = super-duper-task,   subtasks = super-tasks (Empty or Unlock)
-# lv 1: task = super-task,         subtasks = tasks (e.g., goal location)
-# lv 0: task = task (function),    subtasks = data-points (i.e., trajectory)
 class Hierarchical_Memory(object):
     def __init__(self):
+        # TODO "Move to trpo"
         self.memories = {}
 
     def add(self, memory, key):
@@ -42,20 +35,17 @@ hierarchical_memory = Hierarchical_Memory()
 ##############################################################################
 #  Model Hierarchy
 class Hierarchical_Model(nn.Module):
-    def __init__(self, decoder_model, encoders, loggers, is_rl=True, args=None, task=None):
+    def __init__(self, decoder_model, encoders, logger, is_rl=True, args=None, task=None):
         super().__init__()
 
         self.decoder_model = decoder_model 
-        self.n_contexts = args.n_contexts
-        self.args_dict = {
-            'max_iters': args.n_iters,
-            'lrs': args.lrs,
-            'loggers': loggers}
-        self.device = decoder_model.device
-        self.level_max = len(decoder_model.parameters_all)
+        self.encoders = encoders
+        self.logger = logger
         self.is_rl = is_rl
         self.args = args
         self.task = task
+
+        self.level_max = len(decoder_model.parameters_all)
 
         self.status_monitor = {}
         self.status_monitor["cur_iter"] = [0 for _ in range(self.level_max)]
@@ -247,11 +237,6 @@ class Hierarchical_Task(object):
             input_gen, target_gen = self.task
             input_data = input_gen(total_batchsize)
             target_data = target_gen(input_data)
-
-            if DOUBLE_precision:
-                input_data = input_data.double()
-                target_data = target_data.double()
-
             dataset = Meta_Dataset(data=input_data, target=target_data)
             return DataLoader(dataset, batch_size=mini_batchsize, shuffle=True)                # returns tensors
 
