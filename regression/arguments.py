@@ -29,19 +29,38 @@ def parse_args():
         '--log-name', type=str, default="",
         help="Logging name")
 
-    parser.add_argument('--lrs',           type=float, nargs='+', default=[0.05, 0.05, 0.001])     # lr  for inner-loop, midloop, outerloop
-    parser.add_argument('--n_iters',       type=int, nargs='+', default=[3, 2, 1000])             # optim_iter for inner-loop, midloop, outerloop
-    parser.add_argument('--k_batch_train', type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks 
-    parser.add_argument('--k_batch_test',  type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks
-    parser.add_argument('--k_batch_valid', type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks
-    parser.add_argument('--n_batch_train', type=int, nargs='+', default=[30, 2, 2])              # number of datapoints, tasks, super-tasks 
-    parser.add_argument('--n_batch_test',  type=int, nargs='+', default=[30, 2, 2])              # number of datapoints, tasks, super-tasks
-    parser.add_argument('--n_batch_valid', type=int, nargs='+', default=[30, 2, 2])              # number of datapoints, tasks, super-tasks
-    parser.add_argument('--n_contexts',    type=int, nargs='+', default=[2, 1])                  # number of context variables: phi0, phi1 
-    parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
+    parser.add_argument(
+        '--lrs', type=float, nargs='+', default=[0.05, 0.05, 0.001],
+        help="lr for inner-loop, midloop, outerloop")
+    parser.add_argument(
+        '--max-iters', type=int, nargs='+', default=[3, 2, 1000], 
+        help="optim_iter for inner-loop, midloop, outerloop")
+    parser.add_argument(
+        '--k_batch_train', type=int, nargs='+', default=[100, 25, 2],
+        help="number of datapoints, tasks, super-tasks")
+    parser.add_argument(
+        '--k_batch_test', type=int, nargs='+', default=[100, 25, 2], 
+        help="number of datapoints, tasks, super-tasks")
+    parser.add_argument(
+        '--k_batch_valid', type=int, nargs='+', default=[100, 25, 2],
+        help="number of datapoints, tasks, super-tasks")
+    parser.add_argument(
+        '--n_batch_train', type=int, nargs='+', default=[100, 25, 2], 
+        help="number of datapoints, tasks, super-tasks")
+    parser.add_argument(
+        '--n_batch_test', type=int, nargs='+', default=[100, 25, 2],
+        help="number of datapoints, tasks, super-tasks")
+    parser.add_argument(
+        '--n_batch_valid', type=int, nargs='+', default=[100, 25, 2], 
+        help="number of datapoints, tasks, super-tasks")
+    parser.add_argument(
+        '--n_contexts', type=int, nargs='+', default=[2, 1],
+        help="number of context variables: phi0, phi1")
+    parser.add_argument(
+        '--encoders', type=int, nargs='+', default=[None, None, None],
+        help="task encoder-models for model-based Meta-learning. Optimization-based if None (MAML)")
 
-    parser.add_argument('--log_interval',  type=int, default=100)
-    parser.add_argument('--log_name',  type=str, default='')
+    parser.add_argument('--log_interval', type=int, default=100)
 
     # Arguments for reinforcement learning settings
     parser.add_argument(
@@ -54,13 +73,6 @@ def parse_args():
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Set args log name
-    if not args.log_name:
-        args.log_name = \
-            "test::" 
-            # "iter::%s_lr::%sn_batch::%s_n_ctx::%s_prefix::%s" % (
-            #     args.n_iters, args.lrs, args.n_batch_train, len(args.n_contexts), args.prefix)
-    # args.log_name = \
-    #     "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
-    #         args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models, args.prefix)
+    args.log_name = "prefix::%s" % (args.prefix)
 
     return args

@@ -1,32 +1,8 @@
-import torch
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader, Subset
-from torch.utils.data.sampler import RandomSampler, BatchSampler
-from torchvision.transforms import transforms
-import copy
-import csv
-import os
-import matplotlib.pyplot as plt
-import numpy as np
-from PIL import Image
+import gym
 import random
-import IPython
+from torch.utils.data import Dataset
+from torch.utils.data.sampler import RandomSampler, BatchSampler
 
-# from task.mixture2 import task_func_list
-
-
-# class Level0_Dataset(Dataset):
-#     def __init__(self, x, y):
-#         self.x = x
-#         self.y = y
-    
-#     def __len__(self):
-#         assert len(self.x) == len(self.y)
-
-#         return len(self.y)
-    
-#     def __getitem__(self, idx):
-#         return self.x[idx], self.y[idx]
 
 class Meta_Dataset(Dataset):
     def __init__(self, data, target=None):
@@ -46,7 +22,7 @@ class Meta_Dataset(Dataset):
             return self.data[idx], self.target[idx]
 
 
-class Meta_DataLoader():
+class Meta_DataLoader(object):
     def __init__(self, dataset, batch_size):
         self.dataset = dataset
         self.batch_size = batch_size
@@ -65,12 +41,17 @@ class Meta_DataLoader():
         # return mini_dataset
 
 
+def get_samples(task, total_batch, sample_type, is_rl=True):
+    print("is_rl:", is_rl)
 
-def get_samples(task, total_batch, sample_type):
     if isinstance(task, list):
-        print(total_batch, len(task))
         assert total_batch <= len(task)
         tasks = random.sample(task, total_batch)
     else:
-        tasks = [task(sample_type) for _ in range(total_batch)]
+        if is_rl:
+            env = gym.make(task)
+            lower_tasks = env.sample_tasks(num_tasks=total_batch)
+            tasks = [(task, lower_task) for lower_task in lower_tasks]
+        else:
+            tasks = [task(sample_type) for _ in range(total_batch)]
     return tasks
