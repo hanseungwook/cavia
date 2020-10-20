@@ -41,17 +41,12 @@ class Meta_DataLoader(object):
         # return mini_dataset
 
 
-def get_samples(task, total_batch, sample_type, is_rl=True):
-    print("is_rl:", is_rl)
-
+def get_samples(task, total_batch, sample_type):
     if isinstance(task, list):
         assert total_batch <= len(task)
         tasks = random.sample(task, total_batch)
     else:
-        if is_rl:
-            env = gym.make(task)
-            lower_tasks = env.sample_tasks(num_tasks=total_batch)
-            tasks = [(task, lower_task) for lower_task in lower_tasks]
-        else:
-            tasks = [task(sample_type) for _ in range(total_batch)]
+        env = gym.make(task)
+        lower_tasks = env.sample_tasks(num_tasks=total_batch)
+        tasks = [(task, lower_task) for lower_task in lower_tasks]
     return tasks

@@ -40,13 +40,14 @@ def make_env(args, env_name=None, task=None):
 
 
 def collect_trajectory(task, base_model, args):
+    assert len(task) == 2, "Format should be (env_name, task)"
+
     # Initialize memory
     memory = ReplayMemory()
 
     # Set environment
-    # TODO Set from task
     # TODO Avoid hard-coding
-    env = SubprocVecEnv([make_env(args) for _ in range(20)])
+    env = SubprocVecEnv([make_env(args, env_name=task[0], task=task[1]) for _ in range(20)])
 
     obs = env.reset()
     score = 0.
