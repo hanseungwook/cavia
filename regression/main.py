@@ -31,4 +31,4 @@ if __name__ == '__main__':
         task=task)
 
     # Start train
-    model(task, optimizer=TRPO, reset=False)
+    model(task, optimizer=TRPO, reset=False, is_outer=False)

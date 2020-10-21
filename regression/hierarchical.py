@@ -43,10 +43,11 @@ class Hierarchical_Model(nn.Module):
                     optimizer=optimizer, reset=reset, 
                     status=self.status, meta_memory=self.meta_memory, is_outer=is_outer)
                 test_batch = next(iter(task.loader['test']))
-                loss, output = self(test_batch, level - 1)
+                loss, output = self(test_batch, level=level - 1, is_outer=is_outer)
 
                 # Add to meta-memory
-                self.meta_memory.add(output, key=self.status.key())
+                if not isinstance(output, list) and is_outer is False:
+                    self.meta_memory.add(output, key=self.status.key())
 
                 # For next task
                 test_loss += loss
@@ -71,27 +72,33 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
     while True:
         for i_task_batch, task_batch in enumerate(dataloader):
             # Update status
-            status.update("iteration", level, iteration)
+            if is_outer and level == 2:
+                pass
+            else:
+                status.update("iteration", level, iteration)
 
             # Train/optimize up to max_iter # of batches
             if iteration >= args.max_iters[level]:    
                 print("Finished optimizing level {}\n".format(level))
-                return False
+                return
 
-            loss, outputs = model(task_batch, level, is_outer=is_outer)
-            if type(outputs) is not list:
+            loss, outputs = model(task_batch, is_outer=is_outer, level=level)
+            if not isinstance(outputs, list) and is_outer is False:
                 meta_memory.add(outputs, key=status.key())
 
             if reset:
-                new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
+                new_param, = optim.step(loss, params=[param_all[level]])
                 param_all[level] = new_param
             else:
                 if is_outer:
                     return
 
+                print("\n--> Starting outer-loop!\n")
+
                 optim.step(outputs, model)
-                status.clear()
                 meta_memory.clear()
+
+                print("\n--> Finished outer-loop optimization!\n")
 
             iteration += 1   
 
@@ -109,7 +116,6 @@ class Hierarchical_Task(object):
             'train': self.get_dataloader(self.batch_dict[-1]['train'], sample_type='train'), 
             'test': self.get_dataloader(self.batch_dict[-1]['test'], sample_type='test')}
 
-    # total_batch: total # of samples  //  mini_batch: mini batch # of samples
     def get_dataloader(self, batch_size, sample_type):
         if self.level == 0:
             return [self.task]  # Format: List of [env_name, task]
