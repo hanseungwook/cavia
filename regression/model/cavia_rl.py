@@ -22,7 +22,6 @@ class BaseModelRL(nn.Module):
         raise NotImplementedError()
 
     def reset_context(self):
-        raise ValueError("Used?")
         self.parameters_all = [self.make_ctx(n) for n in self.n_contexts] + [self.module_list.parameters]
 
     @staticmethod

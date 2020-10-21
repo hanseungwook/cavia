@@ -4,7 +4,7 @@ import torch
 import numpy as np
 from tensorboardX import SummaryWriter
 from model import get_model_type
-from rl_utils import make_env
+from misc.rl_utils import make_env
 
 
 class Logger(object):

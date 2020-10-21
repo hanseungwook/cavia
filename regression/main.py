@@ -1,7 +1,8 @@
 import os
 import arguments
-from utils import set_seed, Logger, make_batch_dict, get_base_model
 from hierarchical import Hierarchical_Model, get_hierarchical_task
+from misc.utils import set_seed, Logger, make_batch_dict, get_base_model
+from optimizer.trpo import TRPO
 
 
 if __name__ == '__main__':
@@ -19,19 +20,15 @@ if __name__ == '__main__':
     # Get hierarchical task
     batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
     task = get_hierarchical_task(
-        task_func_list=["MiniGrid-Empty-5x5-v0", "MiniGrid-Unlock-v0"], 
+        task_func_list=["MiniGrid-Empty-5x5-v0", "MiniGrid-Empty-5x5-v0"], 
         batch_dict=batch_dict)
 
-    # Start train
+    # set hierarchical model
     base_model = get_base_model(args, logger)
     model = Hierarchical_Model(
-        decoder_model=base_model, 
-        encoders=None, 
+        base_model=base_model, 
         args=args, 
         task=task)
 
-    raise ValueError("Define TRPO optimizer here")
-
-    import sys
-    sys.exit()
-    model(task, reset=False)
+    # Start train
+    model(task, optimizer=TRPO, reset=False)
