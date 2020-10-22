@@ -142,12 +142,12 @@ def setup_cifar10_dataset():
 
 ### TODO: Can we make k_batch, n_batch automatic?
 ### TODO: Can we make the sampling of classes mutually exclusive?
-def sample_cifar10_img_fnc(sample_type):
-    if not (len(train_classes) > 0 and len(test_classes) > 0):
-        setup_cifar10_dataset()
+def sample_cifar10_img_fnc(label, sample_type):
+    # if not (len(train_classes) > 0 and len(test_classes) > 0):
+    #     setup_cifar10_dataset()
     
-    labels = train_classes if 'train' in sample_type else test_classes
-    label = np.random.choice(labels, 1)[0]
+    # labels = train_classes if 'train' in sample_type else test_classes
+    # label = np.random.choice(labels, 1)[0]
     
     # To make labels non-overlapping, remove label after selection at level 1
     # labels.remove(label)

@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader  #, Subset
 import random
 from torch.optim import Adam, SGD
+from functools import partial
 
 # from utils import optimize, manual_optim, send_to
 from dataset import Meta_Dataset, Meta_DataLoader, get_samples  
@@ -38,7 +39,8 @@ def make_tasks(task_names):
         elif task == 'celeba':
             task_func_list.append(sample_celeba_img_fnc)
         elif task == 'cifar10':
-            task_func_list.append(sample_cifar10_img_fnc)
+            for l in range(3):
+                task_func_list.append(partial(sample_cifar10_img_fnc, l))
         elif task == 'hier-imagenet':
             task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
         else:
@@ -158,6 +160,7 @@ class Hierarchical_Task():
 
 ####################################    
 def optimize(model, dataloader, level, args_dict, optimizer, reset):       # optimize parameter for a given 'task'
+    # print('level at optim:', level)
     lr, max_iter, logger = get_args(args_dict, level)
     param_all = model.decoder_model.parameters_all
 
