@@ -13,8 +13,8 @@ if __name__ == '__main__':
     set_seed(args.seed)
 
     # Create logger
-    if not os.path.exists("./logs"):
-        os.makedirs("./logs")
+    if not os.path.exists("./log"):
+        os.makedirs("./log")
     logger = Logger(args=args)
 
     # Get hierarchical task
@@ -28,7 +28,8 @@ if __name__ == '__main__':
     model = Hierarchical_Model(
         base_model=base_model, 
         args=args, 
-        task=task)
+        task=task,
+        logger=logger)
 
     # Start train
     model(task, optimizer=TRPO, reset=False, is_outer=False)

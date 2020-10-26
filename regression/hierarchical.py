@@ -14,16 +14,17 @@ def get_hierarchical_task(task_func_list, batch_dict):
 
 
 class Hierarchical_Model(nn.Module):
-    def __init__(self, base_model, args=None, task=None):
+    def __init__(self, base_model, args=None, task=None, logger=None):
         super().__init__()
 
         self.base_model = base_model 
         self.args = args
         self.task = task
+        self.logger = logger
         self.level_max = len(base_model.parameters_all)
 
         self.status = StatusMonitor(self.level_max)
-        self.meta_memory = MetaMemory()
+        self.meta_memory = MetaMemory(args, logger)
 
     def forward(self, task_batch, level=None, optimizer=SGD, reset=True, is_outer=False):
         if level is None:
@@ -31,7 +32,8 @@ class Hierarchical_Model(nn.Module):
             
         if level == 0:
             memory = self.meta_memory.get(key=self.status.key()) if is_outer else None
-            return get_inner_loss(self.base_model, task_batch, self.args, memory=memory)
+            return get_inner_loss(
+                self.base_model, task_batch, self.args, memory=memory, logger=self.logger)
         else:
             test_loss, outputs = 0, []
             for i_task, task in enumerate(task_batch): 
@@ -78,8 +80,7 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
                 status.update("iteration", level, iteration)
 
             # Train/optimize up to max_iter # of batches
-            if iteration >= args.max_iters[level]:    
-                print("Finished optimizing level {}\n".format(level))
+            if iteration >= args.max_iters[level]:
                 return
 
             loss, outputs = model(task_batch, is_outer=is_outer, level=level)
@@ -93,12 +94,8 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
                 if is_outer:
                     return
 
-                print("\n--> Starting outer-loop!\n")
-
                 optim.step(outputs, model)
                 meta_memory.clear()
-
-                print("\n--> Finished outer-loop optimization!\n")
 
             iteration += 1   
 

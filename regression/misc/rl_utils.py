@@ -6,6 +6,8 @@ from misc.linear_baseline import LinearFeatureBaseline, get_return
 from misc.replay_memory import ReplayMemory
 from misc.multiprocessing_env import SubprocVecEnv
 
+iteration = 0
+
 
 def make_env(args, env_name=None, task=None):
     # Set dummy task
@@ -22,7 +24,8 @@ def make_env(args, env_name=None, task=None):
     return _make_env
 
 
-def collect_trajectory(task, base_model, args):
+def collect_trajectory(task, base_model, args, logger):
+    global iteration
     assert len(task) == 2, "Format should be (env_name, task)"
 
     # Initialize memory
@@ -59,15 +62,17 @@ def collect_trajectory(task, base_model, args):
         # For next timestep
         obs = next_obs
 
-    print("score:", score)
     env.close()
+
+    logger.update(key="score", value=score, iter=iteration)
+    iteration += 1
 
     return memory
 
 
-def get_inner_loss(base_model, task, args, memory=None):
+def get_inner_loss(base_model, task, args, memory=None, logger=None):
     if memory is None:
-        memory = collect_trajectory(task, base_model, args)
+        memory = collect_trajectory(task, base_model, args, logger)
         obs, action, logprob, reward, mask = memory.sample()
         logprob = torch.stack(logprob, dim=1)
     else:

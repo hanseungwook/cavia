@@ -11,17 +11,16 @@ class Logger(object):
     def __init__(self, args):
         self.args = args
         self.log = set_log(args)
-        self.tb_writer = SummaryWriter('./logs/tb_{0}'.format(args.log_name))
+        self.tb_writer = SummaryWriter('./log/tb_{0}'.format(args.log_name))
 
-    def update(self, iter, loss):
-        if not (iter % self.args.log_interval):
-            self.log[self.args.log_name].info("At iteration {}, meta-loss: {:.3f}".format(iter, loss))
-            self.tb_writer.add_scalar("Meta loss:", loss, iter)
+    def update(self, key, value, iter):
+        self.log[self.args.log_name].info("At iteration {}, {}: {:.3f}".format(iter, key, value))
+        self.tb_writer.add_scalar(key, value, iter)
 
 
 def set_log(args):
     log = {}
-    set_logger(logger_name=args.log_name, log_file=r'{0}{1}'.format("./logs/", args.log_name))  
+    set_logger(logger_name=args.log_name, log_file=r'{0}{1}'.format("./log/", args.log_name))  
     log[args.log_name] = logging.getLogger(args.log_name)
 
     for arg, value in sorted(vars(args).items()):
