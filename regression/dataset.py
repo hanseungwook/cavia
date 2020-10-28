@@ -68,7 +68,17 @@ class Meta_DataLoader():
 
 def get_samples(task, total_batch, sample_type):
     # Level 2
-    if isinstance(task, list):
+    # if isinstance(task, list):
+    #     assert total_batch <= len(task)
+    #     tasks = random.sample(task, total_batch)
+    if isinstance(task, dict):
+        # Separate level-2 train and test tasks
+        if sample_type in task:
+            task = task[sample_type]
+        # Same level-2 train and test tasks 
+        else: 
+            task = task['train']
+            
         assert total_batch <= len(task)
         tasks = random.sample(task, total_batch)
     # Levels below 2

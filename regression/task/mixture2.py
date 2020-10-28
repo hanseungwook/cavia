@@ -91,24 +91,16 @@ def get_cifar10_img(sample_type, label):
 
     return img
 
-def get_img_full_input():
-    flattened_indices = range(img_size[0] * img_size[1])
-    x, y = np.unravel_index(flattened_indices, (img_size[0], img_size[1]))
-    coordinates = np.vstack((x, y)).T
-    coordinates = torch.from_numpy(coordinates).float()
-    # normalise coordinates
-    coordinates[:, 0] /= img_size[0]
-    coordinates[:, 1] /= img_size[1]
-    return coordinates
-
-def img_input_function(batch_size, order_pixels=False, full_range=False):
+def img_input_function(batch_size, order_pixels=False):
     if order_pixels:
-            flattened_indices = list(range(img_size[0] * img_size[1]))[:batch_size]
-    elif full_range:
-        flattened_indices = range(img_size[0] * img_size[1])
-    else: 
-        flattened_indices = np.random.choice(list(range(img_size[0] * img_size[1])), batch_size, replace=False)
-    
+        flattened_indices = list(range(img_size[0] * img_size[1]))[:batch_size]
+    else:
+        # Returning full range (in sorted order) if batch size is the full image size
+        if batch_size == 0:
+            flattened_indices = list(range(img_size[0] * img_size[1]))
+        else: 
+            flattened_indices = np.random.choice(list(range(img_size[0] * img_size[1])), batch_size, replace=False)
+
     x, y = np.unravel_index(flattened_indices, (img_size[0], img_size[1]))
     coordinates = np.vstack((x, y)).T
     coordinates = torch.from_numpy(coordinates).float()

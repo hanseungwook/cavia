@@ -13,7 +13,6 @@ from torch.nn.functional import mse_loss
 
 from finite_diff import debug_lower, debug_top
 # from hierarchical import optimize
-from task.mixture2 import get_img_full_input
 from task import mixture2
 
 
@@ -183,9 +182,11 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function, 
     plt.close()
 
 def vis_img_recon(model, task):
-    # Do inner-loop optimizations (outer-loop set to 0)    
-    test_loss = model(task, optimizer = Adam, reset = False)
+    # Do inner-loop optimizations (outer-loop set to 0) # 0 1 inner loop optimization, 1-class
+    test_loss, outputs = model(task, optimizer = Adam, reset=False, return_outputs=True)
+    IPython.embed()
     
+    # Inner-loop 0 for a given image within a class
     task = task[0]
     max_level = task.level
     level = max_level
@@ -193,20 +194,17 @@ def vis_img_recon(model, task):
     # From higher levels, recurse all the way down to level 0
     while level > 0:
         print(task)
-        train_loader = task.loader['train']
-        task = next(iter(train_loader))[0]
+        loader = task.loader['test']
+        task = next(iter(loader))[0]
         level -= 1
     
     # Input and target generator functions for a specific task from train (level 0)
     input_gen, target_gen = task.task
-    img_inputs, img_targets = next(iter(task.loader['train']))
-
-    # Get full input range of image
-    img_full_inputs = get_img_full_input()
+    # img_inputs, img_targets = next(iter(task.loader['test']))
 
     # Get real and predicted image
-    img_real = target_gen(img_full_inputs).view(mixture2.img_size).numpy()
-    img_pred = model.decoder_model((img_full_inputs, )).view(mixture2.img_size).detach().numpy()
+    img_real = target_gen(input_gen(0)).view(mixture2.img_size).numpy()
+    img_pred = outputs.view(mixture2.img_size).detach().numpy()
 
     # Forcing all predictions beyond image value range into (0, 1)
     img_pred = np.clip(img_pred, 0, 1)
@@ -221,39 +219,6 @@ def vis_img_recon(model, task):
     plt.imshow(img_pred)
 
     plt.show()
-
-    # # Inner loop optimizations
-    # level = max_level - 1
-    # reset = True
-
-    # # 0-level optimization is fine, but for 1-level optimization, usually we give a batch of images (coordinates and targets) that's in the same class,
-    # # but here, we only give 1 image from 1 class => is this problematic?
-    # while level >= 0:
-    #     lr, max_iter, logger = get_args(model.args_dict, level)
-    #     param_all = model.decoder_model.parameters_all
-
-    #     ## Initialize param & optim
-    #     if reset:
-    #         param_all[level] = torch.zeros_like(param_all[level], requires_grad= True)   # Reset
-    #         optim = SGD([param_all[level]], lr=lr)
-    #         optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
-        
-    #     cur_iter = 0
-    #     while True:
-    #         print('cur iter / max iter', cur_iter, max_iter)
-    #         if cur_iter >= max_iter:    
-    #             break
-
-    #         loss, _ = model.decoder_model((img_inputs, img_targets))
-
-    #         ## loss.backward() & optim.step()
-    #         if reset:
-    #             new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
-    #             param_all[level] = new_param
-
-    #         cur_iter += 1   
-        
-    #     level -= 1
     
 
 

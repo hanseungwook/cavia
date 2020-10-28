@@ -30,23 +30,32 @@ DOUBLE_precision = False #True
 ###################################
 
 def make_tasks(task_names):
-    task_func_list = []
+    task_func_dict = {}
     for task in task_names:
         if task == 'sine':
-            task_func_list.append(sample_sin_fnc)
+            task_func_dict['train'] = [sample_sin_fnc]
+            # task_func_list.append(sample_sin_fnc)
         elif task == 'linear':
-            task_func_list.append(sample_linear_fnc)
+            task_func_dict['train'] = [sample_linear_fnc]
+            # task_func_list.append(sample_linear_fnc)
         elif task == 'celeba':
-            task_func_list.append(sample_celeba_img_fnc)
+            task_func_dict['train'] = [sample_celeba_img_fnc]
+            # task_func_list.append(sample_celeba_img_fnc)
         elif task == 'cifar10':
-            for l in range(3):
-                task_func_list.append(partial(sample_cifar10_img_fnc, l))
+            # task_func_dict['train'] = [partial(sample_cifar10_img_fnc, l) for l in range(5)]
+            # task_func_dict['test'] = [partial(sample_cifar10_img_fnc, l) for l in range(5,10)]
+            task_func_dict['train'] = [partial(sample_cifar10_img_fnc, l) for l in range(1)]
+            task_func_dict['test'] = [partial(sample_cifar10_img_fnc, l) for l in range(1)]
+            
+            # for l in range(1):
+            #     task_func_list.append(partial(sample_cifar10_img_fnc, l))
         elif task == 'hier-imagenet':
-            task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
+            task_func_dict['train'] = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
+            # task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
         else:
             raise Exeption('Task not implemented/undefined')
 
-    return task_func_list
+    return task_func_dict
 
 def get_hierarchical_task(task_list, k_batch_dict, n_batch_dict):
     task_func_list = make_tasks(task_list)
@@ -75,7 +84,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
         self.level_max = len(decoder_model.parameters_all)  #2
 
-    def forward(self, task_batch, level = None, optimizer = SGD, reset = True):        # def forward(self, task_batch, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
+    def forward(self, task_batch, level = None, optimizer = SGD, reset = True, return_outputs=False):        # def forward(self, task_batch, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
         '''
         args: minibatch of tasks 
         returns:  mean_test_loss, mean_train_loss, outputs
@@ -100,16 +109,16 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                 Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset = reset)
                 test_batch = next(iter(task.loader['test']))
                 # TODO: Test on Cifar10 or imagenet hierarchical (get image from each hierarchy's train & test and need to be able to plot them)
-                l, outputs = self(test_batch, level-1)      # test only 1 minibatch
+                l, outputs = self(test_batch, level-1, return_outputs=return_outputs)      # test only 1 minibatch
                 self.args_dict['test_loggers'][level-1].update(l) # Update test logger for respective level
                 test_loss  += l
                 test_count += 1
 
             mean_test_loss = test_loss / test_count
-            outputs = None
+            # Propagate outputs back with full batch
 
-            # if level == self.level_max - 1: #in [2,3]:
-            #     print('level', level, mean_test_loss.item())
+            if not return_outputs:
+                outputs = None
 
             return mean_test_loss, outputs
 
@@ -136,19 +145,24 @@ class Hierarchical_Task():
 
     def get_dataloader_dict(self):
         return {'train': self.get_dataloader(self.total_batch['train'], self.mini_batch['train'], sample_type='train'), 
-                'test':  self.get_dataloader(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test', full=True)}
+                'test':  self.get_dataloader(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test')}
 
     # total_batch: total # of samples  //  mini_batch: mini batch # of samples
-    def get_dataloader(self, total_batchsize, mini_batchsize, sample_type, full=False):
+    def get_dataloader(self, total_batchsize, mini_batchsize, sample_type):
         if self.level == 0:
             input_gen, target_gen = self.task
-            input_data  = input_gen(total_batchsize, full)
+            input_data  = input_gen(total_batchsize)
             target_data = target_gen(input_data)
 
             if DOUBLE_precision:
                 input_data = input_data.double();  target_data=target_data.double()
 
             dataset = Meta_Dataset(data=input_data, target=target_data)
+
+            # Full range/batch if both 0s
+            if mini_batchsize == 0 and total_batchsize == 0:
+                mini_batchsize = len(dataset)
+
             return DataLoader(dataset, batch_size=mini_batchsize, shuffle=True)                # returns tensors
 
         else:
