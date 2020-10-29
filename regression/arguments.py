@@ -31,6 +31,10 @@ def parse_args():
     parser.add_argument(
         '--viz', action='store_true', default=False, 
         help='Run visualize (with already trained model)')
+    parser.add_argument(
+        '--load_model', type=str, default='', 
+        help='Path to model weights to load')
+
 
     parser.add_argument('--lrs',           type=float, nargs='+', default=[0.05, 0.05, 0.001])     # lr  for inner-loop, midloop, outerloop
     parser.add_argument('--n_iters',       type=int, nargs='+', default=[3, 2, 1000])             # optim_iter for inner-loop, midloop, outerloop

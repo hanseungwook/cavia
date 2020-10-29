@@ -184,7 +184,6 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function, 
 def vis_img_recon(model, task):
     # Do inner-loop optimizations (outer-loop set to 0) # 0 1 inner loop optimization, 1-class
     test_loss, outputs = model(task, optimizer = Adam, reset=False, return_outputs=True)
-    IPython.embed()
     
     # Inner-loop 0 for a given image within a class
     task = task[0]

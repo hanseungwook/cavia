@@ -5,6 +5,7 @@ from hierarchical import Hierarchical_Model,  get_hierarchical_task   # make_hie
 from utils import get_vis_fn
 
 from pdb import set_trace
+import IPython
 
 def get_base_model(args):
     MODEL_TYPE = get_model_type(args.model_type)
@@ -42,19 +43,19 @@ def run(args, logger_maker):
     # model           = make_hierarhical_model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers)
     model   = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.lrs, encoder_models, loggers, test_loggers)
     # set_trace()
-
-    if args.viz:
+    if args.load_model:
         print('Loading model')
         checkpoint = torch.load('./model.pth')
         model.load_state_dict(checkpoint['model_state_dict'])
         del checkpoint
-
+        
+    if args.viz:
         vis_fn = get_vis_fn(args.task)
         vis_fn(model, task)
         
     else:
-        test_loss = model(task, optimizer = Adam, reset = False) #outerloop = True)   # grad_clip = args.clip ) #TODO: gradient clipping?
-
+        test_loss, outputs = model(task, optimizer=Adam, reset=False, return_outputs=True) #outerloop = True)   # grad_clip = args.clip ) #TODO: gradient clipping?
+        print('test loss', test_loss)
         print('Saving model')
         torch.save({'model_state_dict': model.state_dict()}, 'model.pth')
     

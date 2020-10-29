@@ -14,6 +14,7 @@ from utils import vis_img_recon, get_args
 import higher 
 
 from pdb import set_trace
+import IPython
 
 DOUBLE_precision = False #True
 
@@ -82,9 +83,9 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
         # self.adaptation = optimize if encoder_model is None else encoder_model 
 
-        self.level_max = len(decoder_model.parameters_all)  #2
+        self.level_max = len(decoder_model.parameters_all) #2
 
-    def forward(self, task_batch, level = None, optimizer = SGD, reset = True, return_outputs=False):        # def forward(self, task_batch, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
+    def forward(self, task_batch, level=None, optimizer=SGD, reset=True, return_outputs=False, status='', viz=None):        # def forward(self, task_batch, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
         '''
         args: minibatch of tasks 
         returns:  mean_test_loss, mean_train_loss, outputs
@@ -96,6 +97,9 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
         if level is None:
             level = self.level_max
+            print('level max ', level)
+        
+        # print(status)
 
         # assert level == task_batch[0].level + 1                 # check if the level matches with task level        # print('level', level , task_batch[0].level  )
 
@@ -106,13 +110,20 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
             for task in task_batch: 
                 # TODO: ? How can we calculate test loss on outer loop every j iterations? (to check progress)
-                Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset = reset)
+                Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset=reset, status=status+'train')
                 test_batch = next(iter(task.loader['test']))
                 # TODO: Test on Cifar10 or imagenet hierarchical (get image from each hierarchy's train & test and need to be able to plot them)
-                l, outputs = self(test_batch, level-1, return_outputs=return_outputs)      # test only 1 minibatch
+                l, outputs = self(test_batch, level-1, return_outputs=return_outputs, status=status+'test')      # test only 1 minibatch
                 self.args_dict['test_loggers'][level-1].update(l) # Update test logger for respective level
                 test_loss  += l
                 test_count += 1
+                
+            if status == viz:
+                IPython.embed()
+                img_pred = outputs.view(task.mixture2.img_size).detach().numpy()
+                img_pred = np.clip(img_pred, 0, 1)
+                plt.savefig(img_pred)
+
 
             mean_test_loss = test_loss / test_count
             # Propagate outputs back with full batch
@@ -173,8 +184,7 @@ class Hierarchical_Task():
 
 
 ####################################    
-def optimize(model, dataloader, level, args_dict, optimizer, reset):       # optimize parameter for a given 'task'
-    # print('level at optim:', level)
+def optimize(model, dataloader, level, args_dict, optimizer, reset, status):       # optimize parameter for a given 'task'
     lr, max_iter, logger = get_args(args_dict, level)
     param_all = model.decoder_model.parameters_all
 
@@ -189,7 +199,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset):       # opt
     cur_iter = 0; 
     while True:
         for task_batch in dataloader:
-            loss = model(task_batch, level)[0]     # Loss to be optimized
+            loss = model(task_batch, level, status=status)[0]     # Loss to be optimized
 
             if cur_iter >= max_iter:    # train/optimize up to max_iter # of batches
                 return False #loss_all   # Loss-profile
