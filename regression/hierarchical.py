@@ -27,6 +27,12 @@ class Hierarchical_Model(nn.Module):
         self.meta_memory = MetaMemory(args, logger)
 
     def forward(self, task_batch, level=None, optimizer=SGD, reset=True, is_outer=False):
+        """
+        Args:
+            is_outer (bool): Indicates whether forward is currently at the inner-loop process or
+            the outer-loop process. Only needed for TRPO optimization due to adadptation. 
+            Default: True.
+        """
         if level is None:
             level = self.level_max
             
