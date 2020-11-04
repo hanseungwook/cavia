@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 
-class ReplayMemory():
+class ReplayMemory(object):
     def __init__(self):
         self.obs = []
         self.action = []
@@ -27,3 +27,8 @@ class ReplayMemory():
 
     def sample(self):
         return self.obs, self.action, self.logprob, self.reward, self._get_mask(self.done)
+
+    def get_reward(self):
+        reward = torch.stack(self.reward)
+        reward = torch.mean(torch.sum(reward, dim=1))
+        return reward.cpu().numpy()
