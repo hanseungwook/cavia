@@ -36,22 +36,7 @@ def parse_args():
         '--max-iters', type=int, nargs='+', default=[2, 2, 1000], 
         help="optim_iter for inner-loop, midloop, outerloop")
     parser.add_argument(
-        '--k_batch_train', type=int, nargs='+', default=[100, 2, 2],
-        help="number of datapoints, tasks, super-tasks")
-    parser.add_argument(
-        '--k_batch_test', type=int, nargs='+', default=[100, 2, 2], 
-        help="number of datapoints, tasks, super-tasks")
-    parser.add_argument(
-        '--k_batch_valid', type=int, nargs='+', default=[100, 2, 2],
-        help="number of datapoints, tasks, super-tasks")
-    parser.add_argument(
-        '--n_batch_train', type=int, nargs='+', default=[100, 2, 2], 
-        help="number of datapoints, tasks, super-tasks")
-    parser.add_argument(
-        '--n_batch_test', type=int, nargs='+', default=[100, 2, 2],
-        help="number of datapoints, tasks, super-tasks")
-    parser.add_argument(
-        '--n_batch_valid', type=int, nargs='+', default=[100, 2, 2], 
+        '--batch', type=int, nargs='+', default=[100, 3, 2], 
         help="number of datapoints, tasks, super-tasks")
     parser.add_argument(
         '--n_contexts', type=int, nargs='+', default=[3, 3],
@@ -73,7 +58,7 @@ def parse_args():
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Set args log name
-    args.log_name = "max_iters::%s_n_contexts::%s_n_batch_test::%s_prefix::%s" % (
-        args.max_iters, args.n_contexts, args.n_batch_test, args.prefix)
+    args.log_name = "max_iters::%s_n_contexts::%s_batch::%s_prefix::%s" % (
+        args.max_iters, args.n_contexts, args.batch, args.prefix)
 
     return args
