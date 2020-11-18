@@ -8,7 +8,8 @@ def get_return(reward, mask):
 
     R, return_ = 0., []
     for timestep in reversed(range(reward.shape[-1])):
-        R = reward[:, timestep] + 0.99 * R
+        # TODO Use args instead of hard-coding
+        R = reward[:, timestep] + 0.96 * R
         return_.insert(0, R)
     return_ = torch.stack(return_, dim=1)
     assert reward.shape == return_.shape

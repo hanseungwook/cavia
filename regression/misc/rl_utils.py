@@ -13,8 +13,6 @@ def make_env(args, env_name=None, task=None):
     # Set dummy task
     if env_name is None:
         env_name = "MiniGrid-Empty-5x5-v0"
-    if task is None:
-        task = (3, 3)
 
     def _make_env():
         env = gym.make(env_name)
