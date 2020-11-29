@@ -103,13 +103,23 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
                 optim.step(outputs, model)
 
                 # For logging
+                print("key:", status.key(), iteration)
+
                 before_key = status.get_key_by_id([0, 0, iteration], [0, 0, 0])
                 before_memory = meta_memory.get(before_key)
-                model.logger.tb_writer.add_scalars("debug/reward", {"before": before_memory.get_reward()}, iteration)
+                model.logger.tb_writer.add_scalars("debug/reward0", {"before": before_memory.get_reward()}, iteration)
 
                 after_key = status.get_key_by_id([2, 2, iteration], [0, 0, 0])
                 after_memory = meta_memory.get(after_key)
-                model.logger.tb_writer.add_scalars("debug/reward", {"after": after_memory.get_reward()}, iteration)
+                model.logger.tb_writer.add_scalars("debug/reward0", {"after": after_memory.get_reward()}, iteration)
+
+                before_key = status.get_key_by_id([0, 0, iteration], [0, 1, 0])
+                before_memory = meta_memory.get(before_key)
+                model.logger.tb_writer.add_scalars("debug/reward1", {"before": before_memory.get_reward()}, iteration)
+
+                after_key = status.get_key_by_id([2, 2, iteration], [0, 1, 0])
+                after_memory = meta_memory.get(after_key)
+                model.logger.tb_writer.add_scalars("debug/reward1", {"after": after_memory.get_reward()}, iteration)
 
                 # For next outer-loop
                 meta_memory.clear()

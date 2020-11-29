@@ -30,10 +30,10 @@ def parse_args():
         help="Logging name")
 
     parser.add_argument(
-        '--lrs', type=float, nargs='+', default=[0.05, 0.05, 0.001],
+        '--lrs', type=float, nargs='+', default=[0.01, 0.01, 0.001],
         help="lr for inner-loop, midloop, outerloop")
     parser.add_argument(
-        '--max-iters', type=int, nargs='+', default=[2, 2, 1000], 
+        '--max-iters', type=int, nargs='+', default=[2, 2, 10000], 
         help="optim_iter for inner-loop, midloop, outerloop")
     parser.add_argument(
         '--batch', type=int, nargs='+', default=[100, 3, 2], 

@@ -11,7 +11,7 @@ def get_return(reward, mask):
         # TODO Use args instead of hard-coding
         R = reward[:, timestep] + 0.96 * R
         return_.insert(0, R)
-    return_ = torch.stack(return_, dim=1)
+    return_ = torch.stack(return_, dim=1) * mask
     assert reward.shape == return_.shape
 
     return return_
@@ -97,4 +97,4 @@ class LinearFeatureBaseline(nn.Module):
         # Return value
         features = self._feature(obs, mask)
         values = torch.mv(features.view(-1, self.feature_size), self.weight)
-        return values.view(features.shape[:2])
+        return values.view(features.shape[:2]) * mask

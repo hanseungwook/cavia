@@ -22,9 +22,6 @@ if __name__ == '__main__':
     task = get_hierarchical_task(
         task_func_list=["MiniGrid-Unlock-Easy-v0", "MiniGrid-Unlock-Easy-v0"], 
         batch_dict=batch_dict)
-    # task = get_hierarchical_task(
-    #     task_func_list=["MiniGrid-Empty-5x5-v0", "MiniGrid-Empty-5x5-v0"], 
-    #     batch_dict=batch_dict)
 
     # set hierarchical model
     base_model = get_base_model(args, logger)
