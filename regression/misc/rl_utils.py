@@ -34,7 +34,6 @@ def collect_trajectory(task, base_model, args, logger):
     env = SubprocVecEnv([make_env(args, env_name=task[0], task=task[1]) for _ in range(20)])
 
     obs = env.reset()
-    score = 0.
 
     for timestep in range(args.ep_max_timestep):
         # Get action and logprob
@@ -54,15 +53,11 @@ def collect_trajectory(task, base_model, args, logger):
             reward=reward,
             done=done)
 
-        # For logging
-        score += np.mean(reward)
-
         # For next timestep
         obs = next_obs
 
     env.close()
 
-    logger.update(key="score", value=score, iter=iteration)
     iteration += 1
 
     return memory
