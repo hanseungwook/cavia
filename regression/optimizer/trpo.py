@@ -29,7 +29,7 @@ def surrogate_loss(task, memory, model, old_pi=None):
         # Get loss with baseline
         return_ = get_return(reward, mask)
         loss = -torch.mean(torch.sum(ratio * (return_ - value), dim=1))
-        kl = kl_divergence(pi, old_pi).mean()
+        kl = (kl_divergence(pi, old_pi) * mask).mean()
 
     return loss, kl, old_pi
 
