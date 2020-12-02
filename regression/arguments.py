@@ -8,9 +8,6 @@ def parse_args():
     parser.add_argument(
         '--task', type=str, choices=["empty", "unlock", "mixture"], 
         help="Problem to solve")
-    # parser.add_argument(
-    #     '--tasks-per-metaupdate', type=int, 
-    #     default=25, help="Number of tasks per meta-update")
     parser.add_argument(
         '--architecture', type=int, nargs='+', 
         default=[1, 40, 40, 1], help="Architecture of neural network")
@@ -36,16 +33,11 @@ def parse_args():
         '--max-iters', type=int, nargs='+', default=[2, 2, 10000], 
         help="optim_iter for inner-loop, midloop, outerloop")
     parser.add_argument(
-        '--batch', type=int, nargs='+', default=[100, 5, 2], 
-        help="number of datapoints, tasks, super-tasks")
+        '--batch', type=int, nargs='+', default=[25, 5, 2], 
+        help="number of trajectories, tasks (e.g., goal locations), super-tasks (e.g., empty)")
     parser.add_argument(
         '--n_contexts', type=int, nargs='+', default=[5, 5],
         help="number of context variables: phi0, phi1")
-    parser.add_argument(
-        '--encoders', type=int, nargs='+', default=[None, None, None],
-        help="task encoder-models for model-based Meta-learning. Optimization-based if None (MAML)")
-
-    parser.add_argument('--log_interval', type=int, default=100)
 
     # Arguments for reinforcement learning settings
     parser.add_argument(
@@ -58,7 +50,8 @@ def parse_args():
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Set args log name
-    args.log_name = "task::%s_max_iters::%s_n_contexts::%s_batch::%s_prefix::%s" % (
-        args.task, args.max_iters, args.n_contexts, args.batch, args.prefix)
+    args.log_name = \
+        "task::%s_lrs::%s_max_iters::%s_n_contexts::%s_batch::%s_prefix::%s" % (
+            args.task, args.lrs, args.max_iters, args.n_contexts, args.batch, args.prefix)
 
     return args
