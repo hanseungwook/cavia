@@ -6,8 +6,8 @@ def parse_args():
     parser = argparse.ArgumentParser(description='CAVIA (Regression experiments)')
 
     parser.add_argument(
-        '--task', type=str, choices=["sine", "mixture"], 
-        default='mixture', help="Problem to solve")
+        '--task', type=str, choices=["empty", "unlock", "mixture"], 
+        help="Problem to solve")
     # parser.add_argument(
     #     '--tasks-per-metaupdate', type=int, 
     #     default=25, help="Number of tasks per meta-update")
@@ -58,7 +58,7 @@ def parse_args():
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Set args log name
-    args.log_name = "max_iters::%s_n_contexts::%s_batch::%s_prefix::%s" % (
-        args.max_iters, args.n_contexts, args.batch, args.prefix)
+    args.log_name = "task::%s_max_iters::%s_n_contexts::%s_batch::%s_prefix::%s" % (
+        args.task, args.max_iters, args.n_contexts, args.batch, args.prefix)
 
     return args

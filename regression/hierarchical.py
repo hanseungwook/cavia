@@ -8,11 +8,6 @@ from misc.status_monitor import StatusMonitor
 from misc.meta_memory import MetaMemory
 
 
-def get_hierarchical_task(task_func_list, batch_dict):
-    task = Hierarchical_Task(task_func_list, batch_dict)
-    return Meta_Dataset(data=[task])
-
-
 class Hierarchical_Model(nn.Module):
     def __init__(self, base_model, args=None, task=None, logger=None):
         super().__init__()
@@ -148,3 +143,16 @@ class Hierarchical_Task(object):
             subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]
             subtask_dataset = Meta_Dataset(data=subtask_list)
             return Meta_DataLoader(subtask_dataset, batch_size=batch_size)
+
+
+def get_hierarchical_task(batch_dict, args):
+    if args.task == "empty":
+        task_func_list = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Empty-5x5-v0"]
+    elif args.task == "unlock":
+        task_func_list = ["MiniGrid-Unlock-Easy-v0", "MiniGrid-Unlock-Easy-v0"]
+    elif args.task == "mixture":
+        task_func_list = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Unlock-Easy-v0"]
+    else:
+        raise ValueError("Invalid task option")
+    task = Hierarchical_Task(task_func_list, batch_dict)
+    return Meta_Dataset(data=[task])
