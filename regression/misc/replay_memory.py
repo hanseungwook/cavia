@@ -29,6 +29,6 @@ class ReplayMemory(object):
         return self.obs, self.action, self.logprob, self.reward, self._get_mask(self.done)
 
     def get_reward(self):
-        reward = torch.stack(self.reward)
+        reward = torch.stack(self.reward, dim=1) * self._get_mask(self.done)
         reward = torch.mean(torch.sum(reward, dim=1))
         return reward.cpu().numpy()
