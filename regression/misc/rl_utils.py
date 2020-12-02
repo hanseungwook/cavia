@@ -1,6 +1,5 @@
 import torch
 import gym
-import numpy as np
 from gym_minigrid.wrappers import VectorObsWrapper
 from misc.linear_baseline import LinearFeatureBaseline, get_return
 from misc.replay_memory import ReplayMemory
@@ -63,16 +62,10 @@ def collect_trajectory(task, base_model, args, logger):
     return memory
 
 
-def get_inner_loss(base_model, task, args, memory=None, logger=None):
-    if memory is None:
-        memory = collect_trajectory(task, base_model, args, logger)
-        obs, action, logprob, reward, mask = memory.sample()
-        logprob = torch.stack(logprob, dim=1)
-    else:
-        obs, action, logprob, reward, mask = memory.sample()
-        categorical = base_model(torch.from_numpy(np.stack(obs, axis=1)).float())
-        action = torch.from_numpy(np.stack(action, axis=1)).float()
-        logprob = categorical.log_prob(action)  # Replace logprob
+def get_inner_loss(base_model, task, args, logger):
+    memory = collect_trajectory(task, base_model, args, logger)
+    obs, action, logprob, reward, mask = memory.sample()
+    logprob = torch.stack(logprob, dim=1)
 
     # Get baseline
     linear_baseline = LinearFeatureBaseline(obs)

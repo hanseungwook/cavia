@@ -2,7 +2,7 @@ import os
 import arguments
 from hierarchical import Hierarchical_Model, get_hierarchical_task
 from misc.utils import set_seed, Logger, make_batch_dict, get_base_model
-from optimizer.trpo import TRPO
+from torch.optim import Adam
 
 
 if __name__ == '__main__':
@@ -20,7 +20,7 @@ if __name__ == '__main__':
     # Get hierarchical task
     batch_dict = make_batch_dict(args.batch)
     task = get_hierarchical_task(
-        task_func_list=["MiniGrid-Unlock-Easy-v0", "MiniGrid-Unlock-Easy-v0"], 
+        task_func_list=["MiniGrid-Empty-5x5-v0", "MiniGrid-Empty-5x5-v0"], 
         batch_dict=batch_dict)
 
     # set hierarchical model
@@ -32,4 +32,4 @@ if __name__ == '__main__':
         logger=logger)
 
     # Start train
-    model(task, optimizer=TRPO, reset=False, is_outer=False)
+    model(task, optimizer=Adam, reset=False, is_outer=False)

@@ -37,9 +37,7 @@ class Hierarchical_Model(nn.Module):
             level = self.level_max
             
         if level == 0:
-            memory = self.meta_memory.get(key=self.status.key()) if is_outer else None
-            return get_inner_loss(
-                self.base_model, task_batch, self.args, memory=memory, logger=self.logger)
+            return get_inner_loss(self.base_model, task_batch, self.args, self.logger)
         else:
             test_loss, outputs = 0, []
             for i_task, task in enumerate(task_batch): 
@@ -74,7 +72,7 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
         optim = higher.get_diff_optim(optim, [param_all[level]])
     else:
         # Outer-loop optimizer
-        optim = optimizer()
+        optim = optimizer(param_all[level](), lr=0.001)
 
     iteration = 0
     while True:
@@ -100,7 +98,9 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
                 if is_outer:
                     return
 
-                optim.step(outputs, model)
+                optim.zero_grad()
+                loss.backward()
+                optim.step()
 
                 # For logging
                 print("key:", status.key(), iteration)
