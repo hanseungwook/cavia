@@ -5,27 +5,16 @@ import torch
 def parse_args():
     parser = argparse.ArgumentParser(description='CAVIA (Regression experiments)')
 
+    # Arguments for algorithm
     parser.add_argument(
         '--task', type=str, choices=["empty", "unlock", "mixture"], 
         help="Problem to solve")
     parser.add_argument(
-        '--architecture', type=int, nargs='+', 
-        default=[1, 40, 40, 1], help="Architecture of neural network")
+        '--architecture', type=int, nargs='+', default=[1, 40, 40, 1], 
+        help="Architecture of neural network")
     parser.add_argument(
-        '--first_order', action='store_true', default=False, 
-        help='run first-order version')
-    parser.add_argument(
-        '--model-type', type=str, choices=["CAVIA", "ADDITIVE", "MULTIPLICATIVE", "ADD_MULTIPLICATIVE"], 
-        default="CAVIA", help='model type: CAVIA, ADDITIVE, MULTIPLICATIVE, ADD_MULTIPLICATIVE"')
-    parser.add_argument(
-        '--seed', type=int, default=42)
-    parser.add_argument(
-        '--prefix', type=str, default="",
-        help="Prefix for logging")
-    parser.add_argument(
-        '--log-name', type=str, default="",
-        help="Logging name")
-
+        '--model-type', type=str, choices=["CAVIA", "ADDITIVE", "MULTIPLICATIVE", "ADD_MULTIPLICATIVE"], default="CAVIA", 
+        help='model type: CAVIA, ADDITIVE, MULTIPLICATIVE, ADD_MULTIPLICATIVE"')
     parser.add_argument(
         '--lrs', type=float, nargs='+', default=[0.02, 0.02, 0.001],
         help="lr for inner-loop, midloop, outerloop")
@@ -43,6 +32,17 @@ def parse_args():
     parser.add_argument(
         '--ep-max-timestep', type=int, default=20, 
         help="Episode horizon")
+
+    # Arguments for misc
+    parser.add_argument(
+        '--log-name', type=str, default="",
+        help="Logging name")
+    parser.add_argument(
+        '--seed', type=int, default=42, 
+        help="Seed for reproducibility")
+    parser.add_argument(
+        '--prefix', type=str, default="",
+        help="Prefix for logging")
 
     args = parser.parse_args()
 
