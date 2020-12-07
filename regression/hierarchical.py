@@ -1,14 +1,18 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader  #, Subset
+from torch.nn.utils import clip_grad_value_
 import random
 from torch.optim import Adam, SGD
 from functools import partial
+import matplotlib.pyplot as plt
+import numpy as np
 
 # from utils import optimize, manual_optim, send_to
 from dataset import Meta_Dataset, Meta_DataLoader, get_samples  
-from task.mixture2 import sample_sin_fnc, sample_linear_fnc, sample_celeba_img_fnc, sample_cifar10_img_fnc, create_hier_imagenet_supertasks
+from task.mixture2 import sample_sin_fnc, sample_linear_fnc, sample_celeba_img_fnc, sample_cifar10_img_fnc, create_hier_imagenet_supertasks, img_size
 from utils import vis_img_recon, get_args
+from finite_diff import debug_top
 # from torch.autograd import gradcheck
 
 import higher 
@@ -45,8 +49,8 @@ def make_tasks(task_names):
         elif task == 'cifar10':
             # task_func_dict['train'] = [partial(sample_cifar10_img_fnc, l) for l in range(5)]
             # task_func_dict['test'] = [partial(sample_cifar10_img_fnc, l) for l in range(5,10)]
-            task_func_dict['train'] = [partial(sample_cifar10_img_fnc, l) for l in range(1)]
-            task_func_dict['test'] = [partial(sample_cifar10_img_fnc, l) for l in range(1)]
+            task_func_dict['train'] = [partial(sample_cifar10_img_fnc, l) for l in range(7)]
+            task_func_dict['test'] = [partial(sample_cifar10_img_fnc, l) for l in range(7,10)]
             
             # for l in range(1):
             #     task_func_list.append(partial(sample_cifar10_img_fnc, l))
@@ -68,16 +72,18 @@ def get_hierarchical_task(task_list, k_batch_dict, n_batch_dict):
 #  Model Hierarchy
 
 class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, decoder_model, n_contexts, max_iters, lrs, encoders, loggers, test_loggers): 
+    def __init__(self, decoder_model, n_contexts, max_iters, for_iters, lrs, encoders, loggers, test_loggers): 
         super().__init__()
         # assert hasattr  (decoder_model, 'forward')    # submodel has a built-in forward() method 
 
         self.decoder_model  = decoder_model 
         self.n_contexts = n_contexts
         self.args_dict = {'max_iters' : max_iters,
+                          'for_iters' : for_iters, 
                           'lrs'       : lrs,
                           'loggers'   : loggers,
-                          'test_loggers': test_loggers
+                          'test_loggers': test_loggers,
+                          'device': device
                           }
         self.device     = decoder_model.device
 
@@ -97,7 +103,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
         if level is None:
             level = self.level_max
-            print('level max ', level)
         
         # print(status)
 
@@ -109,20 +114,18 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             test_loss,  test_count = 0, 0
 
             for task in task_batch: 
-                # TODO: ? How can we calculate test loss on outer loop every j iterations? (to check progress)
                 Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset=reset, status=status+'train')
                 test_batch = next(iter(task.loader['test']))
-                # TODO: Test on Cifar10 or imagenet hierarchical (get image from each hierarchy's train & test and need to be able to plot them)
                 l, outputs = self(test_batch, level-1, return_outputs=return_outputs, status=status+'test')      # test only 1 minibatch
                 self.args_dict['test_loggers'][level-1].update(l) # Update test logger for respective level
                 test_loss  += l
                 test_count += 1
                 
             if status == viz:
-                IPython.embed()
-                img_pred = outputs.view(task.mixture2.img_size).detach().numpy()
+                img_pred = outputs.view(img_size).detach().numpy()
                 img_pred = np.clip(img_pred, 0, 1)
-                plt.savefig(img_pred)
+                plt.imshow(img_pred)
+                plt.show()
 
 
             mean_test_loss = test_loss / test_count
@@ -174,7 +177,10 @@ class Hierarchical_Task():
             if mini_batchsize == 0 and total_batchsize == 0:
                 mini_batchsize = len(dataset)
 
-            return DataLoader(dataset, batch_size=mini_batchsize, shuffle=True)                # returns tensors
+            shuffle = True if sample_type == 'train' else False
+
+            return DataLoader(dataset, batch_size=mini_batchsize, shuffle=shuffle)                # returns tensors
+
 
         else:
             tasks = get_samples(self.task, total_batchsize, sample_type)
@@ -185,12 +191,12 @@ class Hierarchical_Task():
 
 ####################################    
 def optimize(model, dataloader, level, args_dict, optimizer, reset, status):       # optimize parameter for a given 'task'
-    lr, max_iter, logger = get_args(args_dict, level)
+    lr, max_iter, for_iter, logger = get_args(args_dict, level)
     param_all = model.decoder_model.parameters_all
 
     ## Initialize param & optim
     if reset:
-        param_all[level] = torch.zeros_like(param_all[level], requires_grad= True)   # Reset
+        param_all[level] = torch.zeros_like(param_all[level], requires_grad= True).to(self.device)   # Reset
         optim = optimizer([param_all[level]], lr=lr)
         optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
     else:
@@ -199,30 +205,32 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status):    
     cur_iter = 0; 
     while True:
         for task_batch in dataloader:
-            loss = model(task_batch, level, status=status)[0]     # Loss to be optimized
+            for _ in range(for_iter):
+                if level == 0:
+                    task_batch = task_batch.to(self.device)
 
-            if cur_iter >= max_iter:    # train/optimize up to max_iter # of batches
-                return False #loss_all   # Loss-profile
+                loss = model(task_batch, level, status=status)[0]     # Loss to be optimized
 
-            ## loss.backward() & optim.step()
-            if reset:
-                new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
-                param_all[level] = new_param
-            else:
-                optim.zero_grad()
-                loss.backward()
-                # if level == debug_level: # == 2:
-                #     grad_list = list(par.grad for par in optim.param_groups[0]['params'])
-                #     debug(model, data, level, list(param_all[level]()), grad_list)
-                optim.step()  
+                if cur_iter >= max_iter:    # train/optimize up to max_iter # of batches
+                    return False #loss_all   # Loss-profile
 
-            cur_iter += 1   
+                ## loss.backward() & optim.step()
+                if reset:
+                    new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
+                    param_all[level] = new_param
+                    
+                else:
+                    optim.zero_grad()
+                    loss.backward()
+                    optim.step()  
 
-            # ------------ logging ------------
-            if logger is not None:
-                logger.update(loss.detach().cpu().numpy())
+                cur_iter += 1   
 
-        # return cur_iter  # completed  the batch
+                # ------------ logging ------------
+                if logger is not None:
+                    logger.update(loss.detach().cpu().numpy())
+
+            # return cur_iter  # completed  the batch
 
 
 #######################################

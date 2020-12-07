@@ -53,7 +53,7 @@ class Meta_DataLoader():
 
     def __iter__(self):
         # Create indices of batches
-        batch_idx = list(BatchSampler(RandomSampler(self.dataset), self.batch_size, drop_last=False))
+        batch_idx = list(BatchSampler(RandomSampler(self.dataset), self.batch_size, drop_last=True))
 
         # Create dataset of minibatches of the form [mini-batch of (hierarchical tasks), ...]
         mini_dataset = []

@@ -38,6 +38,7 @@ def parse_args():
 
     parser.add_argument('--lrs',           type=float, nargs='+', default=[0.05, 0.05, 0.001])     # lr  for inner-loop, midloop, outerloop
     parser.add_argument('--n_iters',       type=int, nargs='+', default=[3, 2, 1000])             # optim_iter for inner-loop, midloop, outerloop
+    parser.add_argument('--for_iters',     type=int, nargs='+', default=[3, 1, 1])                  # number of iterations to use the same data
     parser.add_argument('--k_batch_train', type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks 
     parser.add_argument('--k_batch_test',  type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks
     parser.add_argument('--k_batch_valid', type=int, nargs='+', default=[100, 25, 2])              # number of datapoints, tasks, super-tasks
@@ -48,6 +49,7 @@ def parse_args():
     parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
 
     parser.add_argument('--log_interval',  type=int, default=100)
+    parser.add_argument('--test_interval',  type=int, default=0)
     parser.add_argument('--log_name',  type=str, default='')
 
     args = parser.parse_args()

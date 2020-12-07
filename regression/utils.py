@@ -44,7 +44,9 @@ class Logger():
                 self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
 
             self.tb_writer.add_scalar("Meta loss:", loss, self.iter)
-            self.iter += 1
+        
+        self.iter += 1
+        
 
 
 def set_log(args):
@@ -133,8 +135,9 @@ def get_args(args_dict, level):
     # return (arg[name][level] for arg, name in args_dict.items())
     lr = args_dict['lrs'][level] 
     max_iter = args_dict['max_iters'][level] 
+    for_iter = args_dict['for_iters'][level]
     logger = args_dict['loggers'][level] 
-    return lr, max_iter, logger
+    return lr, max_iter, for_iter, logger
 
 
 #################################################################################
@@ -218,6 +221,46 @@ def vis_img_recon(model, task):
     plt.imshow(img_pred)
 
     plt.show()
+
+def save_img_recon(itr, task, outputs):
+    save_dir = './cifar10_ours_recon_plots'
+    if not os.path.isdir(save_dir):
+        os.mkdir(save_dir)
+
+    # Inner-loop 0 for a given image within a class
+    task = task[0]
+    max_level = task.level
+    level = max_level
     
+    # From higher levels, recurse all the way down to level 0
+    while level > 0:
+        print(task)
+        loader = task.loader['test']
+        task = next(iter(loader))[0]
+        level -= 1
+    
+    # Input and target generator functions for a specific task from train (level 0)
+    input_gen, target_gen = task.task
+    # img_inputs, img_targets = next(iter(task.loader['test']))
+
+    # Get real and predicted image
+    img_real = target_gen(input_gen(0)).view(mixture2.img_size).numpy()
+    img_pred = outputs.view(mixture2.img_size).detach().numpy()
+
+    # Forcing all predictions beyond image value range into (0, 1)
+    img_pred = np.clip(img_pred, 0, 1)
+    # print('Loss: {}'.format(mse_loss(torch.from_numpy(img_pred), torch.from_numpy(img_real))))
+
+    # Plotting real and predicted images
+    fig = plt.figure(figsize=(8, 8))
+    fig.add_subplot(1, 2, 1)
+    plt.imshow(img_real)
+
+    fig.add_subplot(1, 2, 2)
+    plt.imshow(img_pred)
+
+    plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(itr)))
+    
+
 
 
