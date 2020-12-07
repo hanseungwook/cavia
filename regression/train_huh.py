@@ -68,7 +68,7 @@ def run(args, logger_maker):
             # save_img_recon(i*args.test_interval, task, outputs)
 
             print('Saving reconstruction')
-            img_pred = outputs.view(32, 32, 3).detach().numpy()
+            img_pred = outputs.view(32, 32, 3).detach().cpu().numpy()
             save_dir = args.log_name
             if not os.path.isdir(save_dir):
                 os.mkdir(save_dir)

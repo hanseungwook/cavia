@@ -114,7 +114,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             test_loss,  test_count = 0, 0
 
             for task in task_batch: 
-                Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset=reset, status=status+'train')
+                Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset=reset, status=status+'train', device=self.device)
                 test_batch = next(iter(task.loader['test']))
                 l, outputs = self(test_batch, level-1, return_outputs=return_outputs, status=status+'test')      # test only 1 minibatch
                 self.args_dict['test_loggers'][level-1].update(l) # Update test logger for respective level
@@ -190,13 +190,13 @@ class Hierarchical_Task():
 
 
 ####################################    
-def optimize(model, dataloader, level, args_dict, optimizer, reset, status):       # optimize parameter for a given 'task'
+def optimize(model, dataloader, level, args_dict, optimizer, reset, status, device):       # optimize parameter for a given 'task'
     lr, max_iter, for_iter, logger = get_args(args_dict, level)
     param_all = model.decoder_model.parameters_all
 
     ## Initialize param & optim
     if reset:
-        param_all[level] = torch.zeros_like(param_all[level], requires_grad= True).to(self.device)   # Reset
+        param_all[level] = torch.zeros_like(param_all[level], requires_grad= True).to(device)   # Reset
         optim = optimizer([param_all[level]], lr=lr)
         optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
     else:
@@ -207,7 +207,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status):    
         for task_batch in dataloader:
             for _ in range(for_iter):
                 if level == 0:
-                    task_batch = task_batch.to(self.device)
+                    task_batch = task_batch.to(device)
 
                 loss = model(task_batch, level, status=status)[0]     # Loss to be optimized
 
