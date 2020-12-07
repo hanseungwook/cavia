@@ -63,7 +63,7 @@ date
 ###  cancel jobs using command 'scancel <jobnum>'
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err 
 
-python3 ../main_huh.py \
+python3 main_huh.py \
 --log_interval=50 --log_name=cifar10_2level_ctx100_28_tasks7_3_lr0.001 \
 --k_batch_train 100 6000 7  --k_batch_test 0 1000 3 --n_batch_train 100 15 3  --n_batch_test 0 15 1 \
 --architecture 2 128 128 128 128 128 3 --n_iters 5 3 10000 --for_iters 5 3 1 \
