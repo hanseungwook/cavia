@@ -123,9 +123,11 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
 
 
 class Hierarchical_Task(object):
-    def __init__(self, task, batch): 
+    def __init__(self, task, batch, args, logger): 
         self.task = task
         self.batch = batch
+        self.args = args
+        self.logger = logger
         self.batch_next = batch[:-1]
         self.level = len(batch) - 1
         self.loader = self.get_dataloader(batch[-1])
@@ -136,24 +138,34 @@ class Hierarchical_Task(object):
     def __len__(self):
         return len(self.loader)
 
-    def sample_new_task(self, task, batch):
-        self.loader = self.get_dataloader(batch[-1], task[0].envs)
+    def __str__(self):
+        if self.level >= 1:
+            for task in self.tasks:
+                self.logger.log[self.args.log_name].info("Level {}: {}".format(self.level, task))
+        if self.level >= 2:
+            for loader in self.loader[0]:
+                print(loader)
+        return ""
+
+    def sample_new_tasks(self, task, batch):
+        self.loader = self.get_dataloader(batch[-1], task[0].tasks)
+        self.logger.log[self.args.log_name].info("Hierarchical task:")
+        print(self)
 
     def get_dataloader(self, batch_size, tasks=None):
         if self.level == 0:
-            return [self.task]  # Format: List of [env, task]
+            self.tasks = [self.task]
+            return self.tasks  # Returns: [(env, task)]
         else:
             if tasks is None:
-                tasks = get_samples(self.task, batch_size, self.level)
-            if self.level == 2:
-                self.envs = tasks
-            subtask_list = [self.__class__(task, self.batch_next) for task in tasks]
+                self.tasks = get_samples(self.task, batch_size, self.level)
+            subtask_list = [
+                self.__class__(task, self.batch_next, self.args, self.logger) 
+                for task in self.tasks]
             return [subtask_list]
-            # subtask_dataset = Meta_Dataset(data=subtask_list)
-            # return Meta_DataLoader(subtask_dataset, batch_size=batch_size)
 
 
-def get_hierarchical_task(args):
+def get_hierarchical_task(args, logger):
     if args.task == "empty":
         highest_tasks = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Empty-5x5-v0"]
     elif args.task == "unlock":
@@ -163,6 +175,7 @@ def get_hierarchical_task(args):
     else:
         raise ValueError("Invalid task option")
 
-    hierarchical_task = Hierarchical_Task(highest_tasks, args.batch)
+    hierarchical_task = Hierarchical_Task(highest_tasks, args.batch, args, logger)
+    logger.log[args.log_name].info("Hierarchical task:")
+    print(hierarchical_task)
     return [hierarchical_task]
-    # return Meta_Dataset(data=[hierarchical_task])

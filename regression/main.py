@@ -24,11 +24,15 @@ if __name__ == '__main__':
         args=args, 
         logger=logger)
 
+    # Get hierarchical task
+    task = get_hierarchical_task(args, logger)
+
     # Start train
-    task = get_hierarchical_task(args)
     while True:
         # Train one outer-loop
         model(task, optimizer=Adam, reset=False, is_outer=False)
 
         # Get new task
-        task[0].sample_new_task(task, args.batch)
+        task[0].sample_new_tasks(task, args.batch)
+        import sys
+        sys.exit()
