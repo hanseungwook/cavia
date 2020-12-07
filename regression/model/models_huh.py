@@ -34,11 +34,11 @@ def get_model_type(model_type):
 # def const_ctx(n):
 #      return torch.empty(1,n)
 
-def make_ctx(n):
+def make_ctx(n, device):
     # if DOUBLE_precision:
     #     return torch.zeros(1,n, requires_grad=True).double()
     # else:
-        return torch.zeros(1,n, requires_grad=True)
+        return torch.zeros(1,n, requires_grad=True, device=device)
 
 
 #######################
@@ -76,9 +76,9 @@ class BaseModel(nn.Module):
 
         self.module_list = nn.ModuleList()
         for i in range(len(n_arch) - 1):
-            self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]))    # Fully connected layers
+            self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]).to(device))    # Fully connected layers
 
-        self.parameters_all = [make_ctx(n) for n in n_contexts] + [self.module_list.parameters]
+        self.parameters_all = [make_ctx(n, device) for n in n_contexts] + [self.module_list.parameters]
 
         self.device = device if device is not None else 'cpu'
         self.n_contexts = n_contexts #sum(n_context)  # Concatenate all high-level ctx into one. 
