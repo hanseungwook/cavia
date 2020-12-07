@@ -82,8 +82,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                           'for_iters' : for_iters, 
                           'lrs'       : lrs,
                           'loggers'   : loggers,
-                          'test_loggers': test_loggers,
-                          'device': device
+                          'test_loggers': test_loggers
                           }
         self.device     = decoder_model.device
 
