@@ -217,7 +217,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
                 ## loss.backward() & optim.step()
                 if reset:
                     new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
-                    param_all[level] = new_param
+                    param_all[level] = new_param.to(device)
                     
                 else:
                     optim.zero_grad()
