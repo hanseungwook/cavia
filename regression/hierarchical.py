@@ -206,8 +206,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
         for task_batch in dataloader:
             for _ in range(for_iter):
                 if level == 0:
-                    inputs, targets = task_batch
-                    task_batch = [inputs.to(device), targets.to(device)]
+                    task_batch = task_batch.to(device)
 
                 loss = model(task_batch, level, status=status)[0]     # Loss to be optimized
 
