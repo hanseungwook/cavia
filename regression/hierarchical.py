@@ -108,6 +108,8 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         # assert level == task_batch[0].level + 1                 # check if the level matches with task level        # print('level', level , task_batch[0].level  )
 
         if level == 0:
+            inputs, targets = task_batch
+            task_batch = [inputs.to(self.device), targets.to(self.device)]
             return self.decoder_model(task_batch)
         else:
             test_loss,  test_count = 0, 0
@@ -205,9 +207,9 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
     while True:
         for task_batch in dataloader:
             for _ in range(for_iter):
-                if level == 0:
-                    inputs, targets = task_batch
-                    task_batch = [inputs.to(device), targets.to(device)]
+                # if level == 0:
+                #     inputs, targets = task_batch
+                #     task_batch = [inputs.to(device), targets.to(device)]
 
                 loss = model(task_batch, level, status=status)[0]     # Loss to be optimized
 
@@ -217,7 +219,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
                 ## loss.backward() & optim.step()
                 if reset:
                     new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
-                    param_all[level] = new_param.to(device)
+                    param_all[level] = new_param
                     
                 else:
                     optim.zero_grad()
