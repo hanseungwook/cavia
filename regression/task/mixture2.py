@@ -35,7 +35,7 @@ def get_celeba_img(sample_type):
     img_files = None
 
     if not (train_imgs and valid_imgs and test_imgs):
-        load_celeba_img_list('/Users/seungwook.han@ibm.com/Documents/Projects/data/Celeba/Img/img_align_celeba', '/Users/seungwook.han@ibm.com/Documents/Projects/data/Celeba/Eval/list_eval_partition.txt')
+        load_celeba_img_list('/nobackup/users/swhan/data/Celeba/Img/img_align_celeba', '/nobackup/users/swhan/data/Celeba/Eval/list_eval_partition.txt')
         
     # Read from global variables
     if sample_type == 'train':
@@ -66,7 +66,7 @@ def get_cifar10_img(sample_type, label):
 
     if not (train_imgs and test_imgs):
         ### TODO: download & re-organize functions
-        load_cifar10_imgs('/Users/seungwook.han@ibm.com/Documents/Projects/data/cifar-10-batches-py')
+        load_cifar10_imgs('/nobackup/users/swhan/data/cifar-10-batches-py')
         
     # Read from global variables
     if sample_type == 'train':
