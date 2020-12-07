@@ -8,13 +8,12 @@ from misc.multiprocessing_env import SubprocVecEnv
 iteration = 0
 
 
-def make_env(args, env_name=None, task=None):
+def make_env(args, env=None, task=None):
     # Set dummy task
-    if env_name is None:
-        env_name = "MiniGrid-Empty-5x5-v0"
+    if env is None:
+        env = gym.make("MiniGrid-Empty-5x5-v0")
 
     def _make_env():
-        env = gym.make(env_name)
         env.max_steps = args.ep_max_timestep
         env.reset_task(task=task)
         return VectorObsWrapper(env)        
@@ -23,14 +22,14 @@ def make_env(args, env_name=None, task=None):
 
 def collect_trajectory(task, base_model, args, logger):
     global iteration
-    assert len(task) == 2, "Format should be (env_name, task)"
+    assert len(task) == 2, "Format should be (env, task)"
 
     # Initialize memory
     memory = ReplayMemory()
 
     # Set environment
-    # TODO Avoid hard-coding
-    env = SubprocVecEnv([make_env(args, env_name=task[0], task=task[1]) for _ in range(20)])
+    print("Collecting traj with task {}".format(task[1]))
+    env = SubprocVecEnv([make_env(args, env=task[0], task=task[1]) for _ in range(args.batch[0])])
 
     obs = env.reset()
 

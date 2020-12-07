@@ -2,19 +2,18 @@ import higher
 import torch
 import torch.nn as nn
 from torch.optim import SGD
-from dataset import Meta_Dataset, Meta_DataLoader, get_samples  
+from dataset import get_samples
 from misc.rl_utils import get_inner_loss
 from misc.status_monitor import StatusMonitor
 from misc.meta_memory import MetaMemory
 
 
 class Hierarchical_Model(nn.Module):
-    def __init__(self, base_model, args=None, task=None, logger=None):
+    def __init__(self, base_model, args=None, logger=None):
         super().__init__()
 
         self.base_model = base_model 
         self.args = args
-        self.task = task
         self.logger = logger
         self.level_max = len(base_model.parameters_all)
 
@@ -35,15 +34,16 @@ class Hierarchical_Model(nn.Module):
             return get_inner_loss(self.base_model, task_batch, self.args, self.logger)
         else:
             test_loss, outputs = 0, []
-            for i_task, task in enumerate(task_batch): 
+            for i_task, task in enumerate(task_batch):
                 self.status.update("i_task", level - 1, i_task)
 
                 # Apply optimization
                 optimize(
-                    self, task.loader['train'], level - 1, self.args, 
+                    self, task.loader, level - 1, self.args, 
                     optimizer=optimizer, reset=reset, 
                     status=self.status, meta_memory=self.meta_memory, is_outer=is_outer)
-                test_batch = next(iter(task.loader['test']))
+                # test_batch = next(iter(task.loader['test']))
+                test_batch = next(iter(task.loader))
                 loss, output = self(test_batch, level=level - 1, is_outer=is_outer)
 
                 # Add to meta-memory
@@ -71,7 +71,7 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
 
     iteration = 0
     while True:
-        for i_task_batch, task_batch in enumerate(dataloader):
+        for task_batch in dataloader:
             # Update status
             if is_outer and level == 2:
                 pass
@@ -98,8 +98,6 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
                 optim.step()
 
                 # For logging
-                print("key:", status.key(), iteration)
-
                 before_key = status.get_key_by_id([0, 0, iteration], [0, 0, 0])
                 before_memory = meta_memory.get(before_key)
                 model.logger.tb_writer.add_scalars("debug/reward0", {"before": before_memory.get_reward()}, iteration)
@@ -119,40 +117,52 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
                 # For next outer-loop
                 meta_memory.clear()
 
+                return
+
             iteration += 1   
 
 
 class Hierarchical_Task(object):
-    def __init__(self, task, batch_dict): 
+    def __init__(self, task, batch): 
         self.task = task
-        self.batch_dict = batch_dict
-        self.batch_dict_next = batch_dict[:-1]
-        self.level = len(self.batch_dict) - 1
-        self.loader = self.get_dataloader_dict()
+        self.batch = batch
+        self.batch_next = batch[:-1]
+        self.level = len(batch) - 1
+        self.loader = self.get_dataloader(batch[-1])
 
-    def get_dataloader_dict(self):
-        return {
-            'train': self.get_dataloader(self.batch_dict[-1]['train'], sample_type='train'), 
-            'test': self.get_dataloader(self.batch_dict[-1]['test'], sample_type='test')}
+    def __iter__(self):
+        return iter(self.loader)
 
-    def get_dataloader(self, batch_size, sample_type):
+    def __len__(self):
+        return len(self.loader)
+
+    def sample_new_task(self, task, batch):
+        self.loader = self.get_dataloader(batch[-1], task[0].envs)
+
+    def get_dataloader(self, batch_size, tasks=None):
         if self.level == 0:
-            return [self.task]  # Format: List of [env_name, task]
+            return [self.task]  # Format: List of [env, task]
         else:
-            tasks = get_samples(self.task, batch_size, sample_type)
-            subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]
-            subtask_dataset = Meta_Dataset(data=subtask_list)
-            return Meta_DataLoader(subtask_dataset, batch_size=batch_size)
+            if tasks is None:
+                tasks = get_samples(self.task, batch_size, self.level)
+            if self.level == 2:
+                self.envs = tasks
+            subtask_list = [self.__class__(task, self.batch_next) for task in tasks]
+            return [subtask_list]
+            # subtask_dataset = Meta_Dataset(data=subtask_list)
+            # return Meta_DataLoader(subtask_dataset, batch_size=batch_size)
 
 
-def get_hierarchical_task(batch_dict, args):
+def get_hierarchical_task(args):
     if args.task == "empty":
-        task_func_list = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Empty-5x5-v0"]
+        highest_tasks = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Empty-5x5-v0"]
     elif args.task == "unlock":
-        task_func_list = ["MiniGrid-Unlock-Easy-v0", "MiniGrid-Unlock-Easy-v0"]
+        highest_tasks = ["MiniGrid-Unlock-Easy-v0", "MiniGrid-Unlock-Easy-v0"]
     elif args.task == "mixture":
-        task_func_list = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Unlock-Easy-v0"]
+        highest_tasks = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Unlock-Easy-v0"]
     else:
         raise ValueError("Invalid task option")
-    task = Hierarchical_Task(task_func_list, batch_dict)
-    return Meta_Dataset(data=[task])
+
+    hierarchical_task = Hierarchical_Task(highest_tasks, args.batch)
+    return [hierarchical_task]
+    # return Meta_Dataset(data=[hierarchical_task])

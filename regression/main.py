@@ -1,7 +1,7 @@
 import os
 import arguments
 from hierarchical import Hierarchical_Model, get_hierarchical_task
-from misc.utils import set_seed, Logger, make_batch_dict, get_base_model
+from misc.utils import set_seed, Logger, get_base_model
 from torch.optim import Adam
 
 
@@ -17,17 +17,18 @@ if __name__ == '__main__':
         os.makedirs("./log")
     logger = Logger(args=args)
 
-    # Get hierarchical task
-    batch_dict = make_batch_dict(args.batch)
-    task = get_hierarchical_task(batch_dict, args)
-
     # set hierarchical model
     base_model = get_base_model(args, logger)
     model = Hierarchical_Model(
         base_model=base_model, 
         args=args, 
-        task=task,
         logger=logger)
 
     # Start train
-    model(task, optimizer=Adam, reset=False, is_outer=False)
+    task = get_hierarchical_task(args)
+    while True:
+        # Train one outer-loop
+        model(task, optimizer=Adam, reset=False, is_outer=False)
+
+        # Get new task
+        task[0].sample_new_task(task, args.batch)

@@ -1,5 +1,4 @@
 import gym
-import random
 from torch.utils.data import Dataset
 from torch.utils.data.sampler import RandomSampler, BatchSampler
 
@@ -7,19 +6,12 @@ from torch.utils.data.sampler import RandomSampler, BatchSampler
 class Meta_Dataset(Dataset):
     def __init__(self, data, target=None):
         self.data = data
-        self.target = target
-        if target is not None:
-            assert len(data) == len(target)
-            # self.target = target
 
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, idx):
-        if self.target is None:
-            return self.data[idx]
-        else: 
-            return self.data[idx], self.target[idx]
+        return self.data[idx]
 
 
 class Meta_DataLoader(object):
@@ -36,17 +28,13 @@ class Meta_DataLoader(object):
         for mini_batch_idx in batch_idx:
             mini_batch = [self.dataset[idx] for idx in mini_batch_idx]
             mini_dataset.append(mini_batch)
-
         return iter(mini_dataset)
-        # return mini_dataset
 
 
-def get_samples(task, total_batch, sample_type):
+def get_samples(task, batch_size, level):
     if isinstance(task, list):
-        assert total_batch <= len(task)
-        tasks = random.sample(task, total_batch)
+        tasks = [gym.make(env_name) for env_name in task]
     else:
-        env = gym.make(task)
-        lower_tasks = env.sample_tasks(num_tasks=total_batch)
+        lower_tasks = task.sample_tasks(num_tasks=batch_size)
         tasks = [(task, lower_task) for lower_task in lower_tasks]
     return tasks
