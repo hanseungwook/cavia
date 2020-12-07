@@ -195,7 +195,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
 
     ## Initialize param & optim
     if reset:
-        param_all[level] = torch.zeros_like(param_all[level], requires_grad= True).to(device)   # Reset
+        param_all[level] = torch.zeros_like(param_all[level], requires_grad=True, device=device)   # Reset
         optim = optimizer([param_all[level]], lr=lr)
         optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
     else:
