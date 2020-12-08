@@ -14,6 +14,7 @@ import IPython
 
 
 img_root = None
+task = ''
 train_imgs = []
 valid_imgs = []
 test_imgs = []
@@ -32,9 +33,12 @@ def regression_input_function(batch_size, full=False):
     return torch.randn(batch_size, 1)
 
 def get_celeba_img(sample_type):
+    global task
     img_files = None
 
-    load_celeba_img_list('/nobackup/users/swhan/data/Celeba/Img/img_align_celeba', '/nobackup/users/swhan/data/Celeba/Eval/list_eval_partition.txt')
+    if not (train_imgs and valid_imgs and test_imgs) or task is not 'celeba':
+        load_celeba_img_list('/nobackup/users/swhan/data/Celeba/Img/img_align_celeba', '/nobackup/users/swhan/data/Celeba/Eval/list_eval_partition.txt')
+        task = 'celeba'
         
     # Read from global variables
     if sample_type == 'train':
@@ -61,9 +65,13 @@ def get_celeba_img(sample_type):
     return img
 
 def get_cifar10_img(sample_type, label):
+    global task
     imgs = None
 
-    load_cifar10_imgs('/nobackup/users/swhan/data/cifar-10-batches-py')
+    if not (train_imgs and test_imgs) or task is not 'cifar10':
+        ### TODO: download & re-organize functions
+        load_cifar10_imgs('/nobackup/users/swhan/data/cifar-10-batches-py')
+        task = 'cifar10'
         
     # Read from global variables
     if sample_type == 'train':
