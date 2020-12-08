@@ -7,6 +7,8 @@ from misc.rl_utils import get_inner_loss
 from misc.status_monitor import StatusMonitor
 from misc.meta_memory import MetaMemory
 
+train_iteration = 0
+
 
 class Hierarchical_Model(nn.Module):
     def __init__(self, base_model, args=None, logger=None):
@@ -53,6 +55,7 @@ class Hierarchical_Model(nn.Module):
 
 
 def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memory):
+    global train_iteration
     param_all = model.base_model.parameters_all
 
     if reset:
@@ -90,22 +93,23 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
                 # For logging
                 before_key = status.get_key_by_id([0, 0, iteration], [0, 0, 0])
                 before_memory = meta_memory.get(before_key)
-                model.logger.tb_writer.add_scalars("debug/reward0", {"before": before_memory.get_reward()}, iteration)
+                model.logger.tb_writer.add_scalars("debug/reward0", {"before": before_memory.get_reward()}, train_iteration)
 
                 after_key = status.get_key_by_id([2, 2, iteration], [0, 0, 0])
                 after_memory = meta_memory.get(after_key)
-                model.logger.tb_writer.add_scalars("debug/reward0", {"after": after_memory.get_reward()}, iteration)
+                model.logger.tb_writer.add_scalars("debug/reward0", {"after": after_memory.get_reward()}, train_iteration)
 
                 before_key = status.get_key_by_id([0, 0, iteration], [0, 1, 0])
                 before_memory = meta_memory.get(before_key)
-                model.logger.tb_writer.add_scalars("debug/reward1", {"before": before_memory.get_reward()}, iteration)
+                model.logger.tb_writer.add_scalars("debug/reward1", {"before": before_memory.get_reward()}, train_iteration)
 
                 after_key = status.get_key_by_id([2, 2, iteration], [0, 1, 0])
                 after_memory = meta_memory.get(after_key)
-                model.logger.tb_writer.add_scalars("debug/reward1", {"after": after_memory.get_reward()}, iteration)
+                model.logger.tb_writer.add_scalars("debug/reward1", {"after": after_memory.get_reward()}, train_iteration)
 
                 # For next outer-loop
                 meta_memory.clear()
+                train_iteration += 1
                 return
 
             iteration += 1   
