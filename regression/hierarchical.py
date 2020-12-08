@@ -53,6 +53,7 @@ def make_tasks(task_names):
             task_func_dict['test'] = [partial(sample_cifar10_img_fnc, l) for l in range(7,10)]
         elif task == 'celeba_airplane':
             task_func_dict['train'] = [partial(sample_cifar10_img_fnc, 0), sample_celeba_img_fnc]
+            task_func_dict['test'] = [partial(sample_cifar10_img_fnc, 0), sample_celeba_img_fnc]            
 
             # for l in range(1):
             #     task_func_list.append(partial(sample_cifar10_img_fnc, l))
