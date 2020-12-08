@@ -20,13 +20,7 @@ class Hierarchical_Model(nn.Module):
         self.status = StatusMonitor(self.level_max)
         self.meta_memory = MetaMemory(args, logger)
 
-    def forward(self, task_batch, level=None, optimizer=SGD, reset=True, is_outer=False):
-        """
-        Args:
-            is_outer (bool): Indicates whether forward is currently at the inner-loop process or
-            the outer-loop process. Only needed for TRPO optimization due to adadptation. 
-            Default: True.
-        """
+    def forward(self, task_batch, level=None, optimizer=SGD, reset=True):
         if level is None:
             level = self.level_max
             
@@ -41,13 +35,14 @@ class Hierarchical_Model(nn.Module):
                 optimize(
                     self, task.loader, level - 1, self.args, 
                     optimizer=optimizer, reset=reset, 
-                    status=self.status, meta_memory=self.meta_memory, is_outer=is_outer)
-                # test_batch = next(iter(task.loader['test']))
+                    status=self.status, meta_memory=self.meta_memory)
+                if level == 3:
+                    return
                 test_batch = next(iter(task.loader))
-                loss, output = self(test_batch, level=level - 1, is_outer=is_outer)
+                loss, output = self(test_batch, level=level - 1)
 
                 # Add to meta-memory
-                if not isinstance(output, list) and is_outer is False:
+                if not isinstance(output, list):
                     self.meta_memory.add(output, key=self.status.key())
 
                 # For next task
@@ -57,7 +52,7 @@ class Hierarchical_Model(nn.Module):
             return test_loss / float(len(task_batch)), outputs
 
 
-def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memory, is_outer):
+def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memory):
     param_all = model.base_model.parameters_all
 
     if reset:
@@ -73,26 +68,21 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
     while True:
         for task_batch in dataloader:
             # Update status
-            if is_outer and level == 2:
-                pass
-            else:
+            if reset:
                 status.update("iteration", level, iteration)
 
             # Train/optimize up to max_iter # of batches
-            if iteration >= args.max_iters[level]:
+            if iteration >= args.max_iters[level] and reset:
                 return
 
-            loss, outputs = model(task_batch, is_outer=is_outer, level=level)
-            if not isinstance(outputs, list) and is_outer is False:
+            loss, outputs = model(task_batch, level=level)
+            if not isinstance(outputs, list):
                 meta_memory.add(outputs, key=status.key())
 
             if reset:
                 new_param, = optim.step(loss, params=[param_all[level]])
                 param_all[level] = new_param
             else:
-                if is_outer:
-                    return
-
                 optim.zero_grad()
                 loss.backward()
                 optim.step()
@@ -116,7 +106,6 @@ def optimize(model, dataloader, level, args, optimizer, reset, status, meta_memo
 
                 # For next outer-loop
                 meta_memory.clear()
-
                 return
 
             iteration += 1   

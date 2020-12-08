@@ -30,9 +30,7 @@ if __name__ == '__main__':
     # Start train
     while True:
         # Train one outer-loop
-        model(task, optimizer=Adam, reset=False, is_outer=False)
+        model(task, optimizer=Adam, reset=False)
 
         # Get new task
         task[0].sample_new_tasks(task, args.batch)
-        import sys
-        sys.exit()
