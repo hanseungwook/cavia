@@ -189,10 +189,10 @@ class Hierarchical_Task():
 
 
         else:
-            tasks = get_samples(self.task, total_batchsize, sample_type, str(self.task))
+            tasks = get_samples(self.task, total_batchsize, sample_type)
             subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]  # recursive
             subtask_dataset = Meta_Dataset(data=subtask_list)
-            return Meta_DataLoader(subtask_dataset, batch_size=mini_batchsize)            #   returns a mini-batch of Hiearchical Tasks[
+            return Meta_DataLoader(subtask_dataset, batch_size=mini_batchsize, str(self.task))            #   returns a mini-batch of Hiearchical Tasks[
 
 
 ####################################    
