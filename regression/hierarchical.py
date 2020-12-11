@@ -123,7 +123,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                 Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset=reset, status=status+'train', device=self.device)
                 test_batch = next(iter(task.loader['test']))
                 l, outputs = self(test_batch, level-1, return_outputs=return_outputs, status=status+'test')      # test only 1 minibatch
-                self.args_dict['test_loggers'][level-1].update(l) # Update test logger for respective level
+                self.args_dict['test_loggers'][level-1].log_loss(l) # Update test logger for respective level
                 test_loss  += l
                 test_count += 1
                 
