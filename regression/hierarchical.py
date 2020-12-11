@@ -238,7 +238,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
                     logger.log_loss(loss.detach().cpu().numpy())
 
     if level == 1:
-        logger.log_ctx(dataloader.task_name, param_all[level].detach(0.cpu().numpy))            
+        logger.log_ctx(dataloader.task_name, param_all[level].detach().cpu().numpy())            
 
             # return cur_iter  # completed  the batch
 
