@@ -37,7 +37,7 @@ class Logger():
         self.no_print = no_print
         self.iter = 0
 
-    def update(self, loss):
+    def log_loss(self, loss):
         if not (self.iter % self.update_iter):
             # print(iter, self.update_iter)
             if not self.no_print:
@@ -46,6 +46,9 @@ class Logger():
             self.tb_writer.add_scalar("Meta loss:", loss, self.iter)
         
         self.iter += 1
+    
+    def log_ctx(self, task_name, ctx):
+        self.tb_writer.add_histogram("Context {}:".format(task_name), ctx, self.iter)
         
 
 

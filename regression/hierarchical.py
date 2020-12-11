@@ -189,7 +189,7 @@ class Hierarchical_Task():
 
 
         else:
-            tasks = get_samples(self.task, total_batchsize, sample_type)
+            tasks = get_samples(self.task, total_batchsize, sample_type, self.task.__name__)
             subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]  # recursive
             subtask_dataset = Meta_Dataset(data=subtask_list)
             return Meta_DataLoader(subtask_dataset, batch_size=mini_batchsize)            #   returns a mini-batch of Hiearchical Tasks[
@@ -235,7 +235,10 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
 
                 # ------------ logging ------------
                 if logger is not None:
-                    logger.update(loss.detach().cpu().numpy())
+                    logger.log_loss(loss.detach().cpu().numpy())
+
+    if level == 1:
+        logger.log_ctx(dataloader.task_name, param_all[level].detach(0.cpu().numpy))            
 
             # return cur_iter  # completed  the batch
 

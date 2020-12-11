@@ -47,9 +47,10 @@ class Meta_Dataset(Dataset):
 
 
 class Meta_DataLoader():
-    def __init__(self, dataset, batch_size):
+    def __init__(self, dataset, batch_size, task_name):
         self.dataset = dataset
         self.batch_size = batch_size
+        self.task_name = task_name
 
     def __iter__(self):
         # Create indices of batches
