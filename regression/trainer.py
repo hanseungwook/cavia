@@ -38,6 +38,16 @@ def train(base_model, hierarchical_task, args, logger):
         # Reset tasks
         hierarchical_task.reset()
 
+        # Log initial reward
+        rewards = []
+        ctx = torch.zeros(1, args.n_contexts[0], requires_grad=False)
+        meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False)
+        for task in hierarchical_task.get_tasks():
+            _, memory = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
+            rewards.append(memory.get_reward())
+        reward = sum(rewards) / float(len(rewards))
+        logger.tb_writer.add_scalars("reward", {"before": reward}, train_iteration)
+
         # First, adapt 0-level context
         ctxs = []
         for task in hierarchical_task.get_tasks():
@@ -59,16 +69,16 @@ def train(base_model, hierarchical_task, args, logger):
             ctxs.append(ctx)
 
         # Compute test loss and update base network
-        test_losses = []
+        rewards, test_losses = [], []
         for i_task, task in enumerate(hierarchical_task.get_tasks()):
             ctx = ctxs[i_task]
             meta_ctx = meta_ctxs[0] if i_task < args.batch[1] else meta_ctxs[1]
             test_loss, memory = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
             test_losses.append(test_loss)
+            rewards.append(memory.get_reward())
 
-            if i_task == 0:
-                reward = memory.get_reward()
-                logger.tb_writer.add_scalars("reward", {"after": reward}, train_iteration)
+        reward = sum(rewards) / float(len(rewards))
+        logger.tb_writer.add_scalars("reward", {"after": reward}, train_iteration)
 
         test_loss = sum(test_losses) / float(len(test_losses))
         base_model.optimizer.zero_grad()
