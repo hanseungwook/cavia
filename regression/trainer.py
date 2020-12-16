@@ -9,7 +9,7 @@ def adapt(base_model, task, args, logger, meta_ctx=None):
         meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False)
 
     for _ in range(args.max_iters[0]):
-        loss = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
+        loss, _ = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
         grad = torch.autograd.grad(loss, [ctx], create_graph=True)[0]
         ctx = ctx - args.lrs[0] * grad
 
@@ -23,7 +23,7 @@ def meta_adapt(base_model, meta_task, args, logger, ctxs):
     for _ in range(args.max_iters[1]):
         losses = []
         for task, ctx in zip(meta_task, ctxs):
-            loss = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
+            loss, _ = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
             losses.append(loss)
         loss = sum(losses) / float(len(losses))
         grad = torch.autograd.grad(loss, [meta_ctx], create_graph=True)[0]
@@ -34,7 +34,7 @@ def meta_adapt(base_model, meta_task, args, logger, ctxs):
 
 def train(base_model, hierarchical_task, args, logger):
     # Initialize context parameters
-    while True:
+    for train_iteration in range(int(1e6)):
         # Reset tasks
         hierarchical_task.reset()
 
@@ -63,8 +63,12 @@ def train(base_model, hierarchical_task, args, logger):
         for i_task, task in enumerate(hierarchical_task.get_tasks()):
             ctx = ctxs[i_task]
             meta_ctx = meta_ctxs[0] if i_task < args.batch[1] else meta_ctxs[1]
-            test_loss = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
+            test_loss, memory = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
             test_losses.append(test_loss)
+
+            if i_task == 0:
+                reward = memory.get_reward()
+                logger.tb_writer.add_scalars("reward", {"after": reward}, train_iteration)
 
         test_loss = sum(test_losses) / float(len(test_losses))
         base_model.optimizer.zero_grad()

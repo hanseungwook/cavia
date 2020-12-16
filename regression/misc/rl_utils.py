@@ -70,4 +70,4 @@ def get_inner_loss(base_model, task, ctx, args, logger):
     return_ = get_return(reward, mask)
     loss = torch.mean(torch.sum(logprob * (return_ - value), dim=1))
 
-    return -loss
+    return -loss, memory
