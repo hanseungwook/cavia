@@ -14,6 +14,7 @@ class CAVIA(nn.Module):
         self.module_list = nn.ModuleList()
         for i_layer in range(len(args.network_arch) - 1):
             self.module_list.append(nn.Linear(args.network_arch[i_layer], args.network_arch[i_layer + 1]))
+        self.optimizer = torch.optim.Adam(self.module_list.parameters(), lr=0.001)
 
     def forward(self, x, ctx):
         if isinstance(x, np.ndarray):

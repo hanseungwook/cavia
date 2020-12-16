@@ -25,7 +25,7 @@ def collect_trajectory(base_model, task, ctx, args, logger):
     memory = ReplayMemory()
 
     # Set environment
-    logger.log[args.log_name].info("Collecting traj with task {}".format(task[1]))
+    logger.log[args.log_name].info("Collecting traj with task {}, {}".format(task[0], task[1]))
     env = SubprocVecEnv([make_env(args, env=task[0], task=task[1]) for _ in range(args.batch[0])])
 
     # Collect trajectory
@@ -50,6 +50,8 @@ def collect_trajectory(base_model, task, ctx, args, logger):
 
         # For next timestep
         obs = next_obs
+
+    env.close()
 
     return memory
 
