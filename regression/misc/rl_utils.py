@@ -5,8 +5,6 @@ from misc.linear_baseline import LinearFeatureBaseline, get_return
 from misc.replay_memory import ReplayMemory
 from misc.multiprocessing_env import SubprocVecEnv
 
-iteration = 0
-
 
 def make_env(args, env=None, task=None):
     # Set dummy task
@@ -16,26 +14,25 @@ def make_env(args, env=None, task=None):
     def _make_env():
         env.max_steps = args.ep_max_timestep
         env.reset_task(task=task)
-        return VectorObsWrapper(env)        
+        return VectorObsWrapper(env)
     return _make_env
 
 
-def collect_trajectory(task, base_model, args, logger):
-    global iteration
+def collect_trajectory(base_model, task, ctx, args, logger):
     assert len(task) == 2, "Format should be (env, task)"
 
     # Initialize memory
     memory = ReplayMemory()
 
     # Set environment
-    print("Collecting traj with task {}".format(task[1]))
+    logger.log[args.log_name].info("Collecting traj with task {}".format(task[1]))
     env = SubprocVecEnv([make_env(args, env=task[0], task=task[1]) for _ in range(args.batch[0])])
 
+    # Collect trajectory
     obs = env.reset()
-
     for timestep in range(args.ep_max_timestep):
         # Get action and logprob
-        categorical = base_model(obs)
+        categorical = base_model(obs, ctx)
         action = categorical.sample()
         logprob = categorical.log_prob(action)
 
@@ -45,24 +42,20 @@ def collect_trajectory(task, base_model, args, logger):
 
         # Add to memory
         memory.add(
-            obs=obs, 
-            action=torch.from_numpy(action), 
-            logprob=logprob, 
+            obs=obs,
+            action=torch.from_numpy(action),
+            logprob=logprob,
             reward=reward,
             done=done)
 
         # For next timestep
         obs = next_obs
 
-    env.close()
-
-    iteration += 1
-
     return memory
 
 
-def get_inner_loss(base_model, task, args, logger):
-    memory = collect_trajectory(task, base_model, args, logger)
+def get_inner_loss(base_model, task, ctx, args, logger):
+    memory = collect_trajectory(base_model, task, ctx, args, logger)
     obs, action, logprob, reward, mask = memory.sample()
     logprob = torch.stack(logprob, dim=1)
 
@@ -75,4 +68,4 @@ def get_inner_loss(base_model, task, args, logger):
     return_ = get_return(reward, mask)
     loss = torch.mean(torch.sum(logprob * (return_ - value), dim=1))
 
-    return -loss, memory
+    return -loss

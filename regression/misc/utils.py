@@ -3,7 +3,7 @@ import random
 import torch
 import numpy as np
 from tensorboardX import SummaryWriter
-from model import get_model_type
+from model.cavia import CAVIA
 from misc.rl_utils import make_env
 
 
@@ -53,19 +53,19 @@ def set_seed(seed, cudnn=True):
 
 
 def get_base_model(args, logger):
-    model_type = get_model_type(args.model_type, is_rl=True)
-    logger.log[args.log_name].info("Selecting base_model: {}".format(model_type))
-
     # Overwrite last layer of the architecture according to the action space of the environment
     # Note that we put a default env and task only to get the action space of the environment
     env = make_env(args=args)()
     input_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
-    args.architecture[0] = input_dim
-    args.architecture[-1] = action_dim
+    args.network_arch[0] = input_dim
+    args.network_arch[-1] = action_dim
     env.close()
 
-    model = model_type(n_arch=args.architecture, n_contexts=args.n_contexts, device=args.device).to(args.device)
-    logger.log[args.log_name].info("Model: {}".format(model))
+    # Overwrite input layer of the architecture with number of context parameters
+    args.network_arch[0] += sum(args.n_contexts)
 
-    return model
+    # Return base_model
+    base_model = CAVIA(args, logger)
+    logger.log[args.log_name].info("Model: {}".format(base_model.module_list))
+    return base_model
