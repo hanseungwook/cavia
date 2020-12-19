@@ -13,7 +13,7 @@ def adapt(base_model, task, args, logger, meta_ctx=None):
         grad = torch.autograd.grad(loss, [ctx], create_graph=True)[0]
         ctx = ctx - args.lrs[0] * grad
 
-    return ctx.detach()
+    return ctx
 
 
 def meta_adapt(base_model, meta_task, args, logger, ctxs):
@@ -29,7 +29,7 @@ def meta_adapt(base_model, meta_task, args, logger, ctxs):
         grad = torch.autograd.grad(loss, [meta_ctx], create_graph=True)[0]
         meta_ctx = meta_ctx - args.lrs[1] * grad
 
-    return meta_ctx.detach()
+    return meta_ctx
 
 
 def train(base_model, hierarchical_task, args, logger):

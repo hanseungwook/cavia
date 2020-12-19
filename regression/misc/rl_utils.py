@@ -1,6 +1,6 @@
-import torch
 import gym
-from gym_minigrid.wrappers import VectorObsWrapper
+import torch
+import numpy as np
 from misc.linear_baseline import LinearFeatureBaseline, get_return
 from misc.replay_memory import ReplayMemory
 from misc.multiprocessing_env import SubprocVecEnv
@@ -9,12 +9,15 @@ from misc.multiprocessing_env import SubprocVecEnv
 def make_env(args, env=None, task=None):
     # Set dummy task
     if env is None:
-        env = gym.make("MiniGrid-Empty-5x5-v0")
+        env = gym.make("2DNavigation-v0")
+
+    if task is None:
+        task = {"goal": np.array([0, 0])}
 
     def _make_env():
         env.max_steps = args.ep_max_timestep
         env.reset_task(task=task)
-        return VectorObsWrapper(env)
+        return env
     return _make_env
 
 
@@ -35,6 +38,8 @@ def collect_trajectory(base_model, task, ctx, args, logger):
         categorical = base_model(obs, ctx)
         action = categorical.sample()
         logprob = categorical.log_prob(action)
+        if args.is_continuous_action:
+            logprob = torch.sum(logprob, dim=1)
 
         # Take step in the environment
         action = action.cpu().numpy().astype(int)

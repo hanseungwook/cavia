@@ -12,13 +12,13 @@ def parse_args():
         '--network_arch', type=int, nargs='+', default=[1, 40, 40, 1],
         help="Architecture of neural network")
     parser.add_argument(
-        '--lrs', type=float, nargs='+', default=[0.02, 0.02, 0.001],
+        '--lrs', type=float, nargs='+', default=[0.02, 0.02, 0.005],
         help="lr for inner-loop, midloop, outerloop")
     parser.add_argument(
         '--max-iters', type=int, nargs='+', default=[2, 2, 10000],
         help="optim_iter for inner-loop, midloop, outerloop")
     parser.add_argument(
-        '--batch', type=int, nargs='+', default=[25, 5, 2],
+        '--batch', type=int, nargs='+', default=[50, 5, 2],
         help="number of trajectories, tasks (e.g., goal locations), super-tasks (e.g., empty)")
     parser.add_argument(
         '--n_contexts', type=int, nargs='+', default=[5, 5],

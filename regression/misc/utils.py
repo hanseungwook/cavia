@@ -1,6 +1,7 @@
 import logging
 import random
 import torch
+import gym
 import numpy as np
 from tensorboardX import SummaryWriter
 from model.cavia import CAVIA
@@ -57,7 +58,12 @@ def get_base_model(args, logger):
     # Note that we put a default env and task only to get the action space of the environment
     env = make_env(args=args)()
     input_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
+    if isinstance(env.action_space, gym.spaces.box.Box):
+        args.is_continuous_action = True
+        action_dim = env.action_space.shape[0]
+    else:
+        args.is_continuous_action = False
+        action_dim = env.action_space.n
     args.network_arch[0] = input_dim
     args.network_arch[-1] = action_dim
     env.close()

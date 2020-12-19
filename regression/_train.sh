@@ -12,5 +12,4 @@ export CUDA_VISIBLE_DEVICES=-1
 export PYTHONPATH=/home/dongki/research/lids/git/gym-minigrid:$PYTHONPATH
 
 # Begin experiment
-python3 main.py \
---task "empty"
+python3 main.py

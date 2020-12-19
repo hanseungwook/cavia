@@ -1,4 +1,5 @@
 import gym
+import gym_env  # nrqa
 
 
 def get_hierarchical_task(args, logger):
@@ -25,11 +26,7 @@ class Hierarchical_Task(object):
         self._set_lower_tasks()
 
     def _set_higher_tasks(self):
-        if self.args.task == "empty":
-            tasks = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Empty-5x5-v0"]
-        else:
-            raise ValueError("Invalid task option")
-
+        tasks = ["2DNavigation-v0", "2DNavigation-v0"]
         for task in tasks:
             self.tasks[1].append(gym.make(task))
 
