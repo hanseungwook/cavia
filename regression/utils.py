@@ -37,20 +37,27 @@ class Logger():
         self.no_print = no_print
         self.iter = 0
 
-    def log_loss(self, loss):
+    def log_loss(self, loss, level, num_adapt):
         if not (self.iter % self.update_iter):
             # print(iter, self.update_iter)
             if not self.no_print:
                 self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
 
-            self.tb_writer.add_scalar("Meta loss:", loss, self.iter)
+            if level < 2:
+                self.tb_writer.add_scalar("Meta loss/Adapt{}".format(num_adapt), loss, self.iter)
+            
+            self.tb_writer.add_scalar("Meta loss/Total", loss, self.iter)
         
         self.iter += 1
     
     def log_ctx(self, task_name, ctx):
         self.log[self.log_name].info('Logging context at iteration {}'.format(self.iter))
-        self.tb_writer.add_histogram("Context {}:".format(task_name), ctx, self.iter)
-        
+        self.tb_writer.add_histogram("Context {}".format(task_name), ctx, self.iter)
+
+        # Log each context changing separately if size <= 5
+        if ctx.size() <= 5:
+            for i in range(ctx.size()):
+                self.tb_writer.add_scalar("Context {}/{}".format(task_name, i), ctx[i], self.iter)
 
 
 def set_log(args):
