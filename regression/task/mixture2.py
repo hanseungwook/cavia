@@ -20,6 +20,7 @@ valid_imgs = []
 test_imgs = []
 train_classes = []
 test_classes = []
+reg_input_range = [-5, 5]
 img_size = (32, 32, 3)
 seed = 2020
 
@@ -30,7 +31,13 @@ def sample_linear_fnc(sample_type):
     return regression_input_function, get_linear_function(*get_linear_params())
 
 def regression_input_function(batch_size, full=False):
-    return torch.randn(batch_size, 1)
+    # Full inputs over the whole regression input range
+    if batch_size == 0:
+        return torch.linspace(reg_input_range[0], reg_input_range[1], steps=100).unsqueeze(1)
+
+    inputs = torch.randn(batch_size, 1)
+    inputs = inputs * (reg_input_range[1] - reg_input_range[0]) + reg_input_range[0]
+    return inputs
 
 def get_celeba_img(sample_type):
     global task
