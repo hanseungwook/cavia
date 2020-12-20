@@ -9,16 +9,16 @@ def parse_args():
         '--task', type=str, choices=["empty", "unlock", "mixture"],
         help="Problem to solve")
     parser.add_argument(
-        '--network_arch', type=int, nargs='+', default=[1, 40, 40, 1],
+        '--network_arch', type=int, nargs='+', default=[1, 100, 100, 1],
         help="Architecture of neural network")
     parser.add_argument(
-        '--lrs', type=float, nargs='+', default=[0.02, 0.02, 0.005],
+        '--lrs', type=float, nargs='+', default=[0.1, 0.02, 0.005],
         help="lr for inner-loop, midloop, outerloop")
     parser.add_argument(
         '--max-iters', type=int, nargs='+', default=[2, 2, 10000],
         help="optim_iter for inner-loop, midloop, outerloop")
     parser.add_argument(
-        '--batch', type=int, nargs='+', default=[50, 5, 2],
+        '--batch', type=int, nargs='+', default=[20, 20, 2],
         help="number of trajectories, tasks (e.g., goal locations), super-tasks (e.g., empty)")
     parser.add_argument(
         '--n_contexts', type=int, nargs='+', default=[5, 5],
@@ -26,7 +26,13 @@ def parse_args():
 
     # Arguments for reinforcement learning settings
     parser.add_argument(
-        '--ep-max-timestep', type=int, default=20,
+        '--discount', type=float, default=0.95,
+        help="Discount factor")
+    parser.add_argument(
+        '--tau', type=float, default=1.0,
+        help="Lambda factor in GAE")
+    parser.add_argument(
+        '--ep-max-timestep', type=int, default=100,
         help="Episode horizon")
 
     # Arguments for misc

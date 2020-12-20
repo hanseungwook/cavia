@@ -73,5 +73,5 @@ def get_base_model(args, logger):
 
     # Return base_model
     base_model = CAVIA(args, logger)
-    logger.log[args.log_name].info("Model: {}".format(base_model.module_list))
+    logger.log[args.log_name].info("Model: {}".format(base_model))
     return base_model

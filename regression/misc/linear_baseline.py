@@ -3,13 +3,13 @@ import torch.nn as nn
 import numpy as np
 
 
-def get_return(reward, mask):
-    reward = torch.stack(reward, dim=1).float() * mask
+def get_return(reward, mask, args):
+    if isinstance(reward, list):
+        reward = torch.stack(reward, dim=1).float() * mask
 
     R, return_ = 0., []
     for timestep in reversed(range(reward.shape[-1])):
-        # TODO Use args instead of hard-coding
-        R = reward[:, timestep] + 0.96 * R
+        R = reward[:, timestep] + args.discount * R
         return_.insert(0, R)
     return_ = torch.stack(return_, dim=1) * mask
     assert reward.shape == return_.shape
@@ -82,14 +82,14 @@ class LinearFeatureBaseline(nn.Module):
                 '(maximum regularization: {0}).'.format(reg_coeff))
         self.weight.copy_(coeffs.flatten())
 
-    def forward(self, obs, reward, mask):
+    def forward(self, obs, reward, mask, args):
         # Apply mask to obs
         obs = torch.from_numpy(np.stack(obs, axis=1)).float()
         obs_mask = torch.repeat_interleave(mask, repeats=obs.shape[-1], dim=1).view(obs.shape)
         obs = obs * obs_mask
 
         # Get return
-        return_ = get_return(reward, mask)
+        return_ = get_return(reward, mask, args)
 
         # Fit linear feature baseline
         self.fit(obs, return_, mask)

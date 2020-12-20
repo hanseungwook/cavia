@@ -1,7 +1,7 @@
 import gym
 import torch
 import numpy as np
-from misc.linear_baseline import LinearFeatureBaseline, get_return
+from misc.linear_baseline import LinearFeatureBaseline
 from misc.replay_memory import ReplayMemory
 from misc.multiprocessing_env import SubprocVecEnv
 
@@ -56,6 +56,9 @@ def collect_trajectory(base_model, task, ctx, args, logger):
         # For next timestep
         obs = next_obs
 
+        if np.sum(done) >= args.batch[0]:
+            break
+
     env.close()
 
     return memory
@@ -67,12 +70,25 @@ def get_inner_loss(base_model, task, ctx, args, logger):
     logprob = torch.stack(logprob, dim=1)
 
     # Get baseline
+    # TODO Why keep creating new linear feature baseline class?
     linear_baseline = LinearFeatureBaseline(obs)
-    value = linear_baseline(obs, reward, mask)
+    value = linear_baseline(obs, reward, mask, args)
 
-    # Get REINFORCE loss with baseline
-    logprob = logprob * mask
-    return_ = get_return(reward, mask)
-    loss = torch.mean(torch.sum(logprob * (return_ - value), dim=1))
+    # Get advantage
+    # TODO Consider mask in padding zero
+    import torch.nn.functional as F
+    value = F.pad(value * mask, (0, 1, 0, 0))  # Add an additional 0 at the end of episode
+    deltas = torch.stack(reward, dim=1) + args.discount * value[:, 1:] - value[:, :-1]
+    advantage = torch.zeros_like(deltas).float()
+    gae = torch.zeros_like(deltas[:, 0]).float()
+    for i in range(args.ep_max_timestep - 1, -1, -1):
+        gae = gae * args.discount * args.tau + deltas[:, i]
+        advantage[:, i] = gae
+    loss = torch.mean(torch.sum(logprob * advantage.detach(), dim=1))
+
+    # # Get REINFORCE loss with baseline
+    # logprob = logprob * mask
+    # return_ = get_return(reward, mask, args)
+    # loss = torch.mean(torch.sum(logprob * (return_ - value), dim=1))
 
     return -loss, memory

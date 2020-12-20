@@ -26,7 +26,7 @@ class Hierarchical_Task(object):
         self._set_lower_tasks()
 
     def _set_higher_tasks(self):
-        tasks = ["2DNavigation-v0", "2DNavigation-v0"]
+        tasks = ["2DNavigation-v0"]
         for task in tasks:
             self.tasks[1].append(gym.make(task))
 
