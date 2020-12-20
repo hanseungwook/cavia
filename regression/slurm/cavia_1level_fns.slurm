@@ -65,7 +65,7 @@ date
 
 python3 main_huh.py \
 --log_interval=50 --log_name=fns_1level_ctx5 \
---k_batch_train 10 6000 1  --k_batch_test 0 1000 1 --n_batch_train 10 15 1  --n_batch_test 0 15 1 \
+--k_batch_train 10 6000 2  --k_batch_test 0 1000 2 --n_batch_train 10 15 2  --n_batch_test 0 15 1 \
 --architecture 1 128 128 128 1 --n_iters 5 0 10000 --for_iters 5 3 1 \
 --task sine linear --n_contexts 5 0 --lrs 1.0 0.0 0.001 --test_interval 100
 
