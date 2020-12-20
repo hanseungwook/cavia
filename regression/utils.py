@@ -50,7 +50,7 @@ class Logger():
         self.iter += 1
     
     def log_ctx(self, task_name, ctx):
-        self.log[self.log_name].info('Logging context at iteration {}'.format(self.iter))
+        # self.log[self.log_name].info('Logging context at iteration {}'.format(self.iter))
         self.tb_writer.add_histogram("Context {}".format(task_name), ctx, self.iter)
 
         # Log each context changing separately if size <= 5
