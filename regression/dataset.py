@@ -47,10 +47,9 @@ class Meta_Dataset(Dataset):
 
 
 class Meta_DataLoader():
-    def __init__(self, dataset, batch_size, task_name):
+    def __init__(self, dataset, batch_size):
         self.dataset = dataset
         self.batch_size = batch_size
-        self.task_name = task_name
 
     def __iter__(self):
         # Create indices of batches
@@ -74,7 +73,7 @@ def get_samples(task, total_batch, sample_type):
     #     tasks = random.sample(task, total_batch)
     if isinstance(task, dict):
         # Separate level-2 train and test tasks
-        if sample_type in task:
+        if task[sample_type]:
             task = task[sample_type]
         # Same level-2 train and test tasks 
         else: 
