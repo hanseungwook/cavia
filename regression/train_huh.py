@@ -64,18 +64,16 @@ def run(args, logger_maker):
         for i in range(num_test):
             test_loss, outputs = model(task, optimizer=Adam, reset=False, return_outputs=True) #outerloop = True)   # grad_clip = args.clip ) #TODO: gradient clipping?
             print('test loss', test_loss)
-            
-            # save_img_recon(i*args.test_interval, task, outputs)
 
-            print('Saving reconstruction')
-            img_pred = outputs.view(32, 32, 3).detach().cpu().numpy()
-            save_dir = args.log_name
-            if not os.path.isdir(save_dir):
-                os.mkdir(save_dir)
-            # Forcing all predictions beyond image value range into (0, 1)
-            img_pred = np.clip(img_pred, 0, 1)
-            plt.imshow(img_pred)
-            plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(i*args.test_interval)))
+            # print('Saving reconstruction')
+            # img_pred = outputs.view(32, 32, 3).detach().cpu().numpy()
+            # save_dir = args.log_name
+            # if not os.path.isdir(save_dir):
+            #     os.mkdir(save_dir)
+            # # Forcing all predictions beyond image value range into (0, 1)
+            # img_pred = np.clip(img_pred, 0, 1)
+            # plt.imshow(img_pred)
+            # plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(i*args.test_interval)))
             
             print('Saving model')
             torch.save({'model_state_dict': model.state_dict()}, os.path.join(save_dir, 'model.pth'))
