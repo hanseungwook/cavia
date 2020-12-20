@@ -220,7 +220,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
 
                 if cur_iter >= max_iter:    # train/optimize up to max_iter # of batches
                     if level == 1 and param_all[level].numel() > 0:
-                        logger.log_ctx(dataloader.task_name, param_all[level].detach().cpu().numpy())   
+                        logger.log_ctx(dataloader.task_name, param_all[level].detach().squeeze().cpu().numpy())   
                     return False #loss_all   # Loss-profile
 
                 ## loss.backward() & optim.step()
