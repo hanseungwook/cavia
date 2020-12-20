@@ -64,10 +64,10 @@ date
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err 
 
 python3 main_huh.py \
---log_interval=50 --log_name=cifar10_2level_ctx100_28_tasks7_3_lr0.001_biggercap \
---k_batch_train 100 6000 7  --k_batch_test 0 1000 3 --n_batch_train 100 15 1  --n_batch_test 0 15 1 \
---architecture 2 128 128 128 128 128 128 128 3 --n_iters 5 3 10000 --for_iters 5 3 1 \
---task cifar10 --n_contexts 100 28 --lrs 1.0 0.001 0.001 --test_interval 100
+--log_interval=50 --log_name=celeba_airplane_2level_ctx5_5_lr0.1_ctxviz \
+--k_batch_train 100 6000 2  --k_batch_test 0 1000 2 --n_batch_train 100 15 1  --n_batch_test 0 15 1 \
+--architecture 2 128 128 128 128 128 3 --n_iters 5 3 3000 --for_iters 5 3 1 \
+--task celeba_airplane --n_contexts 5 5 --lrs 1.0 0.1 0.001 --test_interval 100
 
 
 
