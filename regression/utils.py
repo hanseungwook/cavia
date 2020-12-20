@@ -56,7 +56,7 @@ class Logger():
 
         # Log each context changing separately if size <= 5
         if ctx.size <= 5:
-            for i in range(ctx.size()):
+            for i in range(ctx.size):
                 self.tb_writer.add_scalar("Context {}/{}".format(task_name, i), ctx[i], self.iter)
 
 
