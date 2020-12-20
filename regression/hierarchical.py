@@ -237,7 +237,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
 
                 # ------------ logging ------------
                 if logger is not None:
-                    logger.log_loss(loss.detach().cpu().numpy(), level, cur_iter)
+                    logger.log_loss(loss.detach().cpu().numpy(), level, num_adapt=cur_iter)
 
          
 

@@ -38,9 +38,8 @@ class Logger():
         self.iter = 0
 
     def log_loss(self, loss, level=2, num_adapt=None):
-        if not (self.iter % self.update_iter):
             # print(iter, self.update_iter)
-            if not self.no_print:
+            if not self.no_print and not (self.iter % self.update_iter):
                 self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
 
             if level < 2:
