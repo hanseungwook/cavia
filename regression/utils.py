@@ -38,14 +38,14 @@ class Logger():
         self.iter = 0
 
     def log_loss(self, loss, level=2, num_adapt=None):
-            # print(iter, self.update_iter)
-            if not self.no_print and not (self.iter % self.update_iter):
-                self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
+        # print(iter, self.update_iter)
+        if not self.no_print and not (self.iter % self.update_iter):
+            self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
 
-            if level < 2:
-                self.tb_writer.add_scalar("Meta loss/Adapt{}".format(num_adapt), loss, self.iter)
-            
-            self.tb_writer.add_scalar("Meta loss/Total", loss, self.iter)
+        if level < 2:
+            self.tb_writer.add_scalar("Meta loss/Adapt{}".format(num_adapt), loss, self.iter)
+        
+        self.tb_writer.add_scalar("Meta loss/Total", loss, self.iter)
         
         self.iter += 1
     
