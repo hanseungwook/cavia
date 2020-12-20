@@ -65,8 +65,9 @@ def make_tasks(task_names):
             task_func_dict['train'] = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
             # task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
         else:
-            raise Exeption('Task not implemented/undefined')
+            raise Exception('Task not implemented/undefined')
 
+    print(task_func_dict)
     return task_func_dict
 
 def get_hierarchical_task(task_list, k_batch_dict, n_batch_dict):
