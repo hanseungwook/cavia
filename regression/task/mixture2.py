@@ -122,7 +122,7 @@ def get_mnist_img(sample_type, label):
 
     # Get indices of given label in the dataset
     labels = imgs.targets.numpy()
-    img_idx = np.random.choice(np.where(labels == label), size=1)
+    img_idx = np.random.choice(np.where(labels == label)[0], size=1)
 
     img, _ = imgs[img_idx]
 
