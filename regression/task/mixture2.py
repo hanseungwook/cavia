@@ -44,7 +44,7 @@ def get_celeba_img(sample_type):
     global task
     img_files = None
 
-    if not (train_imgs and valid_imgs and test_imgs) or task is not 'celeba':
+    if not (train_imgs and valid_imgs and test_imgs) or task != 'celeba':
         load_celeba_img_list('/nobackup/users/swhan/data/Celeba/Img/img_align_celeba', '/nobackup/users/swhan/data/Celeba/Eval/list_eval_partition.txt')
         task = 'celeba'
         
@@ -76,7 +76,7 @@ def get_cifar10_img(sample_type, label):
     global task
     imgs = None
 
-    if not (train_imgs and test_imgs) or task is not 'cifar10':
+    if not (train_imgs and test_imgs) or task != 'cifar10':
         ### TODO: download & re-organize functions
         load_cifar10_imgs('/nobackup/users/swhan/data/cifar-10-batches-py')
         task = 'cifar10'
@@ -108,7 +108,7 @@ def get_mnist_img(sample_type, label):
     global task
     imgs = None
 
-    if not (train_imgs and test_imgs) or task is not 'mnist':
+    if not (train_imgs and test_imgs) or task != 'mnist':
         load_mnist_imgs()
         task = 'mnist'
     
@@ -125,6 +125,7 @@ def get_mnist_img(sample_type, label):
     img_idx = np.random.choice(np.where(labels == label)[0], size=1)[0]
 
     img, _ = imgs[img_idx]
+    img = img.permute(1, 2, 0)
 
     return img
 
@@ -156,10 +157,10 @@ def img_target_function(img, coordinates):
     c[:, 1] *= img_size[1]
 
     # Usual H x W x C img dimensions
-    if img.shape[2] == 3:
+    if img.shape[2] == 3 or img.shape[2] == 1:
         pixel_values = img[c[:, 0].long(), c[:, 1].long(), :]    
     # Pytorch C x H x W img dimensions
-    elif img.shape[0] == 3:
+    elif img.shape[0] == 3 or img.shape[0] == 1:
         pixel_values = img[:, c[:, 0].long(), c[:, 1].long()].permute(1, 0) 
 
     return pixel_values
