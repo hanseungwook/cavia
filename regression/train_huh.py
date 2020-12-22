@@ -70,7 +70,7 @@ def run(args, logger_maker):
                 os.mkdir(save_dir)
 
             print('Saving reconstruction')
-            img_pred = outputs.view(28, 28, 3).detach().cpu().numpy()
+            img_pred = outputs.view(28, 28, 1).detach().cpu().numpy()
 
             # Forcing all predictions beyond image value range into (0, 1)
             img_pred = np.clip(img_pred, 0, 1)
