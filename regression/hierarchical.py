@@ -60,7 +60,7 @@ def make_tasks(task_names):
             # for l in range(1):
             #     task_func_list.append(partial(sample_cifar10_img_fnc, l))
         elif task == 'airplane':
-            task_func_dict['train'].append([partial(sample_cifar10_img_fnc, 0)])
+            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, 0)])
         elif task == 'hier-imagenet':
             task_func_dict['train'] = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
             # task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
