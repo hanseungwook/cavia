@@ -18,7 +18,7 @@ def parse_args():
         "--max-iters", type=int, nargs='+', default=[2, 2, 10000],
         help="optim_iter for inner-loop, midloop, outerloop")
     parser.add_argument(
-        "--batch", type=int, nargs='+', default=[20, 20, 2],
+        "--batch", type=int, nargs='+', default=[20, 20, 1],
         help="number of trajectories, tasks (e.g., goal locations), super-tasks (e.g., empty)")
     parser.add_argument(
         "--n_contexts", type=int, nargs='+', default=[5, 5],

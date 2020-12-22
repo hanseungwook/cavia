@@ -1,5 +1,5 @@
 import gym
-import gym_env  # nrqa
+import gym_env  # noqa
 
 
 def get_hierarchical_task(args, logger):
@@ -45,5 +45,8 @@ class Hierarchical_Task(object):
         return self.tasks[0]
 
     def get_meta_tasks(self):
-        # TODO Avoid hard-coding
-        return [self.tasks[0]]
+        meta_tasks = []
+        for i_meta_task in range(len(self.tasks[1])):
+            meta_tasks.append(
+                self.tasks[0][i_meta_task * self.args.batch[1]:(i_meta_task + 1) * self.args.batch[1]])
+        return meta_tasks
