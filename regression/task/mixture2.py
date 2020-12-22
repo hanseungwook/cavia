@@ -8,6 +8,7 @@ import csv
 import numpy as np
 import torch
 import torchvision.transforms as transforms
+import torchvision.datasets as datasets
 from PIL import Image
 
 import IPython
@@ -103,6 +104,31 @@ def get_cifar10_img(sample_type, label):
 
     return img
 
+def get_mnist_img(sample_type, label):
+    global task
+    imgs = None
+
+    if not (train_imgs and test_imgs) or task is not 'mnist':
+        load_mnist_imgs()
+        task = 'mnist'
+    
+    # Read from global variables
+    if sample_type == 'train':
+        imgs = train_imgs
+    elif sample_type == 'test':
+        imgs = test_imgs
+    else:
+        raise Exception('Wrong sampling type')
+
+    # Get indices of given label in the dataset
+    labels = imgs.targets.numpy()
+    img_idx = np.random.choice(np.where(labels == label), size=1)
+
+    img, _ = imgs[img_idx]
+
+    return img
+
+
 def img_input_function(batch_size, order_pixels=False):
     if order_pixels:
         flattened_indices = list(range(img_size[0] * img_size[1]))[:batch_size]
@@ -156,6 +182,12 @@ def sample_cifar10_img_fnc(label, sample_type):
     # To make labels non-overlapping, remove label after selection at level 1
     # labels.remove(label)
     img = get_cifar10_img(sample_type, label)
+    t_fn = partial(img_target_function, img)
+
+    return img_input_function, t_fn
+
+def sample_mnist_img_fnc(label, sample_type):
+    img = get_mnist_img(sample_type, label)
     t_fn = partial(img_target_function, img)
 
     return img_input_function, t_fn
@@ -260,6 +292,25 @@ def load_cifar10_imgs(data_root):
     train_imgs = np.load(os.path.join(data_root, 'cifar10_train.npz'), allow_pickle=True)['imgs'].item()
     test_imgs = np.load(os.path.join(data_root, 'cifar10_test.npz'), allow_pickle=True)['imgs'].item()
 
+def load_mnist_imgs():
+    global train_imgs, test_imgs, img_size
+    img_size = (28, 28, 1)
+
+    train_transforms = transforms.Compose([
+            transforms.Resize(img_size[0]),
+            transforms.CenterCrop(img_size[0]),
+            # transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+        ])
+
+    test_transforms = transforms.Compose([
+        transforms.Resize(img_size[0]),
+        transforms.CenterCrop(img_size[0]),
+        transforms.ToTensor(),
+    ])
+
+    train_imgs = datasets.MNIST('/nobackup/users/swhan/data/', train=True, transform=train_transforms)
+    test_imgs = datasets.MNIST('/nobackup/users/swhan/data/', train=False, transform=test_transforms)
 
 def get_sin_params():
     # Sample n_batch number of parameters
