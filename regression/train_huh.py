@@ -75,6 +75,7 @@ def run(args, logger_maker):
 
             # Forcing all predictions beyond image value range into (0, 1)
             img_pred = np.clip(img_pred, 0, 1)
+            img_pred = np.round(img_pred * 255.0).astype(np.uint8)
             img_pred = transforms.ToPILImage(mode='L')(img_pred)
             # plt.imshow(img_pred)
             # plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(i*args.test_interval)))
