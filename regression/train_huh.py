@@ -1,6 +1,7 @@
 import os
 import torch
 from torch.optim import Adam, SGD
+import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
@@ -74,8 +75,10 @@ def run(args, logger_maker):
 
             # Forcing all predictions beyond image value range into (0, 1)
             img_pred = np.clip(img_pred, 0, 1)
-            plt.imshow(img_pred)
-            plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(i*args.test_interval)))
+            img_pred = transforms.ToPILImage(mode='L')(img_pred)
+            # plt.imshow(img_pred)
+            # plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(i*args.test_interval)))
+            img_pred.save(os.path.join(save_dir, 'recon_img_itr{}.png'.format(i*args.test_interval)))
             
             print('Saving model')
             torch.save({'model_state_dict': model.state_dict()}, os.path.join(save_dir, 'model.pth'))
