@@ -45,6 +45,5 @@ class Hierarchical_Task(object):
         return self.tasks[0]
 
     def get_meta_tasks(self):
-        return [
-            self.tasks[0][0:int(len(self.tasks[0]) / 2.)],
-            self.tasks[0][int(len(self.tasks[0]) / 2.):]]
+        # TODO Avoid hard-coding
+        return [self.tasks[0]]

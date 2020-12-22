@@ -54,26 +54,26 @@ def train(base_model, hierarchical_task, args, logger):
             ctx = adapt(base_model, task, args, logger, meta_ctx=None)
             ctxs.append(ctx)
 
-        # # Based on adapted 0-level context, adapt 1-level context variables
-        # meta_ctxs = []
-        # for i_meta_task, meta_task in enumerate(hierarchical_task.get_meta_tasks()):
-        #     ctxs_ = ctxs[i_meta_task * args.batch[1]: (i_meta_task + 1) * args.batch[1]]
-        #     meta_ctx = meta_adapt(base_model, meta_task, args, logger, ctxs=ctxs_)
-        #     meta_ctxs.append(meta_ctx)
+        # Based on adapted 0-level context, adapt 1-level context variables
+        meta_ctxs = []
+        for i_meta_task, meta_task in enumerate(hierarchical_task.get_meta_tasks()):
+            ctxs_ = ctxs[i_meta_task * args.batch[1]: (i_meta_task + 1) * args.batch[1]]
+            meta_ctx = meta_adapt(base_model, meta_task, args, logger, ctxs=ctxs_)
+            meta_ctxs.append(meta_ctx)
 
-        # # Based on adapted 1-level context, adapt 0-level context variables again
-        # ctxs = []
-        # for i_task, task in enumerate(hierarchical_task.get_tasks()):
-        #     meta_ctx = meta_ctxs[0] if i_task < args.batch[1] else meta_ctxs[1]
-        #     ctx = adapt(base_model, task, args, logger, meta_ctx=meta_ctx)
-        #     ctxs.append(ctx)
+        # Based on adapted 1-level context, adapt 0-level context variables again
+        ctxs = []
+        for i_task, task in enumerate(hierarchical_task.get_tasks()):
+            # TODO Avoid hard-coding
+            meta_ctx = meta_ctxs[0] if i_task < args.batch[1] else meta_ctxs[1]
+            ctx = adapt(base_model, task, args, logger, meta_ctx=meta_ctx)
+            ctxs.append(ctx)
 
         # Compute test loss and update base network
         rewards, test_losses = [], []
         for i_task, task in enumerate(hierarchical_task.get_tasks()):
             ctx = ctxs[i_task]
-            # meta_ctx = meta_ctxs[0] if i_task < args.batch[1] else meta_ctxs[1]
-            meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False)
+            meta_ctx = meta_ctxs[0] if i_task < args.batch[1] else meta_ctxs[1]
             test_loss, memory = get_inner_loss(base_model, task, [ctx, meta_ctx], args, logger)
             test_losses.append(test_loss)
             rewards.append(memory.get_reward())

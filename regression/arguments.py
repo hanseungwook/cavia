@@ -12,7 +12,7 @@ def parse_args():
         '--network_arch', type=int, nargs='+', default=[1, 100, 100, 1],
         help="Architecture of neural network")
     parser.add_argument(
-        '--lrs', type=float, nargs='+', default=[0.1, 0.02, 0.005],
+        '--lrs', type=float, nargs='+', default=[0.05, 0.05, 0.005],
         help="lr for inner-loop, midloop, outerloop")
     parser.add_argument(
         '--max-iters', type=int, nargs='+', default=[2, 2, 10000],
