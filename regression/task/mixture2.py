@@ -122,7 +122,7 @@ def get_mnist_img(sample_type, label):
 
     # Get indices of given label in the dataset
     labels = imgs.targets.numpy()
-    img_idx = np.random.choice(np.where(labels == label)[0], size=1)
+    img_idx = np.random.choice(np.where(labels == label)[0], size=1)[0]
 
     img, _ = imgs[img_idx]
 
@@ -297,11 +297,11 @@ def load_mnist_imgs():
     img_size = (28, 28, 1)
 
     train_transforms = transforms.Compose([
-            # transforms.Resize(img_size[0]),
-            # transforms.CenterCrop(img_size[0]),
-            # transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-        ])
+        # transforms.Resize(img_size[0]),
+        # transforms.CenterCrop(img_size[0]),
+        # transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+    ])
 
     test_transforms = transforms.Compose([
         # transforms.Resize(img_size[0]),
