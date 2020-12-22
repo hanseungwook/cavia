@@ -5,9 +5,9 @@
 ###  cancel jobs using command 'scancel <jobnum>'
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err
 
-#SBATCH -J 1level_airplane
-#SBATCH -o 1level_airplane_%j.out
-#SBATCH -e 1level_airplane_%j.err
+#SBATCH -J 2level_mnist
+#SBATCH -o 2level_mnist%j.out
+#SBATCH -e 2level_mnist%j.err
 
 #SBATCH --mail-user=seungwook.han@ibm.com
 #SBATCH --mail-type=ALL
