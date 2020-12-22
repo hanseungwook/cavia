@@ -23,6 +23,9 @@ def parse_args():
     parser.add_argument(
         '--n_contexts', type=int, nargs='+', default=[5, 5],
         help="number of context variables: phi0, phi1")
+    parser.add_argument(
+        "--is-hierarchical-learning", action="store_true",
+        help="If True, perform hierarchical meta-learning")
 
     # Arguments for reinforcement learning settings
     parser.add_argument(
@@ -50,7 +53,7 @@ def parse_args():
 
     # Set args log name
     args.log_name = \
-        "task::%s_lrs::%s_max_iters::%s_n_contexts::%s_batch::%s_prefix::%s" % (
-            args.task, args.lrs, args.max_iters, args.n_contexts, args.batch, args.prefix)
+        "task::%s_lrs::%s_max_iters::%s_n_contexts::%s_batch::%s_is_hierarchical_learning::%s_prefix::%s" % (
+            args.task, args.lrs, args.max_iters, args.n_contexts, args.batch, args.is_hierarchical_learning, args.prefix)
 
     return args
