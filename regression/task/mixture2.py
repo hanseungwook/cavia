@@ -297,15 +297,15 @@ def load_mnist_imgs():
     img_size = (28, 28, 1)
 
     train_transforms = transforms.Compose([
-            transforms.Resize(img_size[0]),
-            transforms.CenterCrop(img_size[0]),
+            # transforms.Resize(img_size[0]),
+            # transforms.CenterCrop(img_size[0]),
             # transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
         ])
 
     test_transforms = transforms.Compose([
-        transforms.Resize(img_size[0]),
-        transforms.CenterCrop(img_size[0]),
+        # transforms.Resize(img_size[0]),
+        # transforms.CenterCrop(img_size[0]),
         transforms.ToTensor(),
     ])
 
