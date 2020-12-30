@@ -29,7 +29,11 @@ class CAVIA(nn.Module):
             x = torch.from_numpy(x).float()
 
         # Concatenate input with context
-        ctx = torch.cat(ctx, dim=1)
+        if self.args.is_hierarchical_learning:
+            ctx = torch.cat(ctx, dim=1)
+        else:
+            assert len(ctx) == 2, "Format should be [ctx, meta_ctx]"
+            ctx = ctx[0]
         x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)
 
         # Process through neural network

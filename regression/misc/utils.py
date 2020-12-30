@@ -69,7 +69,10 @@ def get_base_model(args, logger):
     env.close()
 
     # Overwrite input layer of the architecture with number of context parameters
-    args.network_arch[0] += sum(args.n_contexts)
+    if args.is_hierarchical_learning:
+        args.network_arch[0] += sum(args.n_contexts)
+    else:
+        args.network_arch[0] += args.n_contexts[0]
 
     # Return base_model
     base_model = CAVIA(args, logger)

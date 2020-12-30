@@ -39,6 +39,7 @@ def train(base_model, hierarchical_task, args, logger):
         hierarchical_task.reset()
 
         # Log initial reward
+        logger.log[args.log_name].info("Logging initial reward")
         rewards = []
         ctx = torch.zeros(1, args.n_contexts[0], requires_grad=False)
         meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False)
@@ -49,13 +50,15 @@ def train(base_model, hierarchical_task, args, logger):
         logger.tb_writer.add_scalars("reward", {"before": reward}, train_iteration)
 
         # First, adapt 0-level context
+        logger.log[args.log_name].info("Adapting 0-level context")
         ctxs = []
         for task in hierarchical_task.get_tasks():
             ctx = adapt(base_model, task, args, logger, meta_ctx=None)
             ctxs.append(ctx)
 
-        # Based on adapted 0-level context, adapt 1-level context variables
         if args.is_hierarchical_learning:
+            # Based on adapted 0-level context, adapt 1-level context variables
+            logger.log[args.log_name].info("Adapting 1-level context")
             meta_ctxs = []
             for i_meta_task, meta_task in enumerate(hierarchical_task.get_meta_tasks()):
                 ctxs_ = ctxs[i_meta_task * args.batch[1]: (i_meta_task + 1) * args.batch[1]]
@@ -63,6 +66,7 @@ def train(base_model, hierarchical_task, args, logger):
                 meta_ctxs.append(meta_ctx)
 
             # Based on adapted 1-level context, adapt 0-level context variables again
+            logger.log[args.log_name].info("Adapting 0-level context (final)")
             ctxs = []
             for i_task, task in enumerate(hierarchical_task.get_tasks()):
                 # TODO Avoid hard-coding
@@ -76,6 +80,7 @@ def train(base_model, hierarchical_task, args, logger):
                 meta_ctxs.append(meta_ctx)
 
         # Compute test loss and update base network
+        logger.log[args.log_name].info("Computing test loss")
         rewards, test_losses = [], []
         for i_task, task in enumerate(hierarchical_task.get_tasks()):
             ctx = ctxs[i_task]
