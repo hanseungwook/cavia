@@ -13,4 +13,5 @@ export PYTHONPATH=/home/dongki/research/lids/git/gym-minigrid:$PYTHONPATH
 
 # Begin experiment
 python3 main.py \
+--task "accelation" \
 --prefix ""

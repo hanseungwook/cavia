@@ -1,35 +1,19 @@
 import torch
 import torch.nn as nn
 import numpy as np
-
-
-def get_return(reward, mask, args):
-    if isinstance(reward, list):
-        reward = torch.stack(reward, dim=1).float() * mask
-
-    R, return_ = 0., []
-    for timestep in reversed(range(reward.shape[-1])):
-        R = reward[:, timestep] + args.discount * R
-        return_.insert(0, R)
-    return_ = torch.stack(return_, dim=1) * mask
-    assert reward.shape == return_.shape
-
-    return return_
+from misc.rl_utils import get_return
 
 
 class LinearFeatureBaseline(nn.Module):
-    """Linear baseline based on handcrafted features, as described in [1] 
+    """Linear baseline based on handcrafted features, as described in [1]
     (Supplementary Material 2).
-    [1] Yan Duan, Xi Chen, Rein Houthooft, John Schulman, Pieter Abbeel, 
-        "Benchmarking Deep Reinforcement Learning for Continuous Control", 2016 
+    [1] Yan Duan, Xi Chen, Rein Houthooft, John Schulman, Pieter Abbeel,
+        "Benchmarking Deep Reinforcement Learning for Continuous Control", 2016
         (https://arxiv.org/abs/1604.06778)
     Ref: https://github.com/tristandeleu/pytorch-maml-rl/blob/master/maml_rl/baseline.py
     """
-    def __init__(self, obs, reg_coeff=1e-5):
+    def __init__(self, input_size, reg_coeff=1e-5):
         super(LinearFeatureBaseline, self).__init__()
-
-        obs = torch.from_numpy(np.stack(obs, axis=1)).float()
-        _, _, input_size = obs.shape
 
         self.input_size = input_size
         self._reg_coeff = reg_coeff

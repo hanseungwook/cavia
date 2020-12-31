@@ -1,8 +1,9 @@
 import os
 import arguments
 from trainer import train
-from task import get_hierarchical_task
-from misc.utils import set_seed, Logger, get_base_model
+from hierarchical.model import get_base_model
+from hierarchical.task import HierarchicalTask
+from misc.utils import set_seed, Logger
 
 
 if __name__ == '__main__':
@@ -21,7 +22,7 @@ if __name__ == '__main__':
     base_model = get_base_model(args, logger)
 
     # Set hierarchical task
-    hierarchical_task = get_hierarchical_task(args, logger)
+    hierarchical_task = HierarchicalTask(args, logger)
 
     # Start train
     train(base_model, hierarchical_task, args, logger)

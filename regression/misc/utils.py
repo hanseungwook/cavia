@@ -1,11 +1,8 @@
 import logging
 import random
 import torch
-import gym
 import numpy as np
 from tensorboardX import SummaryWriter
-from model.cavia import CAVIA
-from misc.rl_utils import make_env
 
 
 class Logger(object):
@@ -53,28 +50,8 @@ def set_seed(seed, cudnn=True):
         torch.backends.cudnn.deterministic = True
 
 
-def get_base_model(args, logger):
-    # Overwrite last layer of the architecture according to the action space of the environment
-    # Note that we put a default env and task only to get the action space of the environment
-    env = make_env(args=args)()
-    input_dim = env.observation_space.shape[0]
-    if isinstance(env.action_space, gym.spaces.box.Box):
-        args.is_continuous_action = True
-        action_dim = env.action_space.shape[0]
-    else:
-        args.is_continuous_action = False
-        action_dim = env.action_space.n
-    args.network_arch[0] = input_dim
-    args.network_arch[-1] = action_dim
-    env.close()
-
-    # Overwrite input layer of the architecture with number of context parameters
-    if args.is_hierarchical_learning:
-        args.network_arch[0] += sum(args.n_contexts)
-    else:
-        args.network_arch[0] += args.n_contexts[0]
-
-    # Return base_model
-    base_model = CAVIA(args, logger)
-    logger.log[args.log_name].info("Model: {}".format(base_model))
-    return base_model
+def log_result(reward, iteration, args, logger, prefix=""):
+    if isinstance(reward, list):
+        reward = sum(reward) / float(len(reward))
+    logger.log[args.log_name].info("{} reward: {:.3f} at iteration {}".format(prefix, reward, iteration))
+    logger.tb_writer.add_scalars("reward", {prefix: reward}, iteration)

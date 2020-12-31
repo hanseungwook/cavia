@@ -4,7 +4,7 @@ from gym import spaces
 from gym.utils import seeding
 
 
-class Navigation2DEnv(gym.Env):
+class NavigationAcc2DEnv(gym.Env):
     """2D navigation problems, as described in [1]. The code is adapted from
     https://github.com/cbfinn/maml_rl/blob/9c8e2ebd741cb0c7b8bf2d040c4caeeb8e06cc95/maml_examples/point_env_randgoal.py
 
@@ -20,7 +20,7 @@ class Navigation2DEnv(gym.Env):
     """
 
     def __init__(self, task={}):
-        super(Navigation2DEnv, self).__init__()
+        super(NavigationAcc2DEnv, self).__init__()
 
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32)
         self.action_space = spaces.Box(low=-0.1, high=0.1, shape=(2,), dtype=np.float32)
@@ -46,12 +46,14 @@ class Navigation2DEnv(gym.Env):
 
     def reset(self, env=True):
         self._state = np.zeros(2, dtype=np.float32)
+        self._vel = np.zeros(2, dtype=np.float32)
         return self._state
 
     def step(self, action):
         action = np.clip(action, -0.1, 0.1)
         assert self.action_space.contains(action)
-        self._state = self._state + action
+        self._vel = self._vel + action
+        self._state = self._state + self._vel
         if self.clip_position:
             self._state = np.clip(self._state, -5., 5.)
 
