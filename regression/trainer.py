@@ -1,6 +1,8 @@
 import torch
 from misc.rl_utils import get_inner_loss
 
+torch.set_num_threads(2)
+
 
 def adapt(base_model, task, args, logger, meta_ctx=None):
     ctx = torch.zeros(1, args.n_contexts[0], requires_grad=True)
