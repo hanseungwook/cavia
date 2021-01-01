@@ -41,13 +41,14 @@ def train(base_model, hierarchical_task, args, logger):
         hierarchical_task.reset()
 
         # Log initial reward
-        rewards = []
         ctx = torch.zeros(1, args.n_contexts[0], requires_grad=False)
         meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False)
-        for task in hierarchical_task.get_tasks():
-            _, memory = get_inner_loss(base_model, task, [ctx, meta_ctx], args)
-            rewards.append(memory.get_reward())
-        log_result(rewards, iteration, args, logger, prefix="Before")
+        for i_meta_task, meta_task in enumerate(hierarchical_task.get_meta_tasks()):
+            rewards = []
+            for i_task, task in enumerate(meta_task):
+                _, memory = get_inner_loss(base_model, task, [ctx, meta_ctx], args)
+                rewards.append(memory.get_reward())
+            log_result(rewards, iteration, args, logger, prefix=str(i_meta_task) + "/before")
 
         # Adapt lowest context parameters
         ctxs = []
@@ -75,14 +76,15 @@ def train(base_model, hierarchical_task, args, logger):
             meta_ctxs = [None for _ in hierarchical_task.get_meta_tasks()]
 
         # Compute test losses
-        rewards, test_losses = [], []
+        test_losses = []
         for i_meta_task, meta_task in enumerate(hierarchical_task.get_meta_tasks()):
+            rewards = []
             for i_task, task in enumerate(meta_task):
                 ctx, meta_ctx = ctxs[i_meta_task * args.batch[1] + i_task], meta_ctxs[i_meta_task]
                 test_loss, memory = get_inner_loss(base_model, task, [ctx, meta_ctx], args)
                 test_losses.append(test_loss)
                 rewards.append(memory.get_reward())
-        log_result(rewards, iteration, args, logger, prefix="After")
+            log_result(rewards, iteration, args, logger, prefix=str(i_meta_task) + "/after")
 
         # Update base network
         test_loss = sum(test_losses) / float(len(test_losses))
