@@ -55,7 +55,7 @@ class NavigationAcc2DEnv(gym.Env):
         self._vel = self._vel + action
         self._state = self._state + self._vel
         if self.clip_position:
-            self._state = np.clip(self._state, -5., 5.)
+            self._state = np.clip(self._state, -1., 1.)
 
         x = self._state[0] - self._goal[0]
         y = self._state[1] - self._goal[1]
