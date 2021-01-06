@@ -339,8 +339,8 @@ def load_mnist_imgs():
         transforms.ToTensor(),
     ])
 
-    train_imgs = datasets.MNIST('/nobackup/users/swhan/data/', train=True, transform=train_transforms)
-    test_imgs = datasets.MNIST('/nobackup/users/swhan/data/', train=False, transform=test_transforms)
+    train_imgs = datasets.MNIST('/nobackup/users/swhan/data/', train=True, transform=train_transforms, download=True)
+    test_imgs = datasets.MNIST('/nobackup/users/swhan/data/', train=False, transform=test_transforms, download=True)
 
 def load_fashion_mnist_imgs():
     global train_imgs, test_imgs, img_size
@@ -359,8 +359,8 @@ def load_fashion_mnist_imgs():
         transforms.ToTensor(),
     ])
 
-    train_imgs = datasets.FashionMNIST('/nobackup/users/swhan/data/', train=True, transform=train_transforms)
-    test_imgs = datasets.FashionMNIST('/nobackup/users/swhan/data/', train=False, transform=test_transforms)
+    train_imgs = datasets.FashionMNIST('/nobackup/users/swhan/data/', train=True, transform=train_transforms, download=True)
+    test_imgs = datasets.FashionMNIST('/nobackup/users/swhan/data/', train=False, transform=test_transforms, download=True)
 
 def get_sin_params():
     # Sample n_batch number of parameters
