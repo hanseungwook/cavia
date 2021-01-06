@@ -10,7 +10,7 @@ import numpy as np
 
 # from utils import optimize, manual_optim, send_to
 from dataset import Meta_Dataset, Meta_DataLoader, get_samples  
-from task.mixture2 import sample_sin_fnc, sample_linear_fnc, sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist_img_fnc, create_hier_imagenet_supertasks, img_size
+from task.mixture2 import sample_sin_fnc, sample_linear_fnc, sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist_img_fnc, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks, img_size
 from utils import vis_img_recon, get_args
 from finite_diff import debug_top
 # from torch.autograd import gradcheck
@@ -66,6 +66,8 @@ def make_tasks(task_names):
             # task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
         elif task == 'mnist':
             task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in range(1, 3)])
+        elif task == 'fashion_mnist':
+            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in range(0, 2)])
         else:
             raise Exception('Task not implemented/undefined')
 

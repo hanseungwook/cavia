@@ -129,6 +129,30 @@ def get_mnist_img(sample_type, label):
 
     return img
 
+def get_fashion_mnist_img(sample_type, label):
+    global task
+    imgs = None
+
+    if not (train_imgs and test_imgs) or task != 'fashion_mnist':
+        load_fashion_mnist_imgs()
+        task = 'fashion_mnist'
+    
+    # Read from global variables
+    if sample_type == 'train':
+        imgs = train_imgs
+    elif sample_type == 'test':
+        imgs = test_imgs
+    else:
+        raise Exception('Wrong sampling type')
+
+    # Get indices of given label in the dataset
+    labels = imgs.targets.numpy()
+    img_idx = np.random.choice(np.where(labels == label)[0], size=1)[0]
+
+    img, _ = imgs[img_idx]
+    img = img.permute(1, 2, 0)
+
+    return img
 
 def img_input_function(batch_size, order_pixels=False):
     if order_pixels:
@@ -193,6 +217,11 @@ def sample_mnist_img_fnc(label, sample_type):
 
     return img_input_function, t_fn
 
+def sample_fashion_mnist_img_fnc(label, sample_type):
+    img = get_fashion_mnist_img(sample_type, label)
+    t_fn = partial(img_target_function, img)
+
+    return img_input_function, t_fn
 
 def sample_celeba_img_fnc(sample_type):
     img = get_celeba_img(sample_type)
@@ -312,6 +341,26 @@ def load_mnist_imgs():
 
     train_imgs = datasets.MNIST('/nobackup/users/swhan/data/', train=True, transform=train_transforms)
     test_imgs = datasets.MNIST('/nobackup/users/swhan/data/', train=False, transform=test_transforms)
+
+def load_fashion_mnist_imgs():
+    global train_imgs, test_imgs, img_size
+    img_size = (28, 28, 1)
+
+    train_transforms = transforms.Compose([
+        # transforms.Resize(img_size[0]),
+        # transforms.CenterCrop(img_size[0]),
+        # transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+    ])
+
+    test_transforms = transforms.Compose([
+        # transforms.Resize(img_size[0]),
+        # transforms.CenterCrop(img_size[0]),
+        transforms.ToTensor(),
+    ])
+
+    train_imgs = datasets.FashionMNIST('/nobackup/users/swhan/data/', train=True, transform=train_transforms)
+    test_imgs = datasets.FashionMNIST('/nobackup/users/swhan/data/', train=False, transform=test_transforms)
 
 def get_sin_params():
     # Sample n_batch number of parameters
