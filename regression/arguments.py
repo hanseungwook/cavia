@@ -6,7 +6,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='CAVIA (Regression experiments)')
 
     parser.add_argument(
-        '--task', type=str, choices=['sine', 'linear', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 'mnist'], 
+        '--task', type=str, choices=['sine', 'linear', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 'mnist', 'fashion_mnist'], 
         nargs='+', help="Supertasks to solve")
     # parser.add_argument(
     #     '--tasks-per-metaupdate', type=int, 
