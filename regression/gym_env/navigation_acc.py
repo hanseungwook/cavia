@@ -22,7 +22,7 @@ class NavigationAcc2DEnv(gym.Env):
     def __init__(self, task={}):
         super(NavigationAcc2DEnv, self).__init__()
 
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(4,), dtype=np.float32)
         self.action_space = spaces.Box(low=-0.1, high=0.1, shape=(2,), dtype=np.float32)
 
         self._task = task
@@ -47,15 +47,15 @@ class NavigationAcc2DEnv(gym.Env):
     def reset(self, env=True):
         self._state = np.zeros(2, dtype=np.float32)
         self._vel = np.zeros(2, dtype=np.float32)
-        return self._state
+        return np.concatenate([self._state, self._vel])
 
     def step(self, action):
         action = np.clip(action, -0.1, 0.1)
         assert self.action_space.contains(action)
-        self._vel = self._vel + action
         self._state = self._state + self._vel
         if self.clip_position:
-            self._state = np.clip(self._state, -1., 1.)
+            self._state = np.clip(self._state, -2., 2.)
+        self._vel = self._vel + action
 
         x = self._state[0] - self._goal[0]
         y = self._state[1] - self._goal[1]
@@ -63,4 +63,4 @@ class NavigationAcc2DEnv(gym.Env):
         # done = ((np.abs(x) < 0.01) and (np.abs(y) < 0.01))
         done = False
 
-        return self._state, reward, done, self._task
+        return np.concatenate([self._state, self._vel]), reward, done, self._task
