@@ -65,9 +65,9 @@ def make_tasks(task_names):
             task_func_dict['train'] = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
             # task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
         elif task == 'mnist':
-            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in range(1, 3)])
+            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in range(0, 10)])
         elif task == 'fashion_mnist':
-            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in range(0, 2)])
+            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in range(0, 10)])
         else:
             raise Exception('Task not implemented/undefined')
 
