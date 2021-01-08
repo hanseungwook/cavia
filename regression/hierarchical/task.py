@@ -27,6 +27,9 @@ class HierarchicalTask(object):
         else:
             raise ValueError("Invalid env name")
 
+        for env in self.meta_tasks:
+            env.seed(self.args.seed)
+
     def _set_tasks(self):
         self.tasks = []
         for meta_task in self.meta_tasks:

@@ -18,7 +18,7 @@ def parse_args():
         "--batch", type=int, nargs='+', default=[20, 20, 2],
         help="number of trajectories, tasks (e.g., goal locations), super-tasks (e.g., empty)")
     parser.add_argument(
-        "--n-contexts", type=int, nargs='+', default=[5, 5],
+        "--n-contexts", type=int, nargs='+', default=[2, 2],
         help="number of context variables: phi0, phi1")
     parser.add_argument(
         "--is-hierarchical", action="store_true",
@@ -32,7 +32,7 @@ def parse_args():
 
     # Arguments for env
     parser.add_argument(
-        "--task", type=str, choices=["velocity", "accelation", "mixture"],
+        "--task", type=str, choices=["velocity", "acceleration", "mixture"],
         help="Problem to solve")
     parser.add_argument(
         "--ep-max-timestep", type=int, default=100,

@@ -19,9 +19,9 @@ def collect_trajectory(base_model, task, ctx, args):
     obs = env.reset()
     for timestep in range(args.ep_max_timestep):
         # Get action and logprob
-        categorical = base_model(obs, ctx)
-        action = categorical.sample()
-        logprob = categorical.log_prob(action)
+        distribution = base_model(obs, ctx)
+        action = distribution.sample()
+        logprob = distribution.log_prob(action)
         if args.is_continuous_action:
             logprob = torch.sum(logprob, dim=1)
 

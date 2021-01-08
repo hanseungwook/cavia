@@ -21,7 +21,7 @@ class CAVIA(nn.Module):
         self.fc2 = nn.Linear(args.network_arch[1], args.network_arch[2])
         if args.is_continuous_action:
             self.fc3_mu = nn.Linear(args.network_arch[2], args.network_arch[3])
-            self.fc3_sigma = nn.Parameter(torch.Tensor(args.network_arch[-1]))
+            self.fc3_sigma = nn.Parameter(torch.zeros(args.network_arch[-1], requires_grad=True, dtype=torch.float32))
             self.min_log_std = math.log(1e-6)
         else:
             self.fc3 = nn.Linear(args.network_arch[2], args.network_arch[3])

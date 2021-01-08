@@ -6,10 +6,10 @@ torch.set_num_threads(2)
 
 
 def adapt(base_model, task, args, logger, meta_ctx):
-    ctx = torch.zeros(1, args.n_contexts[0], requires_grad=True)
+    ctx = torch.zeros(1, args.n_contexts[0], requires_grad=True, dtype=torch.float32)
 
     if meta_ctx is None:
-        meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False)
+        meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False, dtype=torch.float32)
 
     for _ in range(args.max_iterations[0]):
         loss, _ = get_inner_loss(base_model, task, [ctx, meta_ctx], args)
@@ -21,7 +21,7 @@ def adapt(base_model, task, args, logger, meta_ctx):
 
 def meta_adapt(base_model, meta_task, args, logger, ctxs):
     assert len(meta_task) == len(ctxs), "Length must be same"
-    meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=True)
+    meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=True, dtype=torch.float32)
 
     for _ in range(args.max_iterations[1]):
         losses = []
@@ -41,8 +41,8 @@ def train(base_model, hierarchical_task, args, logger):
         hierarchical_task.reset()
 
         # Log initial reward
-        ctx = torch.zeros(1, args.n_contexts[0], requires_grad=False)
-        meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False)
+        ctx = torch.zeros(1, args.n_contexts[0], requires_grad=False, dtype=torch.float32)
+        meta_ctx = torch.zeros(1, args.n_contexts[1], requires_grad=False, dtype=torch.float32)
         for i_meta_task, meta_task in enumerate(hierarchical_task.get_meta_tasks()):
             rewards = []
             for i_task, task in enumerate(meta_task):
