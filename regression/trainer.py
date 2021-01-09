@@ -56,6 +56,9 @@ def train(base_model, hierarchical_task, args, logger):
             ctx = adapt(base_model, task, args, logger, meta_ctx=None)
             ctxs.append(ctx)
 
+            # For logging
+            logger.log[args.log_name].info("0-level ctx: {}".format(ctx.cpu().data.numpy().flatten()))
+
         # Adapt meta-context parameters
         if args.is_hierarchical:
             # Based on adapted context parameters, adapt meta-context parameters
@@ -65,6 +68,9 @@ def train(base_model, hierarchical_task, args, logger):
                 meta_ctx = meta_adapt(base_model, meta_task, args, logger, ctxs=ctxs_)
                 meta_ctxs.append(meta_ctx)
 
+                # For logging
+                logger.log[args.log_name].info("1-level ctx: {}".format(meta_ctx.cpu().data.numpy().flatten()))
+
             # Based on adapted meta-context parameters, adapt context parameters
             ctxs = []
             for i_meta_task, meta_task in enumerate(hierarchical_task.get_meta_tasks()):
@@ -72,6 +78,9 @@ def train(base_model, hierarchical_task, args, logger):
                     meta_ctx = meta_ctxs[i_meta_task]
                     ctx = adapt(base_model, task, args, logger, meta_ctx=meta_ctx)
                     ctxs.append(ctx)
+
+                    # For logging
+                    logger.log[args.log_name].info("0-level ctx (final): {}".format(ctx.cpu().data.numpy().flatten()))
         else:
             meta_ctxs = [None for _ in hierarchical_task.get_meta_tasks()]
 

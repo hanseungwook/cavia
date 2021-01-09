@@ -20,7 +20,7 @@ class HierarchicalTask(object):
     def _set_meta_tasks(self):
         if self.args.task == "velocity":
             self.meta_tasks = [gym.make("2DNavigation-v0")]
-        elif self.args.task == "accelation":
+        elif self.args.task == "acceleration":
             self.meta_tasks = [gym.make("2DNavigationAcc-v0")]
         elif self.args.task == "mixture":
             self.meta_tasks = [gym.make("2DNavigation-v0"), gym.make("2DNavigationAcc-v0")]
