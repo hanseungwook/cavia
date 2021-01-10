@@ -9,7 +9,7 @@ def parse_args():
         "--network_arch", type=int, nargs='+', default=[-1, 100, 100, -1],
         help="Architecture of neural network")
     parser.add_argument(
-        "--learning-rates", type=float, nargs='+', default=[0.005, 0.005, 0.005],
+        "--learning-rates", type=float, nargs='+', default=[0.01, 0.01, 0.005],
         help="lr for inner-loop, midloop, outerloop")
     parser.add_argument(
         "--max-iterations", type=int, nargs='+', default=[2, 2, 10000],
@@ -35,7 +35,7 @@ def parse_args():
         "--task", type=str, choices=["velocity", "acceleration", "mixture"],
         help="Problem to solve")
     parser.add_argument(
-        "--ep-max-timestep", type=int, default=100,
+        "--ep-max-timestep", type=int, default=50,
         help="Episode horizon")
 
     # Arguments for misc

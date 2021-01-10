@@ -7,7 +7,7 @@ from gym.envs.registration import register
 register(
     '2DNavigation-v0',
     entry_point='gym_env.navigation:Navigation2DEnv',
-    max_episode_steps=100
+    max_episode_steps=50
 )
 
 
@@ -15,7 +15,7 @@ register(
 register(
     '2DNavigationRot-v0',
     entry_point='gym_env.navigation_rot:NavigationRot2DEnv',
-    max_episode_steps=100
+    max_episode_steps=50
 )
 
 
@@ -23,7 +23,7 @@ register(
 register(
     '2DNavigationAcc-v0',
     entry_point='gym_env.navigation_acc:NavigationAcc2DEnv',
-    max_episode_steps=100
+    max_episode_steps=50
 )
 
 

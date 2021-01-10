@@ -54,7 +54,7 @@ class Navigation2DEnv(gym.Env):
         assert self.action_space.contains(action)
         self._state = self._state + action
         if self.clip_position:
-            self._state = np.clip(self._state, -2., 2.)
+            self._state = np.clip(self._state, -5., 5.)
 
         x = self._state[0] - self._goal[0]
         y = self._state[1] - self._goal[1]

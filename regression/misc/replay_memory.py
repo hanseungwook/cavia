@@ -3,7 +3,9 @@ import numpy as np
 
 
 class ReplayMemory(object):
-    def __init__(self):
+    def __init__(self, args):
+        self.args = args
+
         self.obs = []
         self.action = []
         self.logprob = []
@@ -32,3 +34,11 @@ class ReplayMemory(object):
         reward = torch.stack(self.reward, dim=1) * self._get_mask(self.done)
         reward = torch.mean(torch.sum(reward, dim=1))
         return reward.cpu().numpy()
+
+    def save_trajectory(self, i_meta_task, iteration):
+        obs = np.array(self.obs)[:, 0, 0:2]
+        filename = \
+            "./log/tb_" + str(self.args.log_name) + "/" + \
+            "obs_i_meta_task::" + str(i_meta_task) + "_" + \
+            "iter::" + str(iteration) + ".npy"
+        np.save(filename, obs)

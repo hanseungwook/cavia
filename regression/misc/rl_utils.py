@@ -10,7 +10,7 @@ def collect_trajectory(base_model, task, ctx, args):
     assert len(task) == 2, "Format should be (env, task)"
 
     # Initialize memory
-    memory = ReplayMemory()
+    memory = ReplayMemory(args)
 
     # Set environment
     env = SubprocVecEnv([make_env(args, env=task[0], task=task[1]) for _ in range(args.batch[0])])
