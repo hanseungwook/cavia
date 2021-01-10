@@ -47,9 +47,6 @@ def train(base_model, hierarchical_task, args, logger):
             rewards = []
             for i_task, task in enumerate(meta_task):
                 _, memory = get_inner_loss(base_model, task, [ctx, meta_ctx], args)
-
-                memory.save_trajectory(i_meta_task, iteration)
-
                 rewards.append(memory.get_reward())
             log_result(rewards, iteration, args, logger, prefix=str(i_meta_task) + "/before")
 
