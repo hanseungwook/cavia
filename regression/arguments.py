@@ -35,7 +35,7 @@ def parse_args():
         "--task", type=str, choices=["velocity", "acceleration", "mixture"],
         help="Problem to solve")
     parser.add_argument(
-        "--ep-max-timestep", type=int, default=50,
+        "--ep-max-timestep", type=int, default=25,
         help="Episode horizon")
 
     # Arguments for misc

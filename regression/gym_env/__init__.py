@@ -3,6 +3,14 @@ import numpy as np
 from gym.envs.registration import register
 
 
+# 1D Navigation
+register(
+    '1DNavigation-v0',
+    entry_point='gym_env.navigation_1d:Navigation1DEnv',
+    max_episode_steps=25
+)
+
+
 # 2D Navigation
 register(
     '2DNavigation-v0',
@@ -30,7 +38,7 @@ register(
 def make_env(args, env=None, task=None):
     # Set dummy task
     if env is None:
-        env = gym.make("2DNavigation-v0")
+        env = gym.make("1DNavigation-v0")
 
     if task is None:
         task = {"goal": np.array([0, 0])}

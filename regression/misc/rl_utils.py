@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from gym_env import make_env
 from misc.replay_memory import ReplayMemory
 from misc.multiprocessing_env import SubprocVecEnv
+from torch.distributions import Normal
 
 
 def collect_trajectory(base_model, task, ctx, args):
@@ -26,7 +27,10 @@ def collect_trajectory(base_model, task, ctx, args):
             logprob = torch.sum(logprob, dim=1)
 
         # Take step in the environment
-        action = action.cpu().numpy().astype(int)
+        if isinstance(distribution, Normal):
+            action = action.cpu().numpy().astype(float)
+        else:
+            raise ValueError("Only continuous action is allowed")
         next_obs, reward, done, _ = env.step(action)
 
         # Add to memory
