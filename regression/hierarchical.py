@@ -205,7 +205,10 @@ class Hierarchical_Task():
 ####################################    
 def optimize(model, dataloader, level, args_dict, optimizer, reset, status, device):       # optimize parameter for a given 'task'
     lr, max_iter, for_iter, logger = get_args(args_dict, level)
-    param_all = model.decoder_model.parameters_all
+    if isinstance(model.decoder_model, nn.DataParallel):
+        param_all = model.decoder_model.module.parameters_all
+    else: 
+        param_all = model.decoder_model.parameters_all
 
     ## Initialize param & optim
     if reset:
