@@ -90,7 +90,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
         if data_parallel:
             self.decoder_model = nn.DataParallel(decoder_model)
-            self.level_max = len(decoder_model.module.parameters_all)
+            
         else:
             self.decoder_model = decoder_model
             self.level_max = len(decoder_model.parameters_all)
@@ -105,6 +105,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                           }
         self.device     = decoder_model.device
 
+        self.level_max = decoder_model.parameters_all
         # self.adaptation = optimize if encoder_model is None else encoder_model 
 
     def forward(self, task_batch, level=None, optimizer=SGD, reset=True, return_outputs=False, status='', viz=None):        # def forward(self, task_batch, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
