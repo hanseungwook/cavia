@@ -34,6 +34,9 @@ def parse_args():
     parser.add_argument(
         '--load_model', type=str, default='', 
         help='Path to model weights to load')
+    parser.add_argument(
+        '--data_parallel', action='store_true', default=False, 
+        help='Use data parallel for inner model (decoder)')
 
 
     parser.add_argument('--lrs',           type=float, nargs='+', default=[0.05, 0.05, 0.001])     # lr  for inner-loop, midloop, outerloop

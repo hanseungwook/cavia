@@ -84,11 +84,11 @@ def get_hierarchical_task(task_list, k_batch_dict, n_batch_dict):
 #  Model Hierarchy
 
 class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, decoder_model, n_contexts, max_iters, for_iters, lrs, encoders, loggers, test_loggers): 
+    def __init__(self, decoder_model, n_contexts, max_iters, for_iters, lrs, encoders, loggers, test_loggers, data_parallel=False): 
         super().__init__()
         # assert hasattr  (decoder_model, 'forward')    # submodel has a built-in forward() method 
 
-        self.decoder_model  = decoder_model 
+        self.decoder_model  = nn.DataParallel(decoder_model)
         self.n_contexts = n_contexts
         self.args_dict = {'max_iters' : max_iters,
                           'for_iters' : for_iters, 
