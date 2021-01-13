@@ -9,7 +9,7 @@ def parse_args():
         "--network_arch", type=int, nargs='+', default=[-1, 100, 100, -1],
         help="Architecture of neural network")
     parser.add_argument(
-        "--learning-rates", type=float, nargs='+', default=[0.01, 0.01, 0.005],
+        "--learning-rates", type=float, nargs='+', default=[0.05, 0.05, 0.005],
         help="lr for inner-loop, midloop, outerloop")
     parser.add_argument(
         "--max-iterations", type=int, nargs='+', default=[2, 2, 10000],
@@ -18,7 +18,7 @@ def parse_args():
         "--batch", type=int, nargs='+', default=[20, 20, 2],
         help="number of trajectories, tasks (e.g., goal locations), super-tasks (e.g., empty)")
     parser.add_argument(
-        "--n-contexts", type=int, nargs='+', default=[2, 2],
+        "--n-contexts", type=int, nargs='+', default=[1, 1],
         help="number of context variables: phi0, phi1")
     parser.add_argument(
         "--is-hierarchical", action="store_true",

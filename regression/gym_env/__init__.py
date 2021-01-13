@@ -11,18 +11,18 @@ register(
 )
 
 
+# 1D Navigation Rotation
+register(
+    '1DNavigationRot-v0',
+    entry_point='gym_env.navigation_rot:Navigation1DRotEnv',
+    max_episode_steps=25
+)
+
+
 # 2D Navigation
 register(
     '2DNavigation-v0',
     entry_point='gym_env.navigation:Navigation2DEnv',
-    max_episode_steps=50
-)
-
-
-# 2D Navigation Rotation
-register(
-    '2DNavigationRot-v0',
-    entry_point='gym_env.navigation_rot:NavigationRot2DEnv',
     max_episode_steps=50
 )
 
@@ -38,7 +38,7 @@ register(
 def make_env(args, env=None, task=None):
     # Set dummy task
     if env is None:
-        env = gym.make("1DNavigation-v0")
+        env = gym.make("1DNavigationRot-v0")
 
     if task is None:
         task = {"goal": np.array([0, 0])}

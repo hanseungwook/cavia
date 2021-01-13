@@ -4,7 +4,7 @@ from gym import spaces
 from gym.utils import seeding
 
 
-class NavigationRot2DEnv(gym.Env):
+class Navigation1DRotEnv(gym.Env):
     """2D navigation problems, as described in [1]. The code is adapted from
     https://github.com/cbfinn/maml_rl/blob/9c8e2ebd741cb0c7b8bf2d040c4caeeb8e06cc95/maml_examples/point_env_randgoal.py
 
@@ -19,15 +19,19 @@ class NavigationRot2DEnv(gym.Env):
         (https://arxiv.org/abs/1703.03400)
     """
 
-    def __init__(self, task={}):
-        super(NavigationRot2DEnv, self).__init__()
+    def __init__(self, rot=False, task={}):
+        super(Navigation1DRotEnv, self).__init__()
 
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(2,), dtype=np.float32)
-        self.action_space = spaces.Box(low=-0.1, high=0.1, shape=(2,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32)
+        self.action_space = spaces.Box(low=-1., high=1., shape=(1,), dtype=np.float32)
 
+        self.rot = rot
         self._task = task
-        self._goal = task.get('goal', np.zeros(2, dtype=np.float32))
-        self._state = np.zeros(2, dtype=np.float32)
+        self._goal = task.get('goal', np.zeros(1, dtype=np.float32))
+        self._state = np.zeros(1, dtype=np.float32)
+        self.clip_position = True
+        self.action_penalty = True
+        self.penalty_coeff = 0.1
         self.seed()
 
     def seed(self, seed=None):
@@ -35,7 +39,7 @@ class NavigationRot2DEnv(gym.Env):
         return [seed]
 
     def sample_tasks(self, num_tasks):
-        goals = self.np_random.uniform(-0.5, 0.5, size=(num_tasks, 2))
+        goals = self.np_random.uniform(-1., 1., size=(num_tasks, 1))
         tasks = [{'goal': goal} for goal in goals]
         return tasks
 
@@ -44,19 +48,25 @@ class NavigationRot2DEnv(gym.Env):
         self._goal = task['goal']
 
     def reset(self, env=True):
-        self._state = np.zeros(2, dtype=np.float32)
+        self._state = np.zeros(1, dtype=np.float32)
         return self._state
 
     def step(self, action):
-        action = np.clip(action, -0.1, 0.1)
-        action = action * -1  # 180 degree rotation
-        assert self.action_space.contains(action)
-        self._state = self._state + action
+        if not self.action_penalty:
+            action = np.clip(action, -1., 1.)
 
-        x = self._state[0] - self._goal[0]
-        y = self._state[1] - self._goal[1]
-        reward = -np.sqrt(x ** 2 + y ** 2)
-        # done = ((np.abs(x) < 0.01) and (np.abs(y) < 0.01))
+        # Update state
+        if self.rot:
+            self._state[0] -= action[0]
+        else:
+            self._state[0] += action[0]
+        if self.clip_position:
+            self._state = np.clip(self._state, -5., 5.)
+
+        # Compute reward
+        reward = -np.sqrt(pow(self._state[0] - self._goal[0], 2))
+        if self.action_penalty:
+            reward = reward - self.penalty_coeff * pow(action[0], 2)
         done = False
 
         return self._state, reward, done, self._task
