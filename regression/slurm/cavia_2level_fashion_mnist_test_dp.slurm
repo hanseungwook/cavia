@@ -68,7 +68,8 @@ python3 main_huh.py \
 --log_interval=50 --log_name=fashion_c10_mnist_2level_ctx10_3_dp \
 --k_batch_train 10 6000 10  --k_batch_test 0 1000 10 --n_batch_train 10 15 10  --n_batch_test 0 15 10 \
 --architecture 2 128 128 128 128 128 1 --n_iters 5 3 100 --for_iters 5 3 1 \
---task fashion_mnist --n_contexts 10 3  --lrs 1.0 0.1 0.001 --test_interval 100
+--task fashion_mnist --n_contexts 10 3  --lrs 1.0 0.1 0.001 --test_interval 100 \
+--data_parallel
 
 
 

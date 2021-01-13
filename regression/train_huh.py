@@ -49,7 +49,10 @@ def run(args, logger_maker):
     num_test = args.n_iters[-1] // args.test_interval
     args.n_iters[-1] = args.test_interval
 
-    model   = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.for_iters, args.lrs, encoder_models, loggers, test_loggers, True if args.data_parallel else False)
+    data_parallel = False
+    if args.data_parallel:
+        data_parallel = True
+    model   = Hierarchical_Model(base_model, args.n_contexts, args.n_iters, args.for_iters, args.lrs, encoder_models, loggers, test_loggers, data_parallel)
     # set_trace()
     if args.load_model:
         print('Loading model')
