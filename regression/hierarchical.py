@@ -68,6 +68,9 @@ def make_tasks(task_names):
             task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in range(0, 10)])
         elif task == 'fashion_mnist':
             task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in range(0, 10)])
+        elif task == 'mnist_fmnist':
+            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in range(0, 5)])
+            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in range(0, 5)])
         else:
             raise Exception('Task not implemented/undefined')
 
