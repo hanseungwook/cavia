@@ -5,17 +5,17 @@
 ###  cancel jobs using command 'scancel <jobnum>'
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err
 
-#SBATCH -J 2level_fmnist
-#SBATCH -o 2level_fmnist%j.out
-#SBATCH -e 2level_fmnist%j.err
+#SBATCH -J 2level_m_fmnist
+#SBATCH -o 2level_m_fmnist%j.out
+#SBATCH -e 2level_m_fmnist%j.err
 
 #SBATCH --mail-user=seungwook.han@ibm.com
 #SBATCH --mail-type=ALL
 ###  the following parameters will get you two nodes with 4 V100's each
 ###  note the run time limit is currently only 12 hours, it will be increased
 ###  next week
-#SBATCH --gres=gpu:4
-#SBATCH --gpus-per-node=4
+#SBATCH --gres=gpu:1
+#SBATCH --gpus-per-node=1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=4
 #SBATCH --mem=500g
@@ -65,10 +65,10 @@ date
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err 
 
 python3 main_huh.py \
---log_interval=50 --log_name=fashion_mnist_c10_2level_ctx10_3_no_dp \
+--log_interval=50 --log_name=mnist_fmnist_c5_5_2level_ctx10_3 \
 --k_batch_train 10 6000 10  --k_batch_test 0 1000 10 --n_batch_train 10 15 10  --n_batch_test 0 15 10 \
---architecture 2 128 128 128 128 128 1 --n_iters 5 3 100 --for_iters 5 3 1 \
---task fashion_mnist --n_contexts 10 3  --lrs 1.0 0.1 0.001 --test_interval 100
+--architecture 2 128 128 128 128 128 1 --n_iters 5 3 10000 --for_iters 5 3 1 \
+--task mnist_fmnist --n_contexts 10 3  --lrs 1.0 0.1 0.001 --test_interval 100
 
 
 
