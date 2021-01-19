@@ -65,8 +65,8 @@ date
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err 
 
 python3 main_huh.py \
---log_interval=50 --log_name=mnist_fmnist_c5_5_2level_ctx10_3 \
---k_batch_train 10 6000 10  --k_batch_test 0 1000 10 --n_batch_train 10 15 10  --n_batch_test 0 15 10 \
+--log_interval=50 --log_name=mnist_fmnist_c10_10_2level_ctx10_3 \
+--k_batch_train 10 6000 20  --k_batch_test 0 1000 20 --n_batch_train 10 15 20  --n_batch_test 0 15 20 \
 --architecture 2 128 128 128 128 128 1 --n_iters 5 3 10000 --for_iters 5 3 1 \
 --task mnist_fmnist --n_contexts 10 3  --lrs 1.0 0.1 0.001 --test_interval 100
 
