@@ -38,7 +38,7 @@ def make_batch_dict(n_trains, n_tests, n_valids):
 def run(args, logger_maker):
     k_batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
     n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
-    task = get_hierarchical_task(args.task, k_batch_dict, n_batch_dict)    ### FIX THIS : task_func_list
+    task = get_hierarchical_task(args.task, args.classes, k_batch_dict, n_batch_dict)    ### FIX THIS : task_func_list
     
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML

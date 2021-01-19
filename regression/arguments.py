@@ -8,6 +8,9 @@ def parse_args():
     parser.add_argument(
         '--task', type=str, choices=['sine', 'linear', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 'mnist', 'fashion_mnist', 'mnist_fmnist'], 
         nargs='+', help="Supertasks to solve")
+    parser.add_argument(
+        '--classes', type=int, nargs='+', 
+        default=[], help="Specified classes of dataset to use (if not specified, all)")
     # parser.add_argument(
     #     '--tasks-per-metaupdate', type=int, 
     #     default=25, help="Number of tasks per meta-update")

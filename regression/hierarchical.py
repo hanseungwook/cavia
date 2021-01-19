@@ -34,7 +34,7 @@ DOUBLE_precision = False #True
 
 ###################################
 
-def make_tasks(task_names):
+def make_tasks(task_names, classes):
     task_func_dict = {}
     task_func_dict['train'] = []
     task_func_dict['test'] = []
@@ -65,20 +65,26 @@ def make_tasks(task_names):
             task_func_dict['train'] = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
             # task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
         elif task == 'mnist':
-            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in range(0, 10)])
+            if len(classes) <= 0:
+                classes = list(range(0, 10))
+            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in classes])
         elif task == 'fashion_mnist':
-            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in range(0, 10)])
+            if len(classes) <= 0:
+                classes = list(range(0, 10))
+            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in classes])
         elif task == 'mnist_fmnist':
-            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in range(0, 10)])
-            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in range(0, 10)])
+            if len(classes) <= 0:
+                classes = list(range(0, 10))
+            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in classes])
+            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in classes])
         else:
             raise Exception('Task not implemented/undefined')
 
     print(task_func_dict)
     return task_func_dict
 
-def get_hierarchical_task(task_list, k_batch_dict, n_batch_dict):
-    task_func_list = make_tasks(task_list)
+def get_hierarchical_task(task_list, classes, k_batch_dict, n_batch_dict):
+    task_func_list = make_tasks(task_list, classes)
     task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
     return Meta_Dataset(data=[task])
 
