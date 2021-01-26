@@ -55,7 +55,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         else:
             self.decoder_model = decoder_model
             
-        self.decoder_model  = nn.DataParallel(decoder_model)
         self.n_contexts = n_contexts
         self.args_dict = {'max_iters' : max_iters,
                           'for_iters' : for_iters, 
