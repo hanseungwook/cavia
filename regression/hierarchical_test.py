@@ -51,12 +51,9 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         # assert hasattr  (decoder_model, 'forward')    # submodel has a built-in forward() method 
 
         if data_parallel:
-            self.decoder_model = nn.DataParallel(decoder_model)
+            decoder_model = nn.DataParallel(decoder_model)
             
-        else:
-            self.decoder_model = decoder_model
-            
-        self.decoder_model  = nn.DataParallel(decoder_model)
+        self.decoder_model  = decoder_model
         self.n_contexts = n_contexts
         self.args_dict = {'max_iters' : max_iters,
                           'for_iters' : for_iters, 
