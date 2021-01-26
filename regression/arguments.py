@@ -2,7 +2,7 @@ import argparse
 import torch
 
 
-def parse_args():
+def get_args(input = None):
     parser = argparse.ArgumentParser(description='CAVIA (Regression experiments)')
 
     parser.add_argument(
@@ -54,23 +54,27 @@ def parse_args():
     parser.add_argument('--n_contexts',    type=int, nargs='+', default=[2, 1])                  # number of context variables: phi0, phi1 
     parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None, None])            # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
 
-    parser.add_argument('--log_interval',  type=int, default=100)
+    parser.add_argument('--log_interval',   type=int, default=100)
     parser.add_argument('--test_interval',  type=int, default=0)
-    parser.add_argument('--log_name',  type=str, default='')
+    parser.add_argument("log_name", nargs='?', type=str, default='test::')
+#     parser.add_argument('--log_name',       type=str, nargs='+', default='test::')
 
-    args = parser.parse_args()
+    if input is None:
+        args = parser.parse_args()
+    else:
+        args = parser.parse_args(input)
 
     # use the GPU if available
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # Set args log name
-    if not args.log_name:
-        args.log_name = \
-            "test::" 
-            # "iter::%s_lr::%sn_batch::%s_n_ctx::%s_prefix::%s" % (
-            #     args.n_iters, args.lrs, args.n_batch_train, len(args.n_contexts), args.prefix)
-    # args.log_name = \
-    #     "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
-    #         args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models, args.prefix)
+#     if not args.log_name:
+#         args.log_name = \
+#             "test::" 
+#             # "iter::%s_lr::%sn_batch::%s_n_ctx::%s_prefix::%s" % (
+#             #     args.n_iters, args.lrs, args.n_batch_train, len(args.n_contexts), args.prefix)
+#     # args.log_name = \
+#     #     "n_inner::%s_k-meta-train::%s_lr_inner::%s_n_context_models::%s_prefix::%s" % (
+#     #         args.n_inner, args.k_meta_train, args.lr_inner, args.n_context_models, args.prefix)
 
     return args
