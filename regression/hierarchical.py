@@ -10,7 +10,7 @@ import numpy as np
 
 from dataset import Meta_Dataset, Meta_DataLoader, get_samples  
 from task.make_tasks import make_tasks
-from task.mixture2 import img_size
+from task.image_reconstruction import img_size
 from utils import get_args  #, vis_img_recon
 # from utils import optimize, manual_optim, send_to
 # from finite_diff import debug_top

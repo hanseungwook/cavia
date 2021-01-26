@@ -1,6 +1,6 @@
 from functools import partial
 from .regression_1d import sample_sin_fnc, sample_linear_fnc
-from .mixture2 import sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist_img_fnc, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks
+from .image_reconstruction import sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist_img_fnc, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks
 from .LQR import LQR_environment, Linear_Policy, Combine_NN_ENV
 
 

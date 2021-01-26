@@ -13,8 +13,7 @@ from torch.nn.functional import mse_loss
 
 from finite_diff import debug_lower, debug_top
 # from hierarchical import optimize
-from task import mixture2
-
+from task.image_reconstruction import img_size
 
 
 
@@ -215,8 +214,8 @@ def vis_img_recon(model, task):
     # img_inputs, img_targets = next(iter(task.loader['test']))
 
     # Get real and predicted image
-    img_real = target_gen(input_gen(0)).view(mixture2.img_size).numpy()
-    img_pred = outputs.view(mixture2.img_size).detach().numpy()
+    img_real = target_gen(input_gen(0)).view(img_size).numpy()
+    img_pred = outputs.view(img_size).detach().numpy()
 
     # Forcing all predictions beyond image value range into (0, 1)
     img_pred = np.clip(img_pred, 0, 1)
@@ -254,8 +253,8 @@ def save_img_recon(itr, task, outputs):
     # img_inputs, img_targets = next(iter(task.loader['test']))
 
     # Get real and predicted image
-    img_real = target_gen(input_gen(0)).view(mixture2.img_size).numpy()
-    img_pred = outputs.view(mixture2.img_size).detach().numpy()
+    img_real = target_gen(input_gen(0)).view(img_size).numpy()
+    img_pred = outputs.view(img_size).detach().numpy()
 
     # Forcing all predictions beyond image value range into (0, 1)
     img_pred = np.clip(img_pred, 0, 1)
