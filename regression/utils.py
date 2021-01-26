@@ -8,7 +8,7 @@ from torch.optim import Adam, SGD
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-import higher
+# import higher
 from torch.nn.functional import mse_loss
 
 from finite_diff import debug_lower, debug_top

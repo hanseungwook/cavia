@@ -58,7 +58,7 @@ def parse_args():
     parser.add_argument('--test_interval',  type=int, default=0)
     parser.add_argument('--log_name',  type=str, default='')
 
-    args = parser.parse_args()
+    args = parser.parse_args("")
 
     # use the GPU if available
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

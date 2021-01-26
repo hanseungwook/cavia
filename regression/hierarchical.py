@@ -8,11 +8,12 @@ from functools import partial
 import matplotlib.pyplot as plt
 import numpy as np
 
-# from utils import optimize, manual_optim, send_to
 from dataset import Meta_Dataset, Meta_DataLoader, get_samples  
-from task.mixture2 import sample_sin_fnc, sample_linear_fnc, sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist_img_fnc, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks, img_size
-from utils import vis_img_recon, get_args
-from finite_diff import debug_top
+from task.make_tasks import make_tasks
+from task.mixture2 import img_size
+from utils import get_args  #, vis_img_recon
+# from utils import optimize, manual_optim, send_to
+# from finite_diff import debug_top
 # from torch.autograd import gradcheck
 
 import higher 
@@ -245,9 +246,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, status, devi
 
                 ## loss.backward() & optim.step()
                 if reset:
-                    new_param, = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
-                    param_all[level] = new_param
-                    
+                    param_all[level], = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
                 else:
                     optim.zero_grad()
                     loss.backward()
