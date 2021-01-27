@@ -156,8 +156,10 @@ def get_args(args_dict, level):
 #################################################################################
 def get_vis_fn(tasks):
     for task in tasks:
-        if task == 'cifar10':
-            return vis_img_recon
+        if task == 'cifar10' or task == 'mnist' or task == 'fmnist' or task == 'mnist_fmnist' or task == 'mnist_fmnist_3level':
+            return vis_save_img_recon
+        else
+            raise NotImplementedError()
 
 def vis_pca(higher_contexts, task_family, iteration, args):
     pca = PCA(n_components=2)
@@ -195,82 +197,92 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function, 
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
     plt.close()
 
-def vis_img_recon(model, task):
-    # Do inner-loop optimizations (outer-loop set to 0) # 0 1 inner loop optimization, 1-class
-    test_loss, outputs = model(task, optimizer = Adam, reset=False, return_outputs=True)
-    
-    # Inner-loop 0 for a given image within a class
-    task = task[0]
-    max_level = task.level
-    level = max_level
-    
-    # From higher levels, recurse all the way down to level 0
-    while level > 0:
-        print(task)
-        loader = task.loader['test']
-        task = next(iter(loader))[0]
-        level -= 1
-    
-    # Input and target generator functions for a specific task from train (level 0)
-    input_gen, target_gen = task.task
-    # img_inputs, img_targets = next(iter(task.loader['test']))
-
-    # Get real and predicted image
-    img_real = target_gen(input_gen(0)).view(img_size).numpy()
-    img_pred = outputs.view(img_size).detach().numpy()
+def vis_save_img_recon(outputs, save_dir, itr):
+    img_pred = outputs.view(28, 28, 1).detach().cpu().numpy()
 
     # Forcing all predictions beyond image value range into (0, 1)
     img_pred = np.clip(img_pred, 0, 1)
-    print('Loss: {}'.format(mse_loss(torch.from_numpy(img_pred), torch.from_numpy(img_real))))
+    img_pred = np.round(img_pred * 255.0).astype(np.uint8)
+    img_pred = transforms.ToPILImage(mode='L')(img_pred)
+    img_pred.save(os.path.join(save_dir, 'recon_img_itr{}.png'.format(itr)))
 
-    # Plotting real and predicted images
-    fig = plt.figure(figsize=(8, 8))
-    fig.add_subplot(1, 2, 1)
-    plt.imshow(img_real)
-
-    fig.add_subplot(1, 2, 2)
-    plt.imshow(img_pred)
-
-    plt.show()
-
-def save_img_recon(itr, task, outputs):
-    save_dir = './cifar10_ours_recon_plots'
-    if not os.path.isdir(save_dir):
-        os.mkdir(save_dir)
-
-    # Inner-loop 0 for a given image within a class
-    task = task[0]
-    max_level = task.level
-    level = max_level
+## Old visualization code
+# def vis_img_recon(model, task):
+#     # Do inner-loop optimizations (outer-loop set to 0) # 0 1 inner loop optimization, 1-class
+#     test_loss, outputs = model(task, optimizer = Adam, reset=False, return_outputs=True)
     
-    # From higher levels, recurse all the way down to level 0
-    while level > 0:
-        print(task)
-        loader = task.loader['test']
-        task = next(iter(loader))[0]
-        level -= 1
+#     # Inner-loop 0 for a given image within a class
+#     task = task[0]
+#     max_level = task.level
+#     level = max_level
     
-    # Input and target generator functions for a specific task from train (level 0)
-    input_gen, target_gen = task.task
-    # img_inputs, img_targets = next(iter(task.loader['test']))
+#     # From higher levels, recurse all the way down to level 0
+#     while level > 0:
+#         print(task)
+#         loader = task.loader['test']
+#         task = next(iter(loader))[0]
+#         level -= 1
+    
+#     # Input and target generator functions for a specific task from train (level 0)
+#     input_gen, target_gen = task.task
+#     # img_inputs, img_targets = next(iter(task.loader['test']))
 
-    # Get real and predicted image
-    img_real = target_gen(input_gen(0)).view(img_size).numpy()
-    img_pred = outputs.view(img_size).detach().numpy()
+#     # Get real and predicted image
+#     img_real = target_gen(input_gen(0)).view(img_size).numpy()
+#     img_pred = outputs.view(img_size).detach().numpy()
 
-    # Forcing all predictions beyond image value range into (0, 1)
-    img_pred = np.clip(img_pred, 0, 1)
-    # print('Loss: {}'.format(mse_loss(torch.from_numpy(img_pred), torch.from_numpy(img_real))))
+#     # Forcing all predictions beyond image value range into (0, 1)
+#     img_pred = np.clip(img_pred, 0, 1)
+#     print('Loss: {}'.format(mse_loss(torch.from_numpy(img_pred), torch.from_numpy(img_real))))
 
-    # Plotting real and predicted images
-    fig = plt.figure(figsize=(8, 8))
-    fig.add_subplot(1, 2, 1)
-    plt.imshow(img_real)
+#     # Plotting real and predicted images
+#     fig = plt.figure(figsize=(8, 8))
+#     fig.add_subplot(1, 2, 1)
+#     plt.imshow(img_real)
 
-    fig.add_subplot(1, 2, 2)
-    plt.imshow(img_pred)
+#     fig.add_subplot(1, 2, 2)
+#     plt.imshow(img_pred)
 
-    plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(itr)))
+#     plt.show()
+
+# def save_img_recon(itr, task, outputs):
+#     save_dir = './cifar10_ours_recon_plots'
+#     if not os.path.isdir(save_dir):
+#         os.mkdir(save_dir)
+
+#     # Inner-loop 0 for a given image within a class
+#     task = task[0]
+#     max_level = task.level
+#     level = max_level
+    
+#     # From higher levels, recurse all the way down to level 0
+#     while level > 0:
+#         print(task)
+#         loader = task.loader['test']
+#         task = next(iter(loader))[0]
+#         level -= 1
+    
+#     # Input and target generator functions for a specific task from train (level 0)
+#     input_gen, target_gen = task.task
+#     # img_inputs, img_targets = next(iter(task.loader['test']))
+
+#     # Get real and predicted image
+#     img_real = target_gen(input_gen(0)).view(img_size).numpy()
+#     img_pred = outputs.view(img_size).detach().numpy()
+
+#     # Forcing all predictions beyond image value range into (0, 1)
+#     img_pred = np.clip(img_pred, 0, 1)
+#     # print('Loss: {}'.format(mse_loss(torch.from_numpy(img_pred), torch.from_numpy(img_real))))
+
+#     # Plotting real and predicted images
+#     fig = plt.figure(figsize=(8, 8))
+#     fig.add_subplot(1, 2, 1)
+#     plt.imshow(img_real)
+
+#     fig.add_subplot(1, 2, 2)
+#     plt.imshow(img_pred)
+
+#     plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(itr)))
     
 
 

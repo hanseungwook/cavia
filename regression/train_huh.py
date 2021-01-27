@@ -61,8 +61,7 @@ def run(args, logger_maker):
         del checkpoint
         
     if args.viz:
-        vis_fn = get_vis_fn(args.task)
-        vis_fn(model, task)
+        vis_save_fn = get_vis_fn(args.task)
         
     else:
         for i in range(num_test):
@@ -73,17 +72,12 @@ def run(args, logger_maker):
             if not os.path.isdir(save_dir):
                 os.mkdir(save_dir)
 
-            print('Saving reconstruction')
-            img_pred = outputs.view(28, 28, 1).detach().cpu().numpy()
-
-            # Forcing all predictions beyond image value range into (0, 1)
-            img_pred = np.clip(img_pred, 0, 1)
-            img_pred = np.round(img_pred * 255.0).astype(np.uint8)
-            img_pred = transforms.ToPILImage(mode='L')(img_pred)
-            # plt.imshow(img_pred)
-            # plt.savefig(os.path.join(save_dir, 'recon_img_itr{}.png'.format(i*args.test_interval)))
-            img_pred.save(os.path.join(save_dir, 'recon_img_itr{}.png'.format(i*args.test_interval)))
+            # Visualize and save
+            if args.viz:
+                print('Saving reconstruction')
+                vis_save_fn(outputs, save_dir, i*args.test_interval)
             
+            # Save model state
             print('Saving model')
             torch.save({'model_state_dict': model.state_dict()}, os.path.join(save_dir, 'model.pth'))
     
