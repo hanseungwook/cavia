@@ -56,7 +56,7 @@ def get_args(input = None):
 
     parser.add_argument('--log_interval',   type=int, default=100)
     parser.add_argument('--test_interval',  type=int, default=0)
-    parser.add_argument("log_name", nargs='?', type=str, default='test::')
+    parser.add_argument('--log_name', nargs='?', type=str, default='test::')
 #     parser.add_argument('--log_name',       type=str, nargs='+', default='test::')
 
     if input is None:
