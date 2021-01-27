@@ -158,7 +158,7 @@ def get_vis_fn(tasks):
     for task in tasks:
         if task == 'cifar10' or task == 'mnist' or task == 'fmnist' or task == 'mnist_fmnist' or task == 'mnist_fmnist_3level':
             return vis_save_img_recon
-        else
+        else:
             raise NotImplementedError()
 
 def vis_pca(higher_contexts, task_family, iteration, args):
