@@ -73,15 +73,17 @@ def set_log(args, no_print):
 
 def set_logger(logger_name, log_file, level=logging.INFO):
     log = logging.getLogger(logger_name)
-    formatter = logging.Formatter('%(asctime)s : %(message)s')
-    fileHandler = logging.FileHandler(log_file, mode='w')
-    fileHandler.setFormatter(formatter)
-    streamHandler = logging.StreamHandler()
-    streamHandler.setFormatter(formatter)
 
-    log.setLevel(level)
-    log.addHandler(fileHandler)
-    log.addHandler(streamHandler)
+    if not getattr(log, 'handler_set', None):
+        formatter = logging.Formatter('%(asctime)s : %(message)s')
+        fileHandler = logging.FileHandler(log_file, mode='w')
+        fileHandler.setFormatter(formatter)
+        streamHandler = logging.StreamHandler()
+        streamHandler.setFormatter(formatter)
+
+        log.setLevel(level)
+        log.addHandler(fileHandler)
+        log.addHandler(streamHandler)
 
 
 
