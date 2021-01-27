@@ -40,10 +40,12 @@ def run(args, logger_maker):
     n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
     task = get_hierarchical_task(args.task, args.classes, k_batch_dict, n_batch_dict)    ### FIX THIS : task_func_list
     
+    levels = len(args.k_batch_train)
     base_model      = get_base_model(args)
     encoder_models  = get_encoder_model(args.encoders, args)                   # adaptation model: None == MAML
-    loggers         = [logger_maker(additional_name='0', no_print=True), logger_maker(additional_name='1', no_print=True), logger_maker(additional_name='2', no_print=False)]
-    test_loggers         = [logger_maker(additional_name='test_0', no_print=True), logger_maker(additional_name='test_1', no_print=True), logger_maker(additional_name='test_2', no_print=True)]
+    loggers = [logger_maker(additional_name=str(l), no_print=True) for l in range(levels-1)] + [logger_maker(additional_name=str(levels-1), no_print=False)]
+    test_loggers = [logger_maker(additional_name='test_{}'.format(str(l)), no_print=True) for l in range(levels)]
+
     if args.test_interval == 0:
         args.test_interval = args.n_iters[-1]
     num_test = args.n_iters[-1] // args.test_interval
