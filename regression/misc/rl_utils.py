@@ -16,7 +16,7 @@ def make_env(args, env=None, task=None):
     def _make_env():
         env.max_steps = args.ep_max_timestep
         env.reset_task(task=task)
-        return VectorObsWrapper(env)        
+        return VectorObsWrapper(env)
     return _make_env
 
 
@@ -38,9 +38,14 @@ def collect_trajectory(task, base_model, args, logger):
         categorical = base_model(obs)
         action = categorical.sample()
         logprob = categorical.log_prob(action)
+        if args.is_continuous_action:
+            logprob = torch.sum(logprob, dim=1)
 
         # Take step in the environment
-        action = action.cpu().numpy().astype(int)
+        if args.is_continuous_action:
+            action = action.cpu().numpy().astype(float)
+        else:
+            action = action.cpu().numpy().astype(int)
         next_obs, reward, done, _ = env.step(action)
 
         # Add to memory

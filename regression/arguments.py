@@ -27,6 +27,9 @@ def parse_args():
     parser.add_argument(
         '--n_contexts', type=int, nargs='+', default=[5, 5],
         help="number of context variables: phi0, phi1")
+    parser.add_argument(
+        '--is_continuous_action', action='store_true', default=False,
+        help='turn on continuous action')
 
     # Arguments for reinforcement learning settings
     parser.add_argument(

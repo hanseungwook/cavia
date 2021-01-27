@@ -65,7 +65,8 @@ def get_base_model(args, logger):
     args.architecture[-1] = action_dim
     env.close()
 
-    model = model_type(n_arch=args.architecture, n_contexts=args.n_contexts, device=args.device).to(args.device)
+    model = model_type(n_arch=args.architecture, n_contexts=args.n_contexts, is_continuous_action=args.is_continuous_action, 
+                        device=args.device).to(args.device)
     logger.log[args.log_name].info("Model: {}".format(model))
 
     return model

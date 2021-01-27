@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch.distributions import Categorical
+from torch.distributions import Categorical, Normal
 
 
 class BaseModelRL(nn.Module):
-    def __init__(self, n_arch, n_contexts, nonlin, loss_fnc, device, FC_module):
+    def __init__(self, n_arch, n_contexts, nonlin, loss_fnc, device, is_continuous_action, FC_module):
         super().__init__()
 
         self.module_list = nn.ModuleList()
@@ -17,6 +17,9 @@ class BaseModelRL(nn.Module):
         self.nonlin = nonlin
         self.loss_fnc = loss_fnc
         self.n_arch = n_arch
+        if is_continuous_action:
+            self.sigma = nn.Parameter(torch.Tensor(output_size))
+            self.sigma.data.fill_(math.log(init_std))
 
     def forward(self, x):
         raise NotImplementedError()
@@ -30,9 +33,9 @@ class BaseModelRL(nn.Module):
 
 
 class CaviaRL(BaseModelRL):
-    def __init__(self, n_arch, n_contexts, nonlin=nn.ReLU(), loss_fnc=None, device=None):
+    def __init__(self, n_arch, n_contexts, is_continuous_action, nonlin=nn.ReLU(), loss_fnc=None, device=None):
         n_arch[0] += sum(n_contexts)  # add n_context to n_input 
-        super(CaviaRL, self).__init__(n_arch, n_contexts, nonlin, loss_fnc, device, FC_module=nn.Linear)
+        super(CaviaRL, self).__init__(n_arch, n_contexts, nonlin, loss_fnc, device, is_continuous_action, FC_module=nn.Linear)
 
     def forward(self, x, layers=None, ctx_=None):
         if isinstance(x, np.ndarray):
@@ -57,5 +60,11 @@ class CaviaRL(BaseModelRL):
         for i, layer in enumerate(layers_):
             x = layer(x)
             x = self.nonlin(x) if i < len(layers_) - 1 else x
-    
-        return Categorical(logits=x)
+            if i == len(layers_) - 1:
+                if is_continuous_action:
+                    scale = torch.exp(torch.clamp(self.sigma, min=self.min_log_std))
+        
+        if is_continuous_action:
+            return Normal(loc=x, scale=scale)
+        else:
+            return Categorical(logits=x)

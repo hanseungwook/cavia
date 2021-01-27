@@ -165,6 +165,8 @@ def get_hierarchical_task(args, logger):
         highest_tasks = ["MiniGrid-Unlock-Easy-v0", "MiniGrid-Unlock-Easy-v0"]
     elif args.task == "mixture":
         highest_tasks = ["MiniGrid-Empty-5x5-v0", "MiniGrid-Unlock-Easy-v0"]
+    elif args.task == "ant":
+        highest_tasks = ["AntVel-v1", "AntVel-v1"]
     else:
         raise ValueError("Invalid task option")
 
