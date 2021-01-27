@@ -1,7 +1,7 @@
 import logging
 from tensorboardX import SummaryWriter
 
-import os
+import os, sys
 import random
 import torch
 from torch.optim import Adam, SGD
@@ -64,9 +64,9 @@ def set_log(args, no_print):
     log[args.log_name] = logging.getLogger(args.log_name)
 
     # Only print if logger is set to print
-    if not no_print:
-        for arg, value in sorted(vars(args).items()):
-            log[args.log_name].info("%s: %r", arg, value)
+    # if not no_print:
+    #     for arg, value in sorted(vars(args).items()):
+    #         log[args.log_name].info("%s: %r", arg, value)
 
     return log
 
@@ -86,6 +86,10 @@ def set_logger(logger_name, log_file, level=logging.INFO):
 
 
 ##########################
+
+def print_args():
+    for arg, value in sorted(vars(args).items()):
+        print("%s: %r".format(arg, value), file=sys.stderr)
 
 def set_seed(seed, cudnn=True):
     """
