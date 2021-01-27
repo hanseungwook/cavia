@@ -1,6 +1,6 @@
 import torch
 import gym
-from gym_minigrid.wrappers import VectorObsWrapper
+#from gym_minigrid.wrappers import VectorObsWrapper
 from misc.linear_baseline import LinearFeatureBaseline, get_return
 from misc.replay_memory import ReplayMemory
 from misc.multiprocessing_env import SubprocVecEnv
@@ -16,7 +16,7 @@ def make_env(args, env=None, task=None):
     def _make_env():
         env.max_steps = args.ep_max_timestep
         env.reset_task(task=task)
-        return VectorObsWrapper(env)
+        return env = gym.make(env)
     return _make_env
 
 
