@@ -199,10 +199,10 @@ def sample_cifar10_img_fnc(label, sample_type):
 
     return img_input_function, t_fn
 
-def sample_mnist(labels):
+def sample_mnist(labels, sample_type):
     return [partial(sample_mnist_img_fnc, l) for l in labels]
 
-def sample_fashion_mnist(labels):
+def sample_fashion_mnist(labels, sample_type):
     return [partial(sample_fashion_mnist_img_fnc, l) for l in labels]
 
 def sample_mnist_img_fnc(label, sample_type):
