@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
 from hierarchical import Hierarchical_Model,  get_hierarchical_task   # make_hierarhical_model,
-from utils import get_vis_fn, save_img_recon
+from utils import get_vis_fn
 
 from pdb import set_trace
 import IPython
