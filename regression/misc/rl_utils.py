@@ -16,7 +16,7 @@ def make_env(args, env=None, task=None):
     def _make_env():
         env.max_steps = args.ep_max_timestep
         env.reset_task(task=task)
-        return env = gym.make(env)
+        return gym.make(env)
     return _make_env
 
 
