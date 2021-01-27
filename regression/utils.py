@@ -63,8 +63,10 @@ def set_log(args):
     set_logger(logger_name=args.log_name,   log_file=r'{0}{1}'.format("./logs/",  args.log_name))  
     log[args.log_name] = logging.getLogger(args.log_name)
 
-    for arg, value in sorted(vars(args).items()):
-        log[args.log_name].info("%s: %r", arg, value)
+    # Only print if logger is set to print
+    if not log[args.log_name].no_print:
+        for arg, value in sorted(vars(args).items()):
+            log[args.log_name].info("%s: %r", arg, value)
 
     return log
 
