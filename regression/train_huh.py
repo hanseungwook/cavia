@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
 from hierarchical import Hierarchical_Model,  get_hierarchical_task   # make_hierarhical_model,
-from utils import get_vis_fn
+from utils import get_vis_fn, print_args
 
 from pdb import set_trace
 import IPython
@@ -36,6 +36,7 @@ def make_batch_dict(n_trains, n_tests, n_valids):
             ]
 
 def run(args, logger_maker):
+    print_args(args)
     k_batch_dict = make_batch_dict(args.k_batch_train, args.k_batch_test, args.k_batch_valid)
     n_batch_dict = make_batch_dict(args.n_batch_train, args.n_batch_test, args.n_batch_valid)
     task = get_hierarchical_task(args.task, args.classes, k_batch_dict, n_batch_dict)    ### FIX THIS : task_func_list
