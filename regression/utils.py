@@ -29,7 +29,7 @@ DEBUG_LEVELS = []  # [1] #[0]  #[2]
 
 class Logger():
     def __init__(self, args, additional_name='', no_print=False):
-        self.log         = set_log(args)
+        self.log         = set_log(args, no_print)
         self.log_name    = args.log_name
         self.update_iter = args.log_interval
         self.tb_writer   = SummaryWriter('./logs/tb_{}_{}'.format(args.log_name, additional_name))
@@ -58,13 +58,13 @@ class Logger():
                 self.tb_writer.add_scalar("Context {}/{}".format(task_name, i), ctx[i], self.iter)
 
 
-def set_log(args):
+def set_log(args, no_print):
     log = {}
     set_logger(logger_name=args.log_name,   log_file=r'{0}{1}'.format("./logs/",  args.log_name))  
     log[args.log_name] = logging.getLogger(args.log_name)
 
     # Only print if logger is set to print
-    if not log[args.log_name].no_print:
+    if not no_print:
         for arg, value in sorted(vars(args).items()):
             log[args.log_name].info("%s: %r", arg, value)
 
