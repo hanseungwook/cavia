@@ -7,7 +7,7 @@ def parse_args():
 
     # Arguments for algorithm
     parser.add_argument(
-        '--task', type=str, choices=["empty", "unlock", "mixture"], 
+        '--task', type=str, choices=["empty", "unlock", "mixture", "ant"], 
         help="Problem to solve")
     parser.add_argument(
         '--architecture', type=int, nargs='+', default=[1, 40, 40, 1], 
@@ -50,7 +50,8 @@ def parse_args():
     args = parser.parse_args()
 
     # use the GPU if available
-    args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    #args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    args.device = torch.device("cpu")
 
     # Set args log name
     args.log_name = \

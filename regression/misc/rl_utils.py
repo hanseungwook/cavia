@@ -3,7 +3,7 @@ import gym
 #from gym_minigrid.wrappers import VectorObsWrapper
 from misc.linear_baseline import LinearFeatureBaseline, get_return
 from misc.replay_memory import ReplayMemory
-from misc.multiprocessing_env import SubprocVecEnv
+from envs.subproc_vec_env import SubprocVecEnv
 
 iteration = 0
 
@@ -11,11 +11,10 @@ iteration = 0
 def make_env(args, env=None, task=None):
     # Set dummy task
     if env is None:
-        env = gym.make("MiniGrid-Empty-5x5-v0")
+        env = gym.make("AntVel-v1")
 
     def _make_env():
-        env.max_steps = args.ep_max_timestep
-        env.reset_task(task=task)
+        #env.reset_task(task=task)
         return gym.make(env)
     return _make_env
 
