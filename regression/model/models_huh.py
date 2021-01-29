@@ -45,11 +45,11 @@ def make_ctx(n, device):
 
 class BaseModel2_CAVIA(nn.Module):
 
-    def __init__(self, n_ctx, *layers):
+    def __init__(self, n_ctx, device, *layers):
         super().__init__()
 
         self.layers = nn.ModuleList(list(layers))        
-        self.parameters_all = [make_ctx(n) for n in n_ctx] + [self.layers.parameters]
+        self.parameters_all = [make_ctx(n, device) for n in n_ctx] + [self.layers.parameters]
         self.nonlin = nn.ReLU()
         self.loss_fnc = nn.MSELoss()
 

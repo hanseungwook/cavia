@@ -152,10 +152,10 @@ def get_args(args_dict, level):
 #################################################################################
 # VISUALIZATION
 #################################################################################
-def get_vis_fn(tasks):
-    for task in tasks:
-        if task == 'cifar10':
-            return vis_img_recon
+# def get_vis_fn(tasks):
+#     for task in tasks:
+#         if task == 'cifar10':
+#             return vis_img_recon
 
 def vis_pca(higher_contexts, task_family, iteration, args):
     pca = PCA(n_components=2)
@@ -193,9 +193,9 @@ def vis_prediction(model, lower_context, higher_context, inputs, task_function, 
     plt.savefig("logs/n_inner" + str(args.n_inner) + "/iteration" + str(iteration).zfill(3) + "_" + super_task + ".png")
     plt.close()
 
-def vis_img_recon(model, task):
+def vis_img_recon(model, task):  #   This function shouldn't be needed
     # Do inner-loop optimizations (outer-loop set to 0) # 0 1 inner loop optimization, 1-class
-    test_loss, outputs = model(task, optimizer = Adam, reset=False, return_outputs=True)
+    test_loss, outputs = model(task, optimizer = Adam, reset=False, return_outputs=True)  # Already done in train_huh.py
     
     # Inner-loop 0 for a given image within a class
     task = task[0]
