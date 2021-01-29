@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
 from hierarchical import Hierarchical_Model,  get_hierarchical_task
-# from utils import vis_img_recon #, save_img_recon  #get_vis_fn
+from utils import get_vis_fn, print_args
 
 from pdb import set_trace
 import IPython
@@ -71,20 +71,20 @@ def run(args, loggers, test_loggers):
     
     task = get_task(args)
 
-#     if args.viz: # This shouldn't be needed. Utilize model run below directly # Visualize only without training
-#         vis_img_recon(model, task) 
-        
     save_dir = get_save_dir(args.log_name)    
+    if args.viz:  # should this be needed? Utilize model run below directly 
+        vis_save_fn = get_vis_fn(args.task)
 
     print('start model training')
     for i in range(num_test):
         test_loss, outputs = model(task, optimizer=Adam, reset=False, return_outputs=True) #outerloop = True)   # grad_clip = args.clip ) #TODO: gradient clipping?
         print('outer-loop idx', i, 'test loss', test_loss.item())
         
-#         if image_flag:
-#             image_reconstruction(save_dir, outputs, iter_num=i*args.test_interval, show_flag=show_flag)
+        if args.viz:
+            print('Saving reconstruction')
+            vis_save_fn(outputs, save_dir, i*args.test_interval)
 
-    save_model(save_dir, model)  
+        save_model(save_dir, model)  
     
             
     return test_loss.item() 
@@ -126,18 +126,3 @@ def save_model(save_dir, model):
     print('Saving model')
     torch.save({'model_state_dict': model.state_dict()}, os.path.join(save_dir, file_name))
             
-
-def image_reconstruction(save_dir, outputs, iter_num, show_flag):
-    filename = 'recon_img_itr{}.png'.format(iter_num)
-    print('Saving reconstruction')
-    
-    img_pred = outputs.view(28, 28, 1).detach().cpu().numpy()
-    img_pred = np.clip(img_pred, 0, 1)                          # Forcing all predictions beyond image value range into (0, 1)
-    img_pred = np.round(img_pred * 255.0).astype(np.uint8)
-    img_pred = transforms.ToPILImage(mode='L')(img_pred)
-    
-    img_pred.save(os.path.join(save_dir, filename))
-    if show_flag:
-        plt.imshow(img_pred)
-    # plt.savefig(os.path.join(save_dir, filename))
-                

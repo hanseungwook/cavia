@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from dataset import Meta_Dataset, Meta_DataLoader #, get_samples  
-from task.make_tasks import get_task_fnc
+from task.make_tasks_new import get_task_fnc
 from task.image_reconstruction import img_size
 from utils import get_args  #, vis_img_recon
 # from utils import optimize, manual_optim, send_to
@@ -179,10 +179,9 @@ class Hierarchical_Task():
         else:
             if isinstance(task, list):    # To fix: task does not take sample_type as an input
                 assert total_batch <= len(task)
-                subtask_samples = random.sample(task, total_batch)                 # sampling from list 
+                subtask_samples = random.sample(task, total_batch)                      # sampling from list 
             else:
-                subtask_samples = [task(sample_type) for _ in range(total_batch)]  # sampling from function 
-
+                subtask_samples = list(task(sample_type) for _ in range(total_batch))   # sampling from function 
             subtask_list = [self.__class__(subtask, batch_dict_next) for subtask in subtask_samples]  # Recursive
             return Meta_Dataset(data=subtask_list)
 
