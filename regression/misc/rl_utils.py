@@ -1,21 +1,18 @@
 import torch
 import gym
+import envs
 #from gym_minigrid.wrappers import VectorObsWrapper
 from misc.linear_baseline import LinearFeatureBaseline, get_return
 from misc.replay_memory import ReplayMemory
-from envs.subproc_vec_env import SubprocVecEnv
+from misc.multiprocessing_env import SubprocVecEnv
 
 iteration = 0
 
 
 def make_env(args, env=None, task=None):
-    # Set dummy task
-    if env is None:
-        env = gym.make("AntVel-v1")
-
     def _make_env():
-        #env.reset_task(task=task)
-        return gym.make(env)
+        env.reset_task(task=task)
+        return env
     return _make_env
 
 
@@ -29,6 +26,7 @@ def collect_trajectory(task, base_model, args, logger):
     # Set environment
     print("Collecting traj with task {}".format(task[1]))
     env = SubprocVecEnv([make_env(args, env=task[0], task=task[1]) for _ in range(args.batch[0])])
+    print("Collecting succeeded")
 
     obs = env.reset()
 

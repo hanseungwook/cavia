@@ -35,6 +35,7 @@ class BaseModelRL(nn.Module):
 class CaviaRL(BaseModelRL):
     def __init__(self, n_arch, n_contexts, is_continuous_action, nonlin=nn.ReLU(), loss_fnc=None, device=None):
         n_arch[0] += sum(n_contexts)  # add n_context to n_input 
+        self.is_continuous_action = is_continuous_action
         super(CaviaRL, self).__init__(n_arch, n_contexts, nonlin, loss_fnc, device, is_continuous_action, FC_module=nn.Linear)
 
     def forward(self, x, layers=None, ctx_=None):
@@ -61,10 +62,10 @@ class CaviaRL(BaseModelRL):
             x = layer(x)
             x = self.nonlin(x) if i < len(layers_) - 1 else x
             if i == len(layers_) - 1:
-                if is_continuous_action:
+                if self.is_continuous_action:
                     scale = torch.exp(torch.clamp(self.sigma, min=self.min_log_std))
         
-        if is_continuous_action:
+        if self.is_continuous_action:
             return Normal(loc=x, scale=scale)
         else:
             return Categorical(logits=x)

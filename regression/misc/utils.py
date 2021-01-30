@@ -2,6 +2,7 @@ import logging
 import random
 import torch
 import numpy as np
+import gym
 from tensorboardX import SummaryWriter
 from model import get_model_type
 from misc.rl_utils import make_env
@@ -58,9 +59,9 @@ def get_base_model(args, logger):
 
     # Overwrite last layer of the architecture according to the action space of the environment
     # Note that we put a default env and task only to get the action space of the environment
-    env = make_env(args=args)()
+    env = gym.make("AntVel-v1")
     input_dim = env.observation_space.shape[0]
-    action_dim = env.action_space.n
+    action_dim = env.action_space.shape[0]
     args.architecture[0] = input_dim
     args.architecture[-1] = action_dim
     env.close()
