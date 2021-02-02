@@ -118,7 +118,7 @@ def get_loggers(logger_maker, levels):
 def get_save_dir(log_name):
     save_dir = os.path.join('model_save', log_name)
     if not os.path.isdir(save_dir):
-        os.mkdir(save_dir)
+        os.makedirs(save_dir, exist_ok=True)
     return save_dir
 
 def save_model(save_dir, model):
