@@ -8,7 +8,7 @@ from functools import partial
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dataset import Meta_Dataset, Meta_DataLoader #, get_samples  
+from dataset import Meta_Dataset, Meta_DataLoader, get_samples #, get_samples  
 from task.make_tasks import make_tasks
 from task.image_reconstruction import img_size
 from utils import get_args  #, vis_img_recon
@@ -165,25 +165,30 @@ class Hierarchical_Task():
             return DataLoader(dataset, batch_size=mini_batch, shuffle=shuffle)                # returns tensors
 
     def get_dataset(self, task, total_batch, sample_type, batch_dict_next = None):             # make a dataset out of the samples from the given task
-        if isinstance(task, tuple): 
-            assert(self.level == 0)
-            assert(len(task) == 2)
-            
-            input_gen, target_gen = task
-            input_data  = input_gen(total_batch, sample_type)  # Huh : added sample_type as input
-            target_data = target_gen(input_data) if target_gen is not None else None
+        if self.level == 0:
+            input_gen, target_gen = self.task
+            input_data  = input_gen(total_batchsize)
+            target_data = target_gen(input_data)
+
             if DOUBLE_precision:
-                input_data  = input_data.double();    target_data = target_data.double() if target_data is not None else None        
-            return Meta_Dataset(data=input_data, target=target_data)
+                input_data = input_data.double();  target_data=target_data.double()
+
+            dataset = Meta_Dataset(data=input_data, target=target_data)
+
+            # Full range/batch if both 0s
+            if mini_batchsize == 0 and total_batchsize == 0:
+                mini_batchsize = len(dataset)
+
+            shuffle = True if sample_type == 'train' else False
+
+            return DataLoader(dataset, batch_size=mini_batchsize, shuffle=shuffle)                # returns tensors
+
 
         else:
-            if isinstance(task, list):    # To fix: task does not take sample_type as an input
-                assert total_batch <= len(task)
-                subtask_samples = random.sample(task, total_batch)                      # sampling from list 
-            else:
-                subtask_samples = list(task(sample_type) for _ in range(total_batch))   # sampling from function 
-            subtask_list = [self.__class__(subtask, batch_dict_next) for subtask in subtask_samples]  # Recursive
-            return Meta_Dataset(data=subtask_list)
+            tasks = get_samples(self.task, total_batchsize, sample_type)
+            subtask_list = [self.__class__(task, self.batch_dict_next) for task in tasks]  # recursive
+            subtask_dataset = Meta_Dataset(data=subtask_list)
+            return Meta_DataLoader(subtask_dataset, batch_size=mini_batchsize, task_name=str(self.task))            #   returns a mini-batch of Hiearchical Tasks[
 
     
 
