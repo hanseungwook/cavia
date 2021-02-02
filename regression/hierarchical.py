@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from dataset import Meta_Dataset, Meta_DataLoader #, get_samples  
-from task.make_tasks_new import get_task_fnc
+from task.make_tasks import make_tasks
 from task.image_reconstruction import img_size
 from utils import get_args  #, vis_img_recon
 # from utils import optimize, manual_optim, send_to
@@ -44,7 +44,7 @@ print_optimize_level_over = False
 
 
 def get_hierarchical_task(task_name, classes, k_batch_dict, n_batch_dict):
-    task_func = get_task_fnc(task_name, classes)
+    task_func = make_tasks(task_name, classes)
     task = Hierarchical_Task(task_func, (k_batch_dict, n_batch_dict))
     return Meta_Dataset(data=[task])
 
