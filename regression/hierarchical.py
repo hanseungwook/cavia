@@ -42,17 +42,60 @@ print_optimize_level_over = False
 
 ###################################
 
+def make_tasks(task_names, classes):
+    task_func_dict = {}
+    task_func_dict['train'] = []
+    task_func_dict['test'] = []
+    for task in task_names:
+        if task == 'sine':
+            task_func_dict['train'].append(sample_sin_fnc)
+            # task_func_list.append(sample_sin_fnc)
+        elif task == 'linear':
+            task_func_dict['train'].append(sample_linear_fnc)
+            # task_func_list.append(sample_linear_fnc)
+        elif task == 'celeba':
+            task_func_dict['train'].append(sample_celeba_img_fnc)
+            # task_func_list.append(sample_celeba_img_fnc)
+        elif task == 'cifar10':
+            # task_func_dict['train'] = [partial(sample_cifar10_img_fnc, l) for l in range(5)]
+            # task_func_dict['test'] = [partial(sample_cifar10_img_fnc, l) for l in range(5,10)]
+            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, l) for l in range(7)])
+            task_func_dict['test'].extend([partial(sample_cifar10_img_fnc, l) for l in range(7,10)])
+        elif task == 'celeba_airplane':
+            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, 0), sample_celeba_img_fnc])
+            task_func_dict['test'].extend([partial(sample_cifar10_img_fnc, 0), sample_celeba_img_fnc])          
 
-def get_hierarchical_task(task_name, classes, k_batch_dict, n_batch_dict):
-    task_func = make_tasks(task_name, classes)
-    task = Hierarchical_Task(task_func, (k_batch_dict, n_batch_dict))
+            # for l in range(1):
+            #     task_func_list.append(partial(sample_cifar10_img_fnc, l))
+        elif task == 'airplane':
+            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, 0)])
+        elif task == 'hier-imagenet':
+            task_func_dict['train'] = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
+            # task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
+        elif task == 'mnist':
+            if len(classes) <= 0:
+                classes = list(range(0, 10))
+            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in classes])
+        elif task == 'fashion_mnist':
+            if len(classes) <= 0:
+                classes = list(range(0, 10))
+            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in classes])
+        elif task == 'mnist_fmnist':
+            if len(classes) <= 0:
+                classes = list(range(0, 10))
+            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in classes])
+            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in classes])
+        else:
+            raise Exception('Task not implemented/undefined')
+
+    print(task_func_dict)
+    return task_func_dict
+
+def get_hierarchical_task(task_list, classes, k_batch_dict, n_batch_dict):
+    task_func_list = make_tasks(task_list, classes)
+    task = Hierarchical_Task(task_func_list, (k_batch_dict, n_batch_dict))
     return Meta_Dataset(data=[task])
 
-def move_to_device(input_tuple, device):
-    if device is None:
-        return input_tuple
-    else:
-        return [k.to(device) for k in input_tuple]
 
 ##############################################################################
 #  Model Hierarchy
@@ -63,9 +106,12 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         # assert hasattr  (decoder_model, 'forward')    # submodel has a built-in forward() method 
 
         if data_parallel:
-            decoder_model = nn.DataParallel(decoder_model)
+            self.decoder_model = nn.DataParallel(decoder_model)
             
-        self.decoder_model  = decoder_model            
+        else:
+            self.decoder_model = decoder_model
+            
+        self.decoder_model  = nn.DataParallel(decoder_model)
         self.n_contexts = n_contexts
         self.args_dict = {'max_iters' : max_iters,
                           'for_iters' : for_iters, 
@@ -73,57 +119,57 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                           'loggers'   : loggers,
                           'test_loggers': test_loggers
                           }
-        
-        print('max_iters', max_iters)
-        
-        self.device    = decoder_model.device
+        self.device     = decoder_model.device
+
         self.level_max = len(decoder_model.parameters_all)
-            
         # self.adaptation = optimize if encoder_model is None else encoder_model 
 
     def forward(self, task_batch, level=None, optimizer=SGD, reset=True, return_outputs=False, status='', viz=None):        # def forward(self, task_batch, ctx_high = [], optimizer = manual_optim, outerloop = False, grad_clip = None): 
         '''
         args: minibatch of tasks 
         returns:  mean_test_loss, mean_train_loss, outputs
-
         Encoder(Adaptation) + Decoder model:
         Takes train_samples, adapt to them, then 
         Applies adaptation on train-tasks and then evaluates the generalization loss on test-tasks 
         '''
-        
+
         if level is None:
             level = self.level_max
-            
+        
+        # print(status)
+
+        # assert level == task_batch[0].level + 1                 # check if the level matches with task level        # print('level', level , task_batch[0].level  )
+
         if level == 0:
-            loss, outputs = self.decoder_model(move_to_device(task_batch, self.device))
-            
+            inputs, targets = task_batch
+            task_batch = [inputs.to(self.device), targets.to(self.device)]
+            return self.decoder_model(task_batch)
         else:
-            loss, count, outputs = 0, 0, []
+            test_loss,  test_count = 0, 0
 
             for task in task_batch: 
                 Flag = optimize(self, task.loader['train'], level-1, self.args_dict, optimizer=optimizer, reset=reset, status=status+'train', device=self.device)
-                
                 test_batch = next(iter(task.loader['test']))
-                l, outputs_ = self(test_batch, level-1, return_outputs=return_outputs, status=status+'test')      # test only 1 minibatch
-                if print_forward_test:
-                    print('level', level, 'test loss', l.item())
-                
-                loss  += l
-                count += 1
-                if return_outputs:
-                    outputs.append(outputs_)
-                
-                if self.args_dict['test_loggers'][level-1] is not None:
-                    self.args_dict['test_loggers'][level-1].log_loss(l) # Update test logger for respective level
+                l, outputs = self(test_batch, level-1, return_outputs=return_outputs, status=status+'test')      # test only 1 minibatch
+                self.args_dict['test_loggers'][level-1].log_loss(l) # Update test logger for respective level
+                test_loss  += l
+                test_count += 1
                 
             if status == viz:
-                visualize_output(outputs)
+                img_pred = outputs.view(img_size).detach().numpy()
+                img_pred = np.clip(img_pred, 0, 1)
+                plt.imshow(img_pred)
+                plt.show()
 
-            loss = loss / count
 
-        if print_forward_return:
-            print('level', level, 'loss', loss.item()) 
-        return loss, outputs
+            mean_test_loss = test_loss / test_count
+            # Propagate outputs back with full batch
+
+            if not return_outputs:
+                outputs = None
+
+            return mean_test_loss, outputs
+
 
 ##############################################################################
 #  Task Hierarchy
@@ -138,33 +184,19 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 class Hierarchical_Task():
     def __init__(self, task, batch_dict): 
         total_batch_dict, mini_batch_dict = batch_dict
-        
         self.task = task
         self.level = len(total_batch_dict) - 1          # print(self.level, total_batch_dict)
-        self.total_batch = total_batch_dict[-1]         # total_batch: total # of samples   
-        self.mini_batch = mini_batch_dict[-1]           # mini_batch: mini batch # of samples
+        self.total_batch = total_batch_dict[-1]
+        self.mini_batch = mini_batch_dict[-1]
         self.batch_dict_next = (total_batch_dict[:-1], mini_batch_dict[:-1])
-        
-        self.loader = {'train': self.get_dataloader(self.task, sample_type='train'), 
-                       'test':  self.get_dataloader(self.task, sample_type='test')}
-    
-        if print_task_loader:
-            print('Task_loader Level', self.level, 'task', self.task)
+        self.loader = self.get_dataloader_dict()
 
-    def get_dataloader(self, task, sample_type):     #     sample_type = 'train' or 'test'  
-        total_batch, mini_batch = self.total_batch[sample_type], self.mini_batch[sample_type],
+    def get_dataloader_dict(self):
+        return {'train': self.get_dataloader(self.total_batch['train'], self.mini_batch['train'], sample_type='train'), 
+                'test':  self.get_dataloader(self.total_batch['test'],  self.mini_batch['test'],  sample_type='test')}
 
-        if self.level > 0:
-            dataset = self.get_dataset(task, total_batch, sample_type, self.batch_dict_next)
-            return Meta_DataLoader(dataset, batch_size=mini_batch, task_name=str(task))      #  returns a mini-batch of Hiearchical Tasks[
-        else:
-            dataset = self.get_dataset(task, total_batch, sample_type) #, batch_dict_next = None)
-            if mini_batch == 0 and total_batch == 0:     # To fix:  why assume total_batch == 0   ??
-                mini_batch = len(dataset)                  # Full range/batch if both 0s
-            shuffle = True if sample_type == 'train' else False
-            return DataLoader(dataset, batch_size=mini_batch, shuffle=shuffle)                # returns tensors
-
-    def get_dataset(self, task, total_batch, sample_type, batch_dict_next = None):             # make a dataset out of the samples from the given task
+    # total_batch: total # of samples  //  mini_batch: mini batch # of samples
+    def get_dataloader(self, total_batchsize, mini_batchsize, sample_type):
         if self.level == 0:
             input_gen, target_gen = self.task
             input_data  = input_gen(total_batchsize)
@@ -190,98 +222,53 @@ class Hierarchical_Task():
             subtask_dataset = Meta_Dataset(data=subtask_list)
             return Meta_DataLoader(subtask_dataset, batch_size=mini_batchsize, task_name=str(self.task))            #   returns a mini-batch of Hiearchical Tasks[
 
-    
 
 ####################################    
-def optimize(model, dataloader, level, args_dict, optimizer, reset, status, device, ctx_logging_levels = [], Higher_flag=False):       # optimize parameter for a given 'task'
+def optimize(model, dataloader, level, args_dict, optimizer, reset, status, device):       # optimize parameter for a given 'task'
     lr, max_iter, for_iter, logger = get_args(args_dict, level)
-    task_name = dataloader.task_name if hasattr(dataloader,'task_name') else None
-    
-    ####################################
-    def initialize():     ## Initialize param & optim
-        # Seungwook: Why decoder_model.module? can u please comment here? 
-        param_all = model.decoder_model.module.parameters_all if isinstance(model.decoder_model, nn.DataParallel) else model.decoder_model.parameters_all
-        # params_all = OrderedDict(model.named_parameters())
+    if isinstance(model.decoder_model, nn.DataParallel):
+        param_all = model.decoder_model.module.parameters_all
+    else: 
+        param_all = model.decoder_model.parameters_all
 
-        optim = None
-        if param_all[level] is not None:
-            if reset:  # use manual optim or higher 
-                param_all[level] = torch.zeros_like(param_all[level], requires_grad=True, device=device)   # Reset
-                if Higher_flag: # using higher 
-                    optim = optimizer([param_all[level]], lr=lr)
-                    optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
-            else: # use regular optim: for outer-loop
-                optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
-                
-        return param_all, optim
-    ######################################
-    def update_step():
-        if param_all[level] is not None:      
-            if reset:  # use manual optim or higher 
-                if Higher_flag:
-                    param_all[level], = optim.step(loss, params=[param_all[level]])    # syntax for diff_optim
-                else: # manual SGD step
-                    first_order = False
-                    grad = torch.autograd.grad(loss, param_all[level], create_graph=not first_order)
-                    param_all[level] = param_all[level] - lr * grad[0]
+    ## Initialize param & optim
+    if reset:
+        param_all[level] = torch.zeros_like(param_all[level], requires_grad=True, device=device)   # Reset
+        optim = optimizer([param_all[level]], lr=lr)
+        optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
+    else:
+        optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
 
-            else: # use regular optim: for outer-loop
-                optim.zero_grad()
-                loss.backward()
-                optim.step()  
-                
-    ######################################
-    def log_ctx(logger, task_name, ctx):
-        if level in ctx_logging_levels:   ##  list of levels for logging ctx variables 
-            if ctx.numel() == 0 or logger is None:
-                pass
-            else:
-                logger.log_ctx(task_name, ctx.detach().squeeze().cpu().numpy())   
-
-        if print_optimize_level_over:
-            print('optimize_level', level, 'is over')
-        
-    ######################################
-    
-    param_all, optim = initialize()  
     cur_iter = 0; 
     while True:
-        for i, task_batch in enumerate(dataloader):
-#             for _ in range(for_iter):          # Huh: what's for_iter for? Seungwook?
+        for task_batch in dataloader:
+            for _ in range(for_iter):
                 loss = model(task_batch, level, status=status)[0]     # Loss to be optimized
 
-                if print_optimize_level_iter:
-                    print('level',level, 'batch', i, 'cur_iter', cur_iter, 'loss', loss.item())
-                    
-                if cur_iter >= max_iter:      # Terminate after max_iter of batches/iter
-                    log_ctx(logger, task_name, param_all[level])    # log the final ctx for the level
-                    return False  #loss_all   # Loss-profile
+                if cur_iter >= max_iter:    # train/optimize up to max_iter # of batches
+                    if level == 1 and param_all[level].numel() > 0:
+                        logger.log_ctx(dataloader.task_name, param_all[level].detach().squeeze().cpu().numpy())   
+                    return False #loss_all   # Loss-profile
 
-                update_step()
-                        
-                if logger is not None:      # - logging -
-                    logger.log_loss(loss.item(), level, num_adapt=cur_iter)
+                ## loss.backward() & optim.step()
+                if reset:
+                    param_all[level], = optim.step(loss, params=[param_all[level]])   # syntax for diff_optim
+                else:
+                    optim.zero_grad()
+                    loss.backward()
+                    optim.step()  
 
                 cur_iter += 1   
-#     return cur_iter 
-        
 
-                
-#######################################
+                # ------------ logging ------------
+                if logger is not None:
+                    logger.log_loss(loss.detach().cpu().numpy(), level, num_adapt=cur_iter)
+
+         
+
+            # return cur_iter  # completed  the batch
 
 
-
-
-def visualize_output(outputs, show = True, save = False):
-    img_pred = outputs.view(img_size).detach().numpy()
-    img_pred = np.clip(img_pred, 0, 1)                         # Forcing all predictions beyond image value range into (0, 1)
-#     img_pred = np.round(img_pred * 255.0).astype(np.uint8)
-#     img_pred = transforms.ToPILImage(mode='L')(img_pred)
-    if show:
-        plt.imshow(img_pred)
-        plt.show()
-    if save:
-        save_dir, filename = get_filename(args)
-        img_pred.save(os.path.join(save_dir, filename))        
+#######################################    
         
     
