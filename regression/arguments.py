@@ -6,7 +6,7 @@ def run_argparse(input = None):
     parser = argparse.ArgumentParser(description='CAVIA (Regression experiments)')
 
     parser.add_argument(
-        '--task', type=str, choices=['sine', 'linear', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 'mnist', 'fashion_mnist', 'mnist_fmnist', 'mnist_fmnist_3level'], 
+        '--task', type=str, choices=['sine', 'linear', 'quadratic', 'cubic', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 'mnist', 'fashion_mnist', 'mnist_fmnist', 'mnist_fmnist_3level'], 
         nargs='+', help="Supertasks to solve")
     parser.add_argument(
         '--classes', type=int, nargs='+', 
