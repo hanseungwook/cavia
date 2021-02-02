@@ -12,6 +12,8 @@ from PIL import Image
 import random
 import IPython
 
+from pdb import set_trace
+
 # from task.mixture2 import task_func_list
 
 
@@ -30,20 +32,33 @@ import IPython
 
 class Meta_Dataset(Dataset):
     def __init__(self, data, target=None):
-        self.data = data
-        self.target = target
-        if target is not None:
-            assert len(data) == len(target)
-            # self.target = target
+        if isinstance(data,tuple) and len(data)==3:
+            kbm, target, x0 = data
+            self.LQR_flag = True
+            self.kbm = kbm
+            self.target = target
+            self.data = x0
+        else:
+            self.LQR_flag = False
+            self.data = data
+            self.target = target
+            if target is not None:
+                assert len(data) == len(target)
 
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, idx):
-        if self.target is None:
-            return self.data[idx]
-        else: 
-            return self.data[idx], self.target[idx]
+#         if self.__len__()>1:
+#             set_trace()
+        if self.LQR_flag:
+            return self.kbm, self.target, self.data[idx]
+        
+        else:
+            if self.target is None:
+                return self.data[idx]
+            else: 
+                return self.data[idx], self.target[idx]
 
 
 class Meta_DataLoader():
@@ -63,27 +78,24 @@ class Meta_DataLoader():
             mini_dataset.append(mini_batch)
 
         return iter(mini_dataset)
-        # return mini_dataset
 
+# def get_samples(task, total_batch, sample_type):
+#     if isinstance(task, dict):
+#         # Separate level-2 train and test tasks
+#         if task[sample_type]:
+#             task = task[sample_type]
+#         # Same level-2 train and test tasks 
+#         else: 
+#             task = task['train']
 
-
-def get_samples(task, total_batch, sample_type):
-    if isinstance(task, dict):
-        # Separate level-2 train and test tasks
-        if task[sample_type]:
-            task = task[sample_type]
-        # Same level-2 train and test tasks 
-        else: 
-            task = task['train']
-
-        # # For 3-level or above training, tasks will continuously be dicts, not lists
-        # if instance(task, dict):
-        #     # Skip random sampling here for now
-        #     tasks = task
-        # else:
-        assert total_batch <= len(task)
-        tasks = random.sample(task, total_batch)
-    # Levels below 2
-    else:
-        tasks = list(task(sample_type) for _ in range(total_batch))
-    return tasks
+#         # # For 3-level or above training, tasks will continuously be dicts, not lists
+#         # if instance(task, dict):
+#         #     # Skip random sampling here for now
+#         #     tasks = task
+#         # else:
+#         assert total_batch <= len(task)
+#         tasks = random.sample(task, total_batch)
+#     # Levels below 2
+#     else:
+#         tasks = list(task(sample_type) for _ in range(total_batch))
+#     return tasks
