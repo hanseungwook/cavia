@@ -64,10 +64,10 @@ date
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err 
 
 python3 main_huh.py \
---log_interval=50 --log_name=fns_1level_ctx2 \
---k_batch_train 10 10000 4  --k_batch_test 10 1000 4 --n_batch_train 10 50 4  --n_batch_test 10 1 1 \
---architecture 1 40 40 1 --n_iters 3 0 10000 --for_iters 5 3 1 \
---task sine linear quadratic cubic --n_contexts 2 0 --lrs 0.03 0.0 0.001 --test_interval 100
+--log_interval=50 --log_name=fns_sine_lin_1level_ctx2 \
+--k_batch_train 10 10000 2  --k_batch_test 10 1000 2 --n_batch_train 10 50 2  --n_batch_test 10 1 1 \
+--architecture 1 40 40 1 --n_iters 3 0 10000 --for_iters 3 3 1 \
+--task sine linear --n_contexts 2 0 --lrs 0.03 0.0 0.001 --test_interval 100
 
 
 
