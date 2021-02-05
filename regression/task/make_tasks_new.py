@@ -14,20 +14,33 @@ def get_task_fnc(task_names, classes):
     for task in task_names:
         
         if task == 'sine':
-            def sample_fnc(sample_type):
+            def sample_LV1(sample_type):
                 return sample_sin_fnc   # no difference between train and test
-            return sample_fnc
+            return sample_LV1
             
         elif task == 'linear':
-            def sample_fnc(sample_type):
+            def sample_LV1(sample_type):
                 return sample_linear_fnc   # no difference between train and test
-            return sample_fnc
+            return sample_LV1
         
-        elif task == 'LQR':
+        elif task == 'sine + linear':
+            def sample_LV2(sample_type):
+                
+                def sample_linear_LV1(sample_type):
+                    return sample_linear_fnc   # no difference between train and test
+                def sample_sine_LV1(sample_type):
+                    return sample_sin_fnc   # no difference between train and test
+                
+                task_list = [sample_linear_LV1, sample_sine_LV1]
+                return task_list
+            return sample_LV2 
+        
+            
+        elif task == 'LQR_lv2':
             x_range = 4
             def sample_LQR_LV2(sample_type):                         #level 2 - dynamics
-                kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-1., 1.),  np.random.uniform(-1., 1.)], axis=0)
-                print('Lv2', 'sample_type', sample_type, ' kbm', kbm.shape) 
+                kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+#                 print('Lv2', 'sample_type', sample_type, ' kbm', kbm.shape) 
             
                 def sample_LQR_LV1(sample_type):                     #level 1 - targets
                     target   = x_range * np.random.randn(1)
@@ -41,6 +54,40 @@ def get_task_fnc(task_names, classes):
                     return sample_LQR_LV0, None    # returning input_sampler (and target_sampler = None) for level0
                 return sample_LQR_LV1
             return sample_LQR_LV2 
+    
+
+        elif task == 'LQR_lv1':
+                x_range = 4
+#             def sample_LQR_LV2(sample_type):                         #level 2 - None
+                def sample_LQR_LV1(sample_type):                         #level  - dynamics, target
+                    kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+                    target   = x_range * np.random.randn(1)
+#                     print('Lv1', 'sample_type', sample_type, ' target', target)
+
+                    def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
+                        pos0   = x_range * np.random.randn(batch_size)
+#                         print('Lv0', 'sample_type', sample_type, 'pos0', pos0)
+                        task_env = kbm, target, pos0
+                        return task_env
+                    return sample_LQR_LV0, None    # returning input_sampler (and target_sampler = None) for level0
+                return sample_LQR_LV1
+#             return sample_LQR_LV2 
+
+
+        elif task == 'LQR_lv0':
+                    x_range = 4
+#             def sample_LQR_LV2(sample_type):                         #level 2 - None
+#                 def sample_LQR_LV1(sample_type):                         #level  - dynamics, target
+                    def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
+                        kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+                        target   = x_range * np.random.randn(1)
+                        pos0   = x_range * np.random.randn(batch_size)
+#                         print('Lv0', 'sample_type', sample_type, 'pos0', pos0)
+                        task_env = kbm, target, pos0
+                        return task_env
+                    return sample_LQR_LV0, None    # returning input_sampler (and target_sampler = None) for level0
+#                 return sample_LQR_LV1
+#             return sample_LQR_LV2 
             
 ############ Testing new code #######################
 

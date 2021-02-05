@@ -43,30 +43,30 @@ def make_ctx(n, device):
 
 #######################
 
-class BaseModel2_CAVIA(nn.Module):
+# class BaseModel2_CAVIA(nn.Module):
 
-    def __init__(self, n_ctx, device, *layers):
-        super().__init__()
+#     def __init__(self, n_ctx, device, *layers):
+#         super().__init__()
 
-        self.layers = nn.ModuleList(list(layers))        
-        self.parameters_all = [make_ctx(n, device) for n in n_ctx] + [self.layers.parameters]
-        self.nonlin = nn.ReLU()
-        self.loss_fnc = nn.MSELoss()
+#         self.layers = nn.ModuleList(list(layers))        
+#         self.parameters_all = [make_ctx(n, device) for n in n_ctx] + [self.layers.parameters]
+#         self.nonlin = nn.ReLU()
+#         self.loss_fnc = nn.MSELoss()
 
-    def forward(self, data_batch):
-        inputs, targets = data_batch
-        ctx_all = self.parameters_all[:-1]
-        outputs = self._forward(inputs, ctx_all)
-        return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
+#     def forward(self, data_batch):
+#         inputs, targets = data_batch
+#         ctx_all = self.parameters_all[:-1]
+#         outputs = self._forward(inputs, ctx_all)
+#         return self.loss_fnc(outputs, targets), outputs   # mean_test_loss, outputs
 
-    def _forward(self, x, ctx_all):
-        ctx = torch.cat(ctx_all, dim=1)         
-        x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)
+#     def _forward(self, x, ctx_all):
+#         ctx = torch.cat(ctx_all, dim=1)         
+#         x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)
 
-        for i, layer in enumerate(self.layers):
-            x = layer(x)
-            x = self.nonlin(x)  if i<len(self.layers)-1 else x
-        return x 
+#         for i, layer in enumerate(self.layers):
+#             x = layer(x)
+#             x = self.nonlin(x)  if i<len(self.layers)-1 else x
+#         return x 
 
 ###################
 class BaseModel(nn.Module):
@@ -78,7 +78,7 @@ class BaseModel(nn.Module):
         for i in range(len(n_arch) - 1):
             self.module_list.append(FC_module(n_arch[i], n_arch[i + 1]).to(device))    # Fully connected layers
 
-        self.parameters_all = [make_ctx(n, device) for n in n_contexts] + [self.module_list.parameters]
+        self.parameters_all = [make_ctx(n, device) for n in n_contexts] + [self.module_list.parameters]   # [ctx0, ctx1, outer_loop_parameters]
 
         self.device = device if device is not None else 'cpu'
         self.n_contexts = n_contexts #sum(n_context)  # Concatenate all high-level ctx into one. 
