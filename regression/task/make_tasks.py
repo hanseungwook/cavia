@@ -1,5 +1,5 @@
 from functools import partial
-from .regression_1d import sample_sin_fnc, sample_linear_fnc
+from .regression_1d import sample_sin_fnc, sample_linear_fnc, sample_quadratic_fnc, sample_cubic_fnc
 from .image_reconstruction import sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist, sample_mnist_img_fnc, sample_fashion_mnist, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks
 from .LQR import LQR_environment, Linear_Policy, Combine_NN_ENV
 
@@ -15,6 +15,10 @@ def make_tasks(task_names, classes):
             task_func_dict['train'].append(sample_sin_fnc)
         elif task == 'linear':
             task_func_dict['train'].append(sample_linear_fnc)
+        elif task == 'quadratic':
+            task_func_dict['train'].append(sample_quadratic_fnc)
+        elif task == 'cubic':
+            task_func_dict['train'].append(sample_cubic_fnc)
         elif task == 'celeba':
             task_func_dict['train'].append(sample_celeba_img_fnc)
         elif task == 'cifar10':

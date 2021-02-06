@@ -47,8 +47,8 @@ def get_args(jupyter_flag = False):
     parser = argparse.ArgumentParser(description='Regression experiments')
 
     parser.add_argument('--task', type=str,  nargs='+', help="Supertasks to solve",)
-#                         choices=['sine', 'linear', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 'mnist', 'fashion_mnist', 
-#                                  'mnist_fmnist', 'mnist_fmnist_3level'])
+#                         choices=['sine', 'linear', 'quadratic', 'cubic', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 
+#                                  'mnist', 'fashion_mnist', 'mnist_fmnist', 'mnist_fmnist_3level'])
     parser.add_argument('--classes', type=int, nargs='+', default=[], help="Specified classes of dataset to use (if not specified, all)")
     parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1], help="Architecture of neural network")
     parser.add_argument('--first_order', action='store_true', default=False, help='run first-order version (create-graph = False)')

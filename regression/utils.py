@@ -90,7 +90,7 @@ def set_logger(logger_name, log_file, level=logging.INFO):
 
 def print_args(args):
     for arg, value in sorted(vars(args).items()):
-        print("%s: %r".format(arg, value), file=sys.stderr)
+        print("{}: {}".format(arg, value), file=sys.stderr)
 
 def set_seed(seed, cudnn=True):
     """
