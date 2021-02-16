@@ -1,15 +1,26 @@
+
+# lv3: dataset f( .  , rnd, type)    -> dataset    (e.g. MNIST vs fMNIST)
+# lv2: label   f(dataset, rnd, type) -> label                -> Loss( theta | dataset )           -> averaged over labels
+# lv1: image   f(label, rnd, type)   -> image                -> Loss( ctx1 | label | theta)       -> averaged over image
+# lv0: pixel   f(image, rnd, type)   -> xy, pixel (target)   -> Loss( ctx0 | image | ctx1, theta) -> averaged over xy E_xy[L(xy)]
+
+
+import random
 from torch.utils.data import Dataset, DataLoader #, Subset
 from torch.utils.data.sampler import RandomSampler, BatchSampler
 
+from task.Siren_dataio import get_mgrid
+# from task.make_tasks_new import get_task_fnc
 
 import IPython
-
 from pdb import set_trace
 
+DOUBLE_precision = False #True
+print_task_loader = True
+print_loader_type = False
+print_hierarhicial_task = False
 
-
-
-class Meta_Dataset(Dataset):
+class Basic_Dataset(Dataset):
     def __init__(self, data, target=None):
         self.data = data
         self.target = target
@@ -25,11 +36,10 @@ class Meta_Dataset(Dataset):
         else: 
             return self.data[idx], self.target[idx]
 
-class Meta_Dataset_LQR(Dataset):  # Temporary code. to be properly written
+class Basic_Dataset_LQR(Dataset):  # Temporary code. to be properly written
     def __init__(self, data, target=None):
-        assert isinstance(data,tuple) and len(data)==3
+#         assert isinstance(data,tuple) and len(data)==3
         kbm, goal, x0 = data
-#         self.LQR_flag = True
         self.kbm = kbm
         self.goal = goal
         self.x0 = x0
@@ -40,28 +50,195 @@ class Meta_Dataset_LQR(Dataset):  # Temporary code. to be properly written
     def __getitem__(self, idx):
         return self.kbm, self.goal, self.x0[idx]
     
-    
+def Dataset_helper(data, target = None):
+#     set_trace()
+    if isinstance(data,tuple):
+        assert len(data)==3
+        return Basic_Dataset_LQR(data)
+    else: 
+        return Basic_Dataset(data, target)
 
 ##################################
 
 class Meta_DataLoader():
-    def __init__(self, dataset, batch_size, task_name, task_idx):
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.task_name = task_name
-        self.task_idx = task_idx
+    def __init__(self, dataset, batch_size, name, idx):
+        self.dataset = dataset               # pre-sampled list of tasks
+        self.minibatch_size = batch_size
+        self.task_name = name
+        self.task_idx = idx
 
     def __iter__(self):
         # Create indices of batches
-        batch_idx = list(BatchSampler(RandomSampler(self.dataset), self.batch_size, drop_last=True))
+        batch_idx = list(BatchSampler(RandomSampler(self.dataset), self.minibatch_size, drop_last=True))
 
+        # since collate does not work for tasks (only works for torch.tensors / arrays ...)
         # Create dataset of minibatches of the form [mini-batch of (hierarchical tasks), ...]
         mini_dataset = []
         for mini_batch_idx in batch_idx:  
-            mini_batch = [self.dataset[idx] for idx in mini_batch_idx]  # always same mini-batch.. Todo: change each time? 
+            mini_batch = [self.dataset[idx_] for idx_ in mini_batch_idx]  # always same mini-batch.. Todo: change each time? 
             mini_dataset.append(mini_batch)
 
         return iter(mini_dataset)
+    
+    
+#################################
+
+
+
+class Implicit2DWrapper(Dataset):
+    def __init__(self, dataset, sidelength): #, img2fnc=None):
+
+#         if isinstance(sidelength, int):
+#             sidelength = (sidelength, sidelength)
+#         self.sidelength = sidelength
+
+        self.transform = Compose([ Resize(sidelength), ToTensor(), Normalize(torch.Tensor([0.5]), torch.Tensor([0.5])) ])
+        self.dataset = dataset
+        self.mgrid = get_mgrid(sidelength)
+#         self.img2fnc = img2fnc
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, idx):
+        img = self.transform(self.dataset[idx])
+        img = img.permute(1, 2, 0).view(-1, self.dataset.img_channels)
+
+        in_dict = {'idx': idx, 'coords': self.mgrid}
+        gt_dict = {'img': self.img2fnc(img)}
+
+        return in_dict, gt_dict
+    
+def img2fnc(mgrid, img):
+    subsamples = int(self.test_sparsity)
+    rand_idcs = np.random.choice(img.shape[0], size=subsamples, replace=False)
+    img_sparse = img[rand_idcs, :]
+    coords_sub = self.mgrid[rand_idcs, :]
+    in_dict = {'idx': idx, 'coords': self.mgrid, 'img_sub': img_sparse, 'coords_sub': coords_sub}
+
+#     def get_item_small(self, idx):   ### used in dataio.ImageGeneralizationWrapper()
+#         img = self.transform(self.dataset[idx])
+#         spatial_img = img.clone()
+#         img = img.permute(1, 2, 0).view(-1, self.dataset.img_channels)
+
+#         gt_dict = {'img': img}
+
+#         return spatial_img, img, gt_dict
+    
+    
+    
+    
+
+###################################
+
+
+# def get_hierarchical_task(task_name, classes, k_batch_dict, n_batch_dict):
+#     task_func = get_task_fnc(task_name, classes)
+#     task = Hierarchical_Task(task_func, idx=0, batch_dict=(k_batch_dict, n_batch_dict))
+#     task_batch = [task]
+#     return task_batch     # Basic_Dataset(data=[task])
+
+
+##############################################################################
+#  Task Hierarchy
+#  A 'task' has built-in sample() method, which returns a 'list of subtasks', and so on..
+# 
+#                                              super-duper-task (base_task)        f(., ., task_idx=None)  
+# lv 2: task = super-duper-task,   subtasks  = super-tasks                        [f(., ., task_idx=None)]
+# lv 1: task = super-task,         subtasks  = tasks (functions)                  [f(., ., task_idx)]
+# lv 0: task = task (function),    subtasks  = data-points (inputs, targets)      [x, y= f(x, task_idx)]
+
+
+class Hierarchical_Task():  
+    def __init__(self, task, batch_dict, idx=0): #task, batch_dict, idx): 
+        
+#         self.task = task
+        self.idx = idx
+        level = len(batch_dict[0]) - 1          # print(self.level, total_batch_dict)
+        
+        if print_hierarhicial_task:
+            print('level', len(batch_dict[0]) - 1)
+            print('batch', batch_dict[0][-1]['train'])
+        print('task', task)
+        
+#         set_trace()
+        
+        self.loader_dict = get_dataloader_dict(level, task, batch_dict, idx)
+        
+        if print_task_loader and level>0:
+            print('Task_loader Level', level, 'task', task)
+            
+    def load(self, sample_type):   # return dataloader
+        dict_ = self.loader_dict[sample_type]
+        if sample_type == 'train':
+            return dict_
+        elif   sample_type in ['test', 'val']:
+            return next(iter(dict_))
+
+###########################
+
+            
+def get_dataloader_dict(level, task, batch_dict, idx):    
+    
+    def get_dict():
+        total_batch_dict, mini_batch_dict = batch_dict
+        batch_dict_next = (total_batch_dict[:-1], mini_batch_dict[:-1])
+        total_batch = total_batch_dict[-1]         # total_batch: total # of samples   
+        mini_batch = mini_batch_dict[-1]           # mini_batch: mini batch # of samples
+
+        loader_dict = {}
+        for sample_type in  ['train', 'test', 'valid']:
+            if print_loader_type:
+                print('level', level, 'type', sample_type)
+            loader_dict[sample_type] = get_dataloader(sample_type, total_batch[sample_type], mini_batch[sample_type], batch_dict_next)
+        return loader_dict
+    
+    def get_dataloader(sample_type, total_batch, mini_batch, batch_dict_next):     #     sample_type = 'train' or 'test'  
+
+        def sample_lv0_data(task):             # make a dataset out of the samples from the given task
+            assert isinstance(task,tuple)
+            input_generator, target_generator = task  # Generator functions for the input and target
+            input_data  = input_generator(total_batch, sample_type)  # Huh : added sample_type as input
+            target = target_generator(input_data) if target_generator is not None else None
+        #     if DOUBLE_precision:
+        #         input_data  = input_data.double();    
+        #         target = target.double() if target is not None else None  
+            return input_data, target
+        
+        def sample_meta_lv_data(task):             # make a dataset out of the samples from the given task
+            if isinstance(task, list):       
+                assert total_batch <= len(task)
+                subtask_list = random.sample(task, total_batch)    #  sampling from task list # To fix: task does not take sample_type as an input
+            elif callable(task):             
+#                 set_trace()
+                subtask_list = [task(sample_type) for _ in range(total_batch)]  #  sampling from task_generating function 
+            else: 
+                print(task)
+                error()
+            data = [Hierarchical_Task(subtask, batch_dict_next, idx_) for (idx_, subtask) in enumerate(subtask_list)]   # Recursive
+            return data
+        
+
+        if level == 0:
+            data, target = sample_lv0_data(task) 
+            dataset = Dataset_helper(data, target)
+            if mini_batch == 0 and total_batch == 0:     # To fix:  why assume total_batch == 0   ??
+                mini_batch = len(dataset)                  # Full range/batch if both 0s
+            shuffle = True if sample_type == 'train' else False
+            return DataLoader(dataset, batch_size=mini_batch, shuffle=shuffle)                # returns tensors
+        else:
+            subtask_samples = sample_meta_lv_data(task)      # list of sampled subtasks
+            subtask_dataset = Dataset_helper(subtask_samples, None)
+            return Meta_DataLoader(subtask_dataset, batch_size=mini_batch, name=str(task), idx=idx)      #  returns a mini-batch of Hiearchical Tasks[
+
+    return get_dict()
+
+
+##################################
+#########
+
+
+###############################
 
 # def get_samples(task, total_batch, sample_type):
 #     if isinstance(task, dict):
@@ -83,3 +260,51 @@ class Meta_DataLoader():
 #     else:
 #         tasks = list(task(sample_type) for _ in range(total_batch))
 #     return tasks
+
+
+
+################
+
+
+class CelebA(Dataset):
+    def __init__(self, split, downsampled=False):
+        # SIZE (178 x 218)
+        super().__init__()
+        assert split in ['train', 'test', 'val'], "Unknown split"
+
+        self.root = '/media/data3/awb/CelebA/kaggle/img_align_celeba/img_align_celeba'
+        csv_path = '/media/data3/awb/CelebA/kaggle/list_eval_partition.csv'
+
+        self.img_channels = 3
+        self.fnames = []
+
+        with open(csv_path, newline='') as csvfile:
+            rowreader = csv.reader(csvfile, delimiter=',', quotechar='|')
+            for row in rowreader:
+                if split == 'train' and row[1] == '0':
+                    self.fnames.append(row[0])
+                elif split == 'val' and row[1] == '1':
+                    self.fnames.append(row[0])
+                elif split == 'test' and row[1] == '2':
+                    self.fnames.append(row[0])
+
+        self.downsampled = downsampled
+
+    def __len__(self):
+        return len(self.fnames)
+
+    def __getitem__(self, idx):
+        path = os.path.join(self.root, self.fnames[idx])
+        img = Image.open(path)
+        if self.downsampled:
+            width, height = img.size  # Get dimensions
+
+            s = min(width, height)
+            left = (width - s) / 2
+            top = (height - s) / 2
+            right = (width + s) / 2
+            bottom = (height + s) / 2
+            img = img.crop((left, top, right, bottom))
+            img = img.resize((32, 32))
+
+        return img

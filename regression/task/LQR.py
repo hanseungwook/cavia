@@ -105,6 +105,7 @@ class LQR_environment():
 class Linear_Policy(nn.Module):
     def __init__(self, x_dim): #(ab,target):
         super().__init__()
+        self.x_dim = x_dim
 #         self.ctx_target = nn.Parameter(torch.zeros(1)) #  Level 0 ctx
 #         self.ctx_coeff = nn.Parameter(torch.zeros(x_dim).t()) #  Level 1 ctx
 #         self.ctx_target = nn.Parameter(torch.randn(1))  #  Level 0 ctx
@@ -120,7 +121,9 @@ class Linear_Policy(nn.Module):
 #         self.parameters_all = [self.ctx_target,  self.ctx_coeff] 
         
     def forward(self, obs, t, ctx):  # action = function ( observation, time )
-        ctx_target, ctx_coeff = ctx
+#         ctx = torch.cat(ctx)
+        ctx = ctx[0]
+        ctx_target, ctx_coeff = ctx[:1], ctx[1:] 
         action = ctx_coeff[:1] @ ( obs[:1,:] - ctx_target )   #         action = self.coeff @ ( x - self.target ) 
         if ctx_coeff.shape[0]>1:
             action += ctx_coeff[1:] @ obs[1:,:]
@@ -149,16 +152,21 @@ def make_ctx(n, device):
 class Combine_NN_ENV(nn.Module):
     device = 'cpu'
     
-    def __init__(self, policy = None, x_dim=2, batch_nums = (1,3,1), kbm_zero = True, random_task = False, T = 12, traj_opt = False, x_range = 4):
+    def __init__(self, policy = None, x_dim=2, levels = None, batch_nums = (1,3,1), kbm_zero = True, random_task = False, T = 12, traj_opt = False, x_range = 4):
         super().__init__()
         
 #         n_ctx = [1,2]
         
         ctx_target = torch.zeros(1, device=self.device) 
-        ctx_coeff = torch.zeros(x_dim, device=self.device)        
-#         self.parameters_all = [make_ctx(n, device) for n in n_ctx] + [None] # [self.layers.parameters]
-        self.parameters_all = [ctx_target, ctx_coeff, None] # [self.layers.parameters]
-
+        ctx_coeff = torch.zeros(x_dim, device=self.device)   
+        if levels == 2:  #         for "LQR_lv2"
+#             self.parameters_all = [ctx_target, ctx_coeff, None] # [self.layers.parameters]
+            self.parameters_all = [torch.cat([ctx_target, ctx_coeff]), None, None] # [self.layers.parameters]
+        elif levels == 1:  #         for "LQR_lv1"
+            self.parameters_all = [torch.cat([ctx_target, ctx_coeff]), None] # [self.layers.parameters]
+        else:
+            error()
+            
 #         if policy is None:
 #             if traj_opt:
 #                 assert random_task is False
@@ -240,7 +248,43 @@ class Combine_NN_ENV(nn.Module):
 #         else:
 #             return l_all, x, u, torch.stack(coeff_all).numpy(), torch.stack(target_all).numpy(), self.env.target.numpy(), self.policy, 
         
+    
+#############################
 
+
+## LQR task
+
+x_range = 4
+def sample_LQR_LV2(sample_type):                      #level 2 - dynamics
+    kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+    def sample_LV1(sample_type):                      #level 1 - goal
+        goal   = x_range * np.random.randn(1)
+        def sample_LV0(batch_size, sample_type):      #level 0 - initial  x0
+            pos0   = x_range * np.random.randn(batch_size)
+            task_env = kbm, goal, pos0
+            return task_env
+        return sample_LV0, None    # returning input_sampler (and target_sampler = None) for level0
+    return sample_LV1
+
+def sample_LQR_LV1(sample_type):                         #level  - dynamics, goal
+    kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+    goal   = x_range * np.random.randn(1)
+    def sample_LV0(batch_size, sample_type):      #level 0 - initial  x0
+        pos0   = x_range * np.random.randn(batch_size)
+        task_env = kbm, goal, pos0
+        return task_env
+    return sample_LV0, None    # returning input_sampler (and target_sampler = None) for level0
+
+def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
+    kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+    goal   = x_range * np.random.randn(1)
+    pos0   = x_range * np.random.randn(batch_size)
+    task_env = kbm, goal, pos0
+    return task_env
+
+
+
+#############################
 
 def plot_all(l_all, u_opt, x_opt, coeff_all, target_all, target0, traj_opt = False):
     plt.figure()

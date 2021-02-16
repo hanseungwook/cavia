@@ -12,27 +12,22 @@ from pytorch_lightning.loggers import TensorBoardLogger # https://pytorch-lightn
 
 from pdb import set_trace
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # use the GPU if available
+default_save_path = "/nobackup/users/benhuh/Projects/cavia/shared_results"
+default_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # use the GPU if available
 
 def main(hparams):
     # Load arguments
 
-    save_path = "/nobackup/users/benhuh/Projects/cavia/shared_results"
-    log_save_path = os.path.join(save_path, "logs")
+    log_save_path = os.path.join(hparams.save_path, "logs")
     hparams.log_save_path = log_save_path
-    if hparams.log_name is None:
-         hparams.log_name = hparams.task[0]+'_test'
-    log_name = hparams.log_name 
+    hparams.log_name = hparams.log_name or hparams.task #+'_test'
     
     if not os.path.exists(log_save_path):
         os.makedirs(log_save_path)
 
     set_seed(hparams.seed)  
-    logger = TensorBoardLogger(log_save_path, name=log_name, version=hparams.v_num) 
+    logger = TensorBoardLogger(log_save_path, name=hparams.log_name, version=hparams.v_num) 
     logger.log_hyperparams(hparams)
-#     set_trace()
-#     logger2 = SummaryWriter(log_save_path+'/'+log_name)
-#     logger2.add_hparams(var(hparams), {"metric/distance": 0.5})
     
     run(hparams, logger)         # Start train
 
@@ -45,6 +40,9 @@ def main(hparams):
 
 def get_args(jupyter_flag = False):
     parser = argparse.ArgumentParser(description='Regression experiments')
+
+    parser.add_argument('--save-path', type=str,  nargs='+', default=default_save_path)
+    parser.add_argument('--device',      type=str, default=default_device)     # "cuda:0" or "cpu"
 
     parser.add_argument('--task', type=str,  nargs='+', help="Supertasks to solve",)
 #                         choices=['sine', 'linear', 'quadratic', 'cubic', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 
@@ -80,7 +78,6 @@ def get_args(jupyter_flag = False):
     parser.add_argument('--ctx_logging_levels', type=int, nargs='+', default=[]) 
     parser.add_argument('--higher_flag',  action='store_true', default=False, help='Use Higher optimizer')
     
-    parser.add_argument('--device',      type=str, default=device)     # "cuda:0" or "cpu"
 
     parser_ = parser  #  = MODEL.add_model_specific_args(parser)
     args, unknown = parser_.parse_known_args("") if jupyter_flag else parser_.parse_known_args()   # needs "" input to run from jupyter notebook.

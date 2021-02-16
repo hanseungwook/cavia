@@ -25,6 +25,18 @@ DEBUG_LEVELS = []  # [1] #[0]  #[2]
 #################################################################################
 
 
+def get_loggers(logger_maker, levels):
+    def get_logger_list(log_type):
+        logger_list = []
+        for i in range(levels):
+            no_print=(i<levels-1)
+            logger_name = log_type+'_lv'+str(i)
+            logger_list.append(logger_maker(additional_name=logger_name, no_print=no_print))
+            if print_logger_name:
+                print('logger_name=', logger_name, 'no_print=', no_print)
+        return logger_list
+    return get_logger_list(log_type='train'), get_logger_list(log_type='test')
+
 
 class Logger():
     def __init__(self, args, additional_name='', no_print=False):
@@ -34,6 +46,9 @@ class Logger():
         self.tb_writer   = SummaryWriter('./logs/tb_{}_{}'.format(args.log_name, additional_name))
         self.no_print = no_print
         self.iter = 0
+        
+    def close():  # Huh: SummaryWriter must be closed at the end. Currently it never gets called. Problem!
+        self.tb_writer()
 
     def log_loss(self, loss, level=2, num_adapt=None):
         # print(iter, self.update_iter)

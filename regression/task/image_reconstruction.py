@@ -359,4 +359,3 @@ def load_fashion_mnist_imgs():
 ### TODO: visualize images
 
 ### TODO: bash script for running script
-

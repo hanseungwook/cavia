@@ -1,153 +1,117 @@
-from functools import partial
-from .regression_1d import sample_sin_fnc, sample_linear_fnc
-from .image_reconstruction import sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist_img_fnc, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks
-from .LQR import LQR_environment, Linear_Policy, Combine_NN_ENV
 import numpy as np
+import random
+from functools import partial
 
-def get_task_fnc(task_names, classes):
-    task_func_dict = {}
-    task_func_dict['train'] = []
-    task_func_dict['test'] = []
-    
-    assert(len(task_names) == 1) # Huh: no need to use for loop.
-    # Huh: modifying code to return a function instead of dictionary task_func_dict.
-    for task in task_names:
+from .regression_1d import sample_sin_fnc, sample_linear_fnc
+from .image_reconstruction_new import sample_mnist_img_fnc, sample_fmnist_img_fnc
+# from .image_reconstruction import sample_celeba_img_fnc, sample_cifar10_img_fnc, create_hier_imagenet_supertasks
+from .LQR import sample_LQR_LV2, sample_LQR_LV1, sample_LQR_LV0 
+
+from pdb import set_trace
+
+
+
+##########################
+
+class Task_sampler():
+    def __init__(self, tasks, k_batches, task_fnc = None):
+        batch_cumsum = np.cumsum([0]+k_batches)
         
-        if task == 'sine':
-            def sample_LV1(sample_type):
-                return sample_sin_fnc   # no difference between train and test
-            return sample_LV1
+#         if isinstance(tasks,int):     # if 'tasks' == total number of tasks 
+#             tasks = list(range(tasks))  # list of task indices/labels 
             
-        elif task == 'linear':
-            def sample_LV1(sample_type):
-                return sample_linear_fnc   # no difference between train and test
-            return sample_LV1
+        self.task_fnc = task_fnc  # function that takes task label and returns actual tasks 
+        self.task_dict={}
+        self.split(tasks, batch_cumsum)
         
-        elif task == 'sine + linear':
-            def sample_LV2(sample_type):
-                
-                def sample_linear_LV1(sample_type):
-                    return sample_linear_fnc   # no difference between train and test
-                def sample_sine_LV1(sample_type):
-                    return sample_sin_fnc   # no difference between train and test
-                
-                task_list = [sample_linear_LV1, sample_sine_LV1]
-                return task_list
-            return sample_LV2 
+    def split(self, label_list, batch_cumsum):
+        batch_total = batch_cumsum[-1]
+        assert isinstance(label_list,list) 
+        assert batch_total <= len(label_list)
         
+        task_sublist = random.sample(label_list, batch_total)   
+        for i, sample_type in enumerate(['train', 'test', 'valid']):
+            self.task_dict[sample_type] = task_sublist[batch_cumsum[i]:batch_cumsum[i+1]]
             
-        elif task == 'LQR_lv2':
-            x_range = 4
-            def sample_LQR_LV2(sample_type):                         #level 2 - dynamics
-                kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
-#                 print('Lv2', 'sample_type', sample_type, ' kbm', kbm.shape) 
+        for sample_type in ['test']: #, 'valid']:             # if k_batch_test is zero, then copy 'train' task
+            if len(self.task_dict[sample_type]) == 0:
+                self.task_dict[sample_type] = self.task_dict['train']
             
-                def sample_LQR_LV1(sample_type):                     #level 1 - targets
-                    target   = x_range * np.random.randn(1)
-#                     print('Lv1', 'sample_type', sample_type, ' target', target)
-
-                    def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
-                        pos0   = x_range * np.random.randn(batch_size)
-#                         print('Lv0', 'sample_type', sample_type, 'pos0', pos0)
-                        task_env = kbm, target, pos0
-                        return task_env
-                    return sample_LQR_LV0, None    # returning input_sampler (and target_sampler = None) for level0
-                return sample_LQR_LV1
-            return sample_LQR_LV2 
-    
-
-        elif task == 'LQR_lv1':
-                x_range = 4
-#             def sample_LQR_LV2(sample_type):                         #level 2 - None
-                def sample_LQR_LV1(sample_type):                         #level  - dynamics, target
-                    kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
-                    target   = x_range * np.random.randn(1)
-#                     print('Lv1', 'sample_type', sample_type, ' target', target)
-
-                    def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
-                        pos0   = x_range * np.random.randn(batch_size)
-#                         print('Lv0', 'sample_type', sample_type, 'pos0', pos0)
-                        task_env = kbm, target, pos0
-                        return task_env
-                    return sample_LQR_LV0, None    # returning input_sampler (and target_sampler = None) for level0
-                return sample_LQR_LV1
-#             return sample_LQR_LV2 
-
-
-        elif task == 'LQR_lv0':
-                    x_range = 4
-#             def sample_LQR_LV2(sample_type):                         #level 2 - None
-#                 def sample_LQR_LV1(sample_type):                         #level  - dynamics, target
-                    def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
-                        kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
-                        target   = x_range * np.random.randn(1)
-                        pos0   = x_range * np.random.randn(batch_size)
-#                         print('Lv0', 'sample_type', sample_type, 'pos0', pos0)
-                        task_env = kbm, target, pos0
-                        return task_env
-                    return sample_LQR_LV0, None    # returning input_sampler (and target_sampler = None) for level0
-#                 return sample_LQR_LV1
-#             return sample_LQR_LV2 
-            
-############ Testing new code #######################
-
-        elif task == 'cifar10':
-            def sample_fnc(sample_type):
-                if sample_type == 'train':
-                    return [partial(sample_cifar10_img_fnc, l) for l in range(0,7)]
-                else: 
-                    return [partial(sample_cifar10_img_fnc, l) for l in range(7,10)]
-            return sample_fnc
-#             task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, l) for l in range(7)])
-#             task_func_dict['test'].extend([partial(sample_cifar10_img_fnc, l) for l in range(7,10)])
-
-#############################################################################################################            
-            
-            ## HUH: Here's (a minor) consistency problem of using dictionary.  
-#             'task_func' should be the Level2 function of sample_type, not a dictionary of sample_type
-#             or task_func_dict can be represented as a function
-
-
-        elif task == 'celeba':
-            task_func_dict['train'].append(sample_celeba_img_fnc)
-
-        elif task == 'celeba_airplane':
-            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, 0), sample_celeba_img_fnc])
-
-            # for l in range(1):
-            #     task_func_list.append(partial(sample_cifar10_img_fnc, l))
-        elif task == 'airplane':
-            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, 0)])
-        elif task == 'hier-imagenet':
-            task_func_dict['train'] = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
-            # task_func_list = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
-        elif task == 'mnist':
-            if len(classes) <= 0:
-                classes = list(range(0, 10))
-            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in classes])
-        elif task == 'fashion_mnist':
-            if len(classes) <= 0:
-                classes = list(range(0, 10))
-            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in classes])
-        elif task == 'mnist_fmnist':
-            if len(classes) <= 0:
-                classes = list(range(0, 10))
-            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in classes])
-            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in classes])
+    def sample(self, sample_type):
+        tasks = self.task_dict[sample_type]
+        if self.task_fnc is None:
+            return tasks
         else:
-            raise Exception('Task not implemented/undefined')
+            return [self.task_fnc(l) for l in tasks] 
+        
+        
 
-#     print(task_func_dict)
     
-#     if isinstance(task_func_dict, dict):
-#         if len(task_func_dict['test']) == 0:
-#             task_func_dict['test'] = task_func_dict['train']
-#         return dict_2_fnc(task_func_dict)
+# subtask_list = random.sample(task, total_batch)    #  sampling from task list # To fix: task does not take sample_type as an input
+# subtask_list = [task(sample_type) for _ in range(total_batch)]  #
+
+
+##########
+# def sample_label_mnist(sample_type):
+# #     available_labels = range(0,10)
+#     if sample_type = 'train':
+#         sampled_labels = range(0,7)
 #     else:
-#         return task_func_dict
+#         sampled_labels = range(7,10)
+#     return [partial(sample_mnist_img_fnc, l) for l in sampled_labels]
 
 
-# def dict_2_fnc(dict_):
-#     def fnc(sample_type):
-#         return dict_[sample_type]
-#     return fnc
+# def sample_label_fmnist(sample_type):
+#     if sample_type = 'train':
+#         sampled_labels = range(0,7)
+#     else:
+#         sampled_labels = range(7,10)
+#     return [partial(sample_fmnist_img_fnc, l) for l in sampled_labels]
+
+
+# def sample_dataset_mnist_fmnist_lv3(sample_type):
+#     fnc_dict = {
+#         'mnist': sample_label_mnist,
+#         'fmnist': sample_label_fmnist,        
+#         'celeba': sample_label_celeba,        
+#     }
+    
+#     if sample_type = 'train':
+#         ds_names = ['mnist', 'fmnist']
+#     else:
+#         ds_names = ['mnist', 'fmnist']
+# #         ds_names = ['celeba']
+        
+#     return [fnc_dict[name] for name in ds_names]
+
+
+###########
+
+# classes = list(range(0, 10))
+
+get_task_dict={
+    'sine':   sample_sin_fnc,
+    'linear': sample_linear_fnc,
+#     'sine+linear': Label_pre_sampler([sample_sin_fnc, sample_linear_fnc], [2,0,0]).sample,
+    'sine+linear': [sample_sin_fnc, sample_linear_fnc],
+#     
+    'LQR_lv2': sample_LQR_LV2,
+    'LQR_lv1': sample_LQR_LV1,
+    'LQR_lv0': (sample_LQR_LV0, None),
+#     
+    'mnist'  : sample_label_mnist,  #[partial(sample_mnist_img_fnc,  l) for l in classes],
+    'fmnist' : sample_label_fmnist, #[partial(sample_fmnist_img_fnc, l) for l in classes],
+    'mnist+fmnist' : [sample_label_mnist, sample_label_fmnist],
+}
+
+
+# def lv2_fnc(sample_type, dataset):
+#     if sample_type = 'train':
+#         labels = range(0,7)
+#     else:
+#         labels = range(7,10)
+#     return labels
+
+# def lv1_fnc(sample_type, label):
+#     sample_imange()
+#     return image

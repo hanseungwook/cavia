@@ -1,6 +1,6 @@
 from functools import partial
 from .regression_1d import sample_sin_fnc, sample_linear_fnc, sample_quadratic_fnc, sample_cubic_fnc
-from .image_reconstruction import sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist, sample_mnist_img_fnc, sample_fashion_mnist, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks
+from .image_reconstruction import sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist_img_fnc, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks
 from .LQR import LQR_environment, Linear_Policy, Combine_NN_ENV
 
 
@@ -47,6 +47,13 @@ def make_tasks(task_names, classes):
         elif task == 'mnist_fmnist_3level':
             if len(classes) <= 0:
                 classes = list(range(0, 10))
+
+            def sample_mnist(labels, sample_type):
+                return [partial(sample_mnist_img_fnc, l) for l in labels]
+
+            def sample_fashion_mnist(labels, sample_type):
+                return [partial(sample_fashion_mnist_img_fnc, l) for l in labels]                
+                
             task_func_dict['train'].extend([partial(sample_mnist, classes), partial(sample_fashion_mnist, classes)])
         elif task == 'LQR':
             pass
