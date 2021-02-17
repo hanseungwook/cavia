@@ -14,7 +14,14 @@ from pdb import set_trace
 ##########################
 
 class Task_sampler():
-    def __init__(self, tasks, k_batches, task_fnc = None):
+    sample_types = ['train', 'test', 'valid']
+
+    def __init__(self, tasks: list, 
+                       k_batches: list = None, #[], 
+                       task_gen_fnc = None):
+        ### k_batches is a list of k_batch for the sample types
+        if k_batches == []:
+            k_batches = [len(tasks),0,0]
         batch_cumsum = np.cumsum([0]+k_batches)
         
 #         if isinstance(tasks,int):     # if 'tasks' == total number of tasks 
@@ -30,7 +37,7 @@ class Task_sampler():
         assert batch_total <= len(label_list)
         
         task_sublist = random.sample(label_list, batch_total)   
-        for i, sample_type in enumerate(['train', 'test', 'valid']):
+        for i, sample_type in enumerate(self.sample_types): #['train', 'test', 'valid']):
             self.task_dict[sample_type] = task_sublist[batch_cumsum[i]:batch_cumsum[i+1]]
             
         for sample_type in ['test']: #, 'valid']:             # if k_batch_test is zero, then copy 'train' task
@@ -38,15 +45,16 @@ class Task_sampler():
                 self.task_dict[sample_type] = self.task_dict['train']
             
     def sample(self, sample_type):
+        assert sample_type in self.sample_types
+
         tasks = self.task_dict[sample_type]
-        if self.task_fnc is None:
+        if self.task_gen_fnc is None:
             return tasks
         else:
-            return [self.task_fnc(l) for l in tasks] 
+            return [self.task_gen_fnc(l) for l in tasks] 
         
         
 
-    
 # subtask_list = random.sample(task, total_batch)    #  sampling from task list # To fix: task does not take sample_type as an input
 # subtask_list = [task(sample_type) for _ in range(total_batch)]  #
 
@@ -60,14 +68,8 @@ class Task_sampler():
 #         sampled_labels = range(7,10)
 #     return [partial(sample_mnist_img_fnc, l) for l in sampled_labels]
 
-
-# def sample_label_fmnist(sample_type):
-#     if sample_type = 'train':
-#         sampled_labels = range(0,7)
-#     else:
-#         sampled_labels = range(7,10)
-#     return [partial(sample_fmnist_img_fnc, l) for l in sampled_labels]
-
+sample_label_mnist = Task_sampler(tasks = list(range(10)), k_batches = [7,3,0], task_gen_fnc = sample_mnist_img_fnc).sample,
+sample_label_fmnist = Task_sampler(tasks = list(range(10)), k_batches = [7,3,0], task_gen_fnc = sample_fmnist_img_fnc).sample,
 
 # def sample_dataset_mnist_fmnist_lv3(sample_type):
 #     fnc_dict = {
@@ -92,16 +94,15 @@ class Task_sampler():
 get_task_dict={
     'sine':   sample_sin_fnc,
     'linear': sample_linear_fnc,
-#     'sine+linear': Label_pre_sampler([sample_sin_fnc, sample_linear_fnc], [2,0,0]).sample,
-    'sine+linear': [sample_sin_fnc, sample_linear_fnc],
+    'sine+linear': Task_sampler(tasks = [sample_sin_fnc, sample_linear_fnc]).sample,
 #     
     'LQR_lv2': sample_LQR_LV2,
     'LQR_lv1': sample_LQR_LV1,
     'LQR_lv0': (sample_LQR_LV0, None),
 #     
-    'mnist'  : sample_label_mnist,  #[partial(sample_mnist_img_fnc,  l) for l in classes],
+    'mnist'  : sample_label_mnist, 
     'fmnist' : sample_label_fmnist, #[partial(sample_fmnist_img_fnc, l) for l in classes],
-    'mnist+fmnist' : [sample_label_mnist, sample_label_fmnist],
+    'mnist+fmnist' : Task_sampler(tasks = [sample_label_mnist, sample_label_fmnist]).sample,
 }
 
 
