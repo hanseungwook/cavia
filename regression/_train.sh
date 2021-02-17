@@ -13,6 +13,5 @@ export PYTHONPATH=/home/dongki/research/lids/git/gym-minigrid:$PYTHONPATH
 
 # Begin experiment
 python3 main.py \
---task "mixture" \
---is-hierarchical \
+--task "HalfCheetahDir-v2" "HalfCheetahVel-v2" \
 --prefix ""

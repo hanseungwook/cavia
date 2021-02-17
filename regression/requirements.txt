@@ -9,3 +9,4 @@ ipython
 tensorboardX==1.2
 sklearn
 higher
+mujoco_py==1.50.1.68

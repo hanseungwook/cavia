@@ -32,7 +32,7 @@ def parse_args():
 
     # Arguments for env
     parser.add_argument(
-        "--task", type=str, choices=["velocity", "acceleration", "mixture"],
+        "--task", type=str, nargs='+', default=[],
         help="Problem to solve")
     parser.add_argument(
         "--ep-max-timestep", type=int, default=25,

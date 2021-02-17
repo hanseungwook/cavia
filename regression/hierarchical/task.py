@@ -18,19 +18,7 @@ class HierarchicalTask(object):
         return ""
 
     def _set_meta_tasks(self):
-        if self.args.task == "velocity":
-            self.meta_tasks = [gym.make("1DNavigationRot-v0", rot=False)]
-        elif self.args.task == "acceleration":
-            self.meta_tasks = [gym.make("1DNavigationRot-v0", rot=True)]
-        elif self.args.task == "mixture":
-            self.meta_tasks = [
-                gym.make("1DNavigationRot-v0", rot=False),
-                gym.make("1DNavigationRot-v0", rot=True)]
-        else:
-            raise ValueError("Invalid env name")
-
-        for env in self.meta_tasks:
-            env.seed(self.args.seed)
+        self.meta_tasks = [gym.make(meta_task) for meta_task in self.args.task]
 
     def _set_tasks(self):
         self.tasks = []
