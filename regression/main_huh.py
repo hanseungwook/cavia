@@ -11,7 +11,7 @@ from pytorch_lightning.loggers import TensorBoardLogger # https://pytorch-lightn
 
 from pdb import set_trace
 
-default_save_path = "/nobackup/users/benhuh/Projects/cavia/shared_results"
+# default_save_path = 
 default_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # use the GPU if available
 
 def main(hparams):
@@ -40,7 +40,7 @@ def main(hparams):
 def get_args(jupyter_flag = False):
     parser = argparse.ArgumentParser(description='Regression experiments')
 
-    parser.add_argument('--save-path', type=str,  nargs='+', default=default_save_path)
+    parser.add_argument('--save-path', type=str,  nargs='+', default="/nobackup/users/benhuh/Projects/cavia/shared_results")
     parser.add_argument('--device',      type=str, default=default_device)     # "cuda:0" or "cpu"
 
     parser.add_argument('--task', type=str,  nargs='+', help="Supertasks to solve",)
