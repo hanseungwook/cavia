@@ -40,7 +40,7 @@ def main(hparams):
 def get_args(jupyter_flag = False):
     parser = argparse.ArgumentParser(description='Regression experiments')
 
-    parser.add_argument('--save-path', type=str,  nargs='+', default="/nobackup/users/benhuh/Projects/cavia/shared_results")
+    parser.add_argument('--save-path', type=str, default="/nobackup/users/benhuh/Projects/cavia/shared_results")
     parser.add_argument('--device',      type=str, default=default_device)     # "cuda:0" or "cpu"
 
     parser.add_argument('--task', type=str,  nargs='+', help="Supertasks to solve",)
