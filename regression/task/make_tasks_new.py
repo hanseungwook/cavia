@@ -20,7 +20,7 @@ class Task_sampler():
                        k_batches: list = None, #[], 
                        task_gen_fnc = None):
         ### k_batches is a list of k_batch for the sample types
-        if k_batches == []:
+        if k_batches is None or k_batches == []:
             k_batches = [len(tasks),0,0]
         batch_cumsum = np.cumsum([0]+k_batches)
         
