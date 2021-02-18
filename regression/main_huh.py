@@ -7,7 +7,6 @@ from utils import set_seed, Logger
 from functools import partial
 
 import torch
-from torch.utils.tensorboard import SummaryWriter
 from pytorch_lightning.loggers import TensorBoardLogger # https://pytorch-lightning.readthedocs.io/en/latest/_modules/pytorch_lightning/loggers/tensorboard.html
 
 from pdb import set_trace
