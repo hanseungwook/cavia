@@ -26,7 +26,7 @@ def main(hparams):
 
     set_seed(hparams.seed)  
     logger = TensorBoardLogger(log_save_path, name=hparams.log_name, version=hparams.v_num) 
-    logger.log_hyperparams(hparams)
+    # logger.log_hyperparams(hparams) # Commenting out b/c causing errors with logging hyperparameters of lists
     
     run(hparams, logger)         # Start train
 
@@ -53,7 +53,7 @@ def get_args(jupyter_flag = False):
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--prefix', type=str, default="", help="Prefix for logging")
 
-    parser.add_argument('--log-name', nargs='?', type=str, help="Logging name", default=None) #'test::')
+    parser.add_argument('--log-name', type=str, help="Logging name", default='experiment') #'test::')
     parser.add_argument('--log_interval',   type=int, default=100)
     parser.add_argument('--test_interval',  type=int, default=0)
     parser.add_argument('--v_num', type=int, help='version number for resuming') #type=str)
