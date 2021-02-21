@@ -38,16 +38,16 @@ def main(hparams):
 
 
 
-def get_args(jupyter_flag = False):
+def get_args(*args):
     parser = argparse.ArgumentParser(description='Regression experiments')
 
     parser.add_argument('--save-path', type=str,  nargs='+', default=default_save_path)
     parser.add_argument('--device',      type=str, default=default_device)     # "cuda:0" or "cpu"
 
-    parser.add_argument('--task', type=str,  nargs='+', help="Supertasks to solve",)
+    parser.add_argument('--task', type=str,  help="Supertask name",)
 #                         choices=['sine', 'linear', 'quadratic', 'cubic', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 
 #                                  'mnist', 'fashion_mnist', 'mnist_fmnist', 'mnist_fmnist_3level'])
-    parser.add_argument('--classes', type=int, nargs='+', default=[], help="Specified classes of dataset to use (if not specified, all)")
+#     parser.add_argument('--classes', type=int, nargs='+', default=[], help="Specified classes of dataset to use (if not specified, all)")
     parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1], help="Architecture of neural network")
     parser.add_argument('--first_order', action='store_true', default=False, help='run first-order version (create-graph = False)')
     parser.add_argument('--model-type', type=str, choices=["CAVIA", "ADDITIVE", "MULTIPLICATIVE", "ADD_MULTIPLICATIVE"], default="CAVIA") 
@@ -75,14 +75,13 @@ def get_args(jupyter_flag = False):
     parser.add_argument('--n_contexts',    type=int, nargs='+', default=[2, 1])                  # number of context variables: phi0, phi1 
     parser.add_argument('--encoders',      type=int, nargs='+', default=[None, None, None])      # task encoder-models for model-based Meta-learning. Optimization-based if None (MAML) 
     
+    parser.add_argument('--loss_logging_levels', type=int, nargs='+', default=[]) 
     parser.add_argument('--ctx_logging_levels', type=int, nargs='+', default=[]) 
     parser.add_argument('--higher_flag',  action='store_true', default=False, help='Use Higher optimizer')
     
 
     parser_ = parser  #  = MODEL.add_model_specific_args(parser)
-    args, unknown = parser_.parse_known_args("") if jupyter_flag else parser_.parse_known_args()   # needs "" input to run from jupyter notebook.
-
-    
+    args, unknown = parser_.parse_known_args(*args) 
 
     return args
 

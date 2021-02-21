@@ -7,7 +7,7 @@ import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
 from hierarchical import Hierarchical_Model  #,  get_hierarchical_task
 from dataset import Hierarchical_Task #, get_hierarchical_task
-from task.make_tasks_new import get_task_dict #get_task_fnc
+from task.make_tasks_new import get_task_dict 
 from utils import get_vis_fn #, print_args
 
 from pdb import set_trace
@@ -33,8 +33,8 @@ def get_base_model(hparams):
             error()
     else:
         MODEL_TYPE = get_model_type(hparams.model_type)
-        n_contexts=hparams.n_contexts    #   n_context=sum(hparams.n_contexts)
-        return MODEL_TYPE(n_arch=hparams.architecture, n_contexts=hparams.n_contexts, device=hparams.device).to(hparams.device)
+        n_contexts=hparams.n_contexts    #  sum(hparams.n_contexts)
+        return MODEL_TYPE(n_arch=hparams.architecture, n_contexts=n_contexts, device=hparams.device).to(hparams.device)
 
 def get_encoder_model(encoder_types, hparams):
     encoders = []
@@ -50,17 +50,21 @@ def get_encoder_model(encoder_types, hparams):
 
 
 def get_task(hparams):
+    
     def make_batch_dict(n_trains, n_tests, n_valids):
         return [   {'train': n_train, 'test': n_test, 'valid': n_valid} 
                    for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids) ]
-    k_batch_dict = make_batch_dict(hparams.k_batch_train, hparams.k_batch_test, hparams.k_batch_valid)
-    n_batch_dict = make_batch_dict(hparams.n_batch_train, hparams.n_batch_test, hparams.n_batch_valid)
     
-    task_name = hparams.task #hparams.task[0]
-#     task_func = get_task_fnc(task_name) #, hparams.classes)
-    task_func = get_task_dict[task_name]
+    k_batch_dict = make_batch_dict(hparams.k_batch_train, hparams.k_batch_test, hparams.k_batch_valid)  # Total-batch
+    n_batch_dict = make_batch_dict(hparams.n_batch_train, hparams.n_batch_test, hparams.n_batch_valid)  # mini-batch
+    
     batch_dict=(k_batch_dict, n_batch_dict)
+
+    task_func = get_task_dict[hparams.task]  #     task_name = hparams.task 
+
+
     return task_func, batch_dict
+
 #     task = Hierarchical_Task(task_func, idx=0, batch_dict=(k_batch_dict, n_batch_dict))
 #     return [task]
 
@@ -92,7 +96,8 @@ def run(hparams, logger): #loggers, test_loggers):
     encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
     model   = Hierarchical_Model(base_model, encoder_models, logger, 
                                  hparams.n_contexts, hparams.n_iters, hparams.for_iters, hparams.lrs, 
-                                 hparams.ctx_logging_levels, hparams.higher_flag, hparams.data_parallel)
+                                 hparams.loss_logging_levels, hparams.ctx_logging_levels, 
+                                 hparams.higher_flag, hparams.data_parallel)
     
     if hparams.load_model:
         model = load_model(model, save_dir, hparams.log_name)
