@@ -5,9 +5,9 @@
 ###  cancel jobs using command 'scancel <jobnum>'
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err
 
-#SBATCH -J 2level_fns
-#SBATCH -o 2level_fns_%j.out
-#SBATCH -e 2level_fns_%j.err
+#SBATCH -J 1level_fns
+#SBATCH -o 1level_fns_%j.out
+#SBATCH -e 1level_fns_%j.err
 
 #SBATCH --mail-user=seungwook.han@ibm.com
 #SBATCH --mail-type=ALL
@@ -64,10 +64,10 @@ date
 ###  outputs are in  multi_torch_<jobnum>.out and multi_torch_<jobnum>.err 
 
 python3 main_huh.py \
---log_interval=50 --log_name=fns_sine_lin_2level_ctx2_2_full \
+--log_interval=50 --log_name=fns_sine_lin_1level_ctx4_full \
 --k_batch_train 10 10000 2  --k_batch_test 0 1000 2 --n_batch_train 10 50 2  --n_batch_test 0 1 1 \
---architecture 1 40 40 1 --n_iters 3 3 5000 --for_iters 3 3 1 \
---task sine linear --n_contexts 2 2 --lrs 0.03 0.03 0.001 --test_interval 100
+--architecture 1 40 40 1 --n_iters 3 0 5000 --for_iters 3 3 1 \
+--task sine linear --n_contexts 4 0 --lrs 0.03 0.0 0.001 --test_interval 100
 
 
 

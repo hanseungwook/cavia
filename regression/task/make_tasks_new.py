@@ -48,9 +48,9 @@ def make_dict(keys, vals):
 def sample_shuffle_split(input_, k_batches: dict):
     types = ['train', 'test', 'valid']
     set_trace()
-    if isinstance(input_, list) and k_batches is None: 
+    if k_batches is None and hasattr(input, '__len__'): 
         k_batches_list = [len(input_),0,0]
-    else: 
+    else:
         assert  types == list(k_batches.keys()) 
         k_batches_list = list(k_batches.values())
     assert len(k_batches_list) == 3
