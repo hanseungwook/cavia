@@ -44,36 +44,36 @@ print_optimize_level_over = True #False
 #  Model Hierarchy
 
 class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, decoder_model, encoders, logger, n_contexts, max_iters, for_iters, lrs, loss_logging_levels = [], ctx_logging_levels = [], Higher_flag = False, data_parallel=False): 
+    def __init__(self, levels, decoder_model, encoder_model, logger, n_contexts, max_iters, for_iters, lrs, loss_logging_levels = [], ctx_logging_levels = [], Higher_flag = False, data_parallel=False): 
+        
         super().__init__()
-
-        if data_parallel:
-            decoder_model = nn.DataParallel(decoder_model)
-            
-        self.decoder_model  = decoder_model            
-        self.n_contexts = n_contexts
-        self.args_dict = {'max_iters' : max_iters,
-                          'for_iters' : for_iters, 
-                          'lrs'       : lrs,
-#                           'loggers'   : loggers,
-                          }
+        
+#         levels           = len(n_contexts) + 1 #len(decoder_model.parameters_all) #- 1
+        self.levels      = levels
+        self.n_contexts  = n_contexts
+        self.max_iters   = max_iters
+        self.for_iters   = for_iters #or [1]*levels
+        self.lrs         = lrs #or [0.01]*levels
+#         self.args_dict      = {'max_iters' : max_iters,
+#                                'for_iters' : for_iters or [1]*levels, 
+#                                'lrs'       : lrs or [0.01]*levels}
         self.logger = logger
         self.loss_logging_levels = loss_logging_levels
         self.ctx_logging_levels = ctx_logging_levels
-        self.Higher_flag = Higher_flag  # Use Higher ?
+        self.Higher_flag        = Higher_flag 
         
-        print('max_iters', max_iters)
-        
-        self.device    = decoder_model.device
-        self.level_max = len(decoder_model.parameters_all) #- 1
-
+        if data_parallel:
+            decoder_model  = nn.DataParallel(decoder_model)
+        self.decoder_model = decoder_model            
+        self.device        = decoder_model.device
         # self.adaptation = optimize if encoder_model is None else encoder_model 
-        
+        print('max_iters', max_iters)
+
     def high_level_foward(self, task, level, status, optimizer, reset, return_outputs):
         status_idx = status +'_task'#+str(task.idx)  # prev_status = prev_status+current_status+'/'   # current_status = 'lv'+str(level)+'_task'+str(task.idx)
 
         # inner-loop optimization
-        optimize(self, task.load('train'), level, self.args_dict, 
+        optimize(self, task.load('train'), level, self.lrs[level], self.max_iters[level], self.for_iters[level], #self.args_dict, 
                         optimizer=optimizer, reset=reset, prev_status=status_idx+'/train', current_status = '' , # 'train' + current_status, 
                         device=self.device, Higher_flag = self.Higher_flag, 
                         log_loss_flag = (level in self.loss_logging_levels),
@@ -105,7 +105,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
         
         if level is None:
-            level = self.level_max 
+            level = self.levels 
         lower_level = level-1
                 
         if level == 0:
@@ -149,9 +149,9 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 ####################################   
 ## Optimize
 
-def optimize(model, dataloader, level, args_dict, optimizer, reset, prev_status, current_status, device, Higher_flag, log_loss_flag, log_ctx_flag):       
+def optimize(model, dataloader, level, lr, max_iter, for_iter, optimizer, reset, prev_status, current_status, device, Higher_flag, log_loss_flag, log_ctx_flag):       
     ## optimize parameter for a given 'task'
-    lr, max_iter, for_iter = get_args(args_dict, level)
+#     lr, max_iter, for_iter = get_args(args_dict, level)
     task_idx = dataloader.task_idx if hasattr(dataloader,'task_idx') else None
 #     task_name = dataloader.task_name if hasattr(dataloader,'task_name') else None
     
@@ -169,6 +169,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, prev_status,
                     optim = optimizer([param_all[level]], lr=lr)
                     optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
             else: # use regular optim: for outer-loop
+                set_trace()
                 optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
                 
         return param_all, optim

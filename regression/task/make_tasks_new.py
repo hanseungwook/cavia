@@ -47,7 +47,6 @@ def make_dict(keys, vals):
 
 def sample_shuffle_split(input_, k_batches: dict):
     types = ['train', 'test', 'valid']
-    set_trace()
     if k_batches is None and hasattr(input, '__len__'): 
         k_batches_list = [len(input_),0,0]
     else:
@@ -131,7 +130,7 @@ get_task_dict={
     'LQR_lv1': sample_LQR_LV1,
     'LQR_lv0': (sample_LQR_LV0, None),
 #
-#     'mnist'  : sample_label_mnist, 
+    'mnist'  : sample_label_mnist, 
 #     'fmnist' : sample_label_fmnist, 
 #     'mnist+fmnist' : sample_label_mnist_fmnist,
 }

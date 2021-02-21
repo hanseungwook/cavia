@@ -89,18 +89,20 @@ def get_num_test(hparams):
 
 def run(hparams, logger): #loggers, test_loggers):
 
+    hparams, levels = check_hparam_default(hparams)
+    
     num_test = get_num_test(hparams)
     save_dir = get_save_dir(hparams)    
     
     base_model      = get_base_model(hparams) 
     encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
-    model   = Hierarchical_Model(base_model, encoder_models, logger, 
+    model   = Hierarchical_Model(levels, base_model, encoder_models, logger, 
                                  hparams.n_contexts, hparams.n_iters, hparams.for_iters, hparams.lrs, 
                                  hparams.loss_logging_levels, hparams.ctx_logging_levels, 
                                  hparams.higher_flag, hparams.data_parallel)
     
-    if hparams.load_model:
-        model = load_model(model, save_dir, hparams.log_name)
+    if hparams.v_num is not None: #if hparams.load_model:
+        model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
     task_func, batch_dict = get_task(hparams)
     supertask = Hierarchical_Task(task_func, batch_dict=batch_dict, idx=0)
     
@@ -120,8 +122,28 @@ def run(hparams, logger): #loggers, test_loggers):
     return test_loss.item() 
 
 
+###################
+def check_hparam_default(hparams):
+    ## Default copy replacing None
+    
+    levels   = len(hparams.n_contexts) + 1 #len(decoder_model.parameters_all) #- 1
 
-
+    hparams.for_iters     = hparams.for_iters or [1]*levels
+    hparams.lrs           = hparams.lrs or [0.01]*levels
+    
+    hparams.k_batch_train = hparams.k_batch_train or [None]*levels
+    hparams.n_batch_train = hparams.n_batch_train or [1]*levels  #hparams.k_batch_train
+    
+    hparams.k_batch_test  = hparams.k_batch_test  or hparams.k_batch_train
+    hparams.k_batch_valid = hparams.k_batch_valid or hparams.k_batch_train
+    hparams.n_batch_test  = hparams.n_batch_test  or hparams.n_batch_train
+    hparams.n_batch_valid = hparams.n_batch_valid or hparams.n_batch_train
+    
+    
+    for name in ['lrs', 'n_iters', 'for_iters', 'k_batch_train', 'k_batch_test', 'k_batch_valid', 'n_batch_train', 'n_batch_test', 'n_batch_valid']:
+        assert len(getattr(hparams,name)) == levels, "wrong level "+name
+        
+    return hparams, levels
 
 ###################################################
 
