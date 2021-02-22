@@ -29,7 +29,7 @@ print_forward_test = False
 print_forward_return = False #True
 # print_task_loader = True
 print_optimize_level_iter = False
-print_optimize_level_over = True #False
+print_optimize_level_over = False #False
 
 ##############################################################################
 # set self.ctx as parameters # BAD IDEA
