@@ -1,4 +1,4 @@
-from Task_sampler import Task_sampler, Partial_Task_sampler, batch_wrapper
+from .Task_sampler import Task_sampler, Partial_Task_sampler, batch_wrapper
 
 
 
@@ -50,9 +50,9 @@ task_dict={
 #     'sine+line_lv1': sine_line2_task(None),
 #
 #     'mnist_lv0'  : mnist2_task(None, None), 
-    'mnist_lv1'  : mnist2_task(None), 
+#     'mnist_lv1'  : mnist2_task(None), 
     'mnist_lv2'  : mnist2_task, 
-    'fmnist_lv1' : fmnist2_task(None), 
+#     'fmnist_lv1' : fmnist2_task(None), 
     'fmnist_lv2' : fmnist2_task, 
     'mnist+fmnist_lv3' : mnist_fmnist3_task,
 #     'mnist+fmnist_lv2' : mnist_fmnist3_task(None),

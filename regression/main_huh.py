@@ -20,7 +20,7 @@ def main(hparams):
 
     set_seed(hparams.seed)  
     logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
-    # logger.log_hyperparams(hparams) # Commenting out b/c causing errors with logging hyperparameters of lists
+    logger.log_hyperparams(hparams) 
     
     model = get_Hierarchical_Model(hparams, logger)
     supertask = get_Hierarchical_Task(hparams)
@@ -44,7 +44,7 @@ def get_args(*args):
     parser.add_argument('--v_num',     type=int, default=None, help='version number for resuming') #type=str)
     parser.add_argument('--seed',      type=int, default=42)
 
-    parser.add_argument('--task', type=str,  help="Supertask name",)
+    parser.add_argument('--task', type=str, help="Supertasks to solve",)
 #                         choices=['sine', 'linear', 'quadratic', 'cubic', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 
 #                                  'mnist', 'fashion_mnist', 'mnist_fmnist', 'mnist_fmnist_3level'])
     parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1], help="Architecture of neural network")

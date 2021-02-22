@@ -83,7 +83,7 @@ def get_num_test(hparams):
 
 ###############################################################
 
-def run(hparams, model, supertask): #loggers, test_loggers):
+def run(hparams, model, supertask): 
 
     num_test = get_num_test(hparams)
     save_dir = get_save_dir(hparams)    
@@ -102,8 +102,9 @@ def run(hparams, model, supertask): #loggers, test_loggers):
             vis_save_fn(outputs, save_dir, i*hparams.test_interval)
 
         save_model(model, save_dir)  
-
-    return test_loss
+        model.logger.save()
+    
+    return test_loss.item() 
 
 ###############################################################
 

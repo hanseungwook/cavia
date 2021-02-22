@@ -135,15 +135,16 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
     ######################################
     def log_ctx(self, ctx, status, iter_num):   #   def log_ctx(self, prev_status, current_status, ctx):
-        if ctx is None or ctx.numel() == 0 or logger is None:
+        if ctx is None or ctx.numel() == 0 or self.logger is None:
             pass
         else:
             # Log each context changing separately if size <= 3
             if ctx.numel() <= 3:
                 for i, ctx_ in enumerate(ctx.flatten()): #range(ctx.size):
-                    self.logger.experiment.add_scalar("ctx{}/{}".format(prev_status,i), {current_status: ctx_}, iter_num)
+                    # self.logger.experiment.add_scalar("ctx{}/{}".format(prev_status,i), {current_status: ctx_}, iter_num)
+                    self.logger.experiment.add_scalar("ctx{}/{}".format(status,i), ctx_, iter_num)
             else:
-                self.logger.experiment.add_histogram("ctx{}".format(prev_status), {current_status: ctx}, iter_num)
+                self.logger.experiment.add_histogram("ctx{}".format(status), ctx, iter_num)
 
 
 ####################################   
@@ -200,7 +201,7 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, optimizer, reset,
             if log_loss_flag:
                 model.logging(loss, prev_status+current_status, cur_iter)  #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
             if log_ctx_flag:
-                model.log_ctx(param_all[level], prev_status + current_status)  #  log the adapted ctx for the level
+                model.log_ctx(param_all[level], prev_status + current_status, cur_iter)  #  log the adapted ctx for the level
                 
     ######################################
     
