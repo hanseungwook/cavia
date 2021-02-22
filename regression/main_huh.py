@@ -29,6 +29,7 @@ def main(hparams):
     # logger.log_hyperparams(hparams) # Commenting out b/c causing errors with logging hyperparameters of lists
     
     run(hparams, logger)         # Start train
+    logger.save()
 
     
 ###############
