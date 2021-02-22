@@ -104,7 +104,7 @@ def get_average_loss(model, tasks):
 
 # input_1d_range = [-5, 5]
 
-# def input_gen_1d(batch, grid=False):         # Full inputs over the whole regression input range
+# def input_fnc_1d(batch, grid=False):         # Full inputs over the whole regression input range
 #     if grid:
 #         return torch.linspace(input_1d_range[0], input_1d_range[1], steps=batch).unsqueeze(1)
 #     else:
@@ -123,5 +123,5 @@ def get_average_loss(model, tasks):
 #     return slope, bias
 
 
-# sine_param_gen = batch_wrapper(sine_params)
+# sine1_param_gen = batch_wrapper(sine_params)
 # line_param_gen = batch_wrapper(line_params) 

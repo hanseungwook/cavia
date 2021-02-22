@@ -1,64 +1,64 @@
-from functools import partial
-from .regression_1d import sample_sin_fnc, sample_linear_fnc, sample_quadratic_fnc, sample_cubic_fnc
-from .image_reconstruction import sample_celeba_img_fnc, sample_cifar10_img_fnc, sample_mnist_img_fnc, sample_fashion_mnist_img_fnc, create_hier_imagenet_supertasks
-from .LQR import LQR_environment, Linear_Policy, Combine_NN_ENV
+from Task_sampler import Task_sampler, Partial_Task_sampler, batch_wrapper
 
 
-def make_tasks(task_names, classes):
-    task_func_dict = {}
-    task_func_dict['train'] = []
-    task_func_dict['test'] = []
 
-    # If 'test' is not set, 'test' uses the same tasks/labels as 'train'
-    for task in task_names:
-        if task == 'sine':
-            task_func_dict['train'].append(sample_sin_fnc)
-        elif task == 'linear':
-            task_func_dict['train'].append(sample_linear_fnc)
-        elif task == 'quadratic':
-            task_func_dict['train'].append(sample_quadratic_fnc)
-        elif task == 'cubic':
-            task_func_dict['train'].append(sample_cubic_fnc)
-        elif task == 'celeba':
-            task_func_dict['train'].append(sample_celeba_img_fnc)
-        elif task == 'cifar10':
-            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, l) for l in range(7)])
-            task_func_dict['test'].extend([partial(sample_cifar10_img_fnc, l) for l in range(7,10)])
-        elif task == 'celeba_airplane':
-            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, 0), sample_celeba_img_fnc])
-            task_func_dict['test'].extend([partial(sample_cifar10_img_fnc, 0), sample_celeba_img_fnc])          
-        elif task == 'airplane':
-            task_func_dict['train'].extend([partial(sample_cifar10_img_fnc, 0)])
-        elif task == 'hier-imagenet':
-            task_func_dict['train'] = create_hier_imagenet_supertasks(data_dir='/disk_c/han/data/ImageNet/', info_dir='./imagenet_class_hierarchy/modified', level=4)
-        elif task == 'mnist':
-            if len(classes) <= 0:
-                classes = list(range(0, 10))
-            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in classes])
-        elif task == 'fashion_mnist':
-            if len(classes) <= 0:
-                classes = list(range(0, 10))
-            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in classes])
-        elif task == 'mnist_fmnist':
-            if len(classes) <= 0:
-                classes = list(range(0, 10))
-            task_func_dict['train'].extend([partial(sample_mnist_img_fnc, l) for l in classes])
-            task_func_dict['train'].extend([partial(sample_fashion_mnist_img_fnc, l) for l in classes])
-        elif task == 'mnist_fmnist_3level':
-            if len(classes) <= 0:
-                classes = list(range(0, 10))
+###########################################
+#  1D regression task
 
-            def sample_mnist(labels, sample_type):
-                return [partial(sample_mnist_img_fnc, l) for l in labels]
+from .regression_1d import input_fnc_1d, sine_params, line_params, sine1_fnc, line1_fnc
 
-            def sample_fashion_mnist(labels, sample_type):
-                return [partial(sample_fashion_mnist_img_fnc, l) for l in labels]                
-                
-            task_func_dict['train'].extend([partial(sample_mnist, classes), partial(sample_fashion_mnist, classes)])
-        elif task == 'LQR':
-            pass
-        else:
-            raise Exception('Task not implemented/undefined')
+sine0_task = Partial_Task_sampler(sine1_fnc, input_fnc_1d)
+sine1_task = Task_sampler(task_fnc = sine0_task, param_fnc = batch_wrapper(sine_params))
 
-    print(task_func_dict)
-    return task_func_dict
+line0_task = Partial_Task_sampler(line1_fnc, input_fnc_1d)
+line1_task = Task_sampler(task_fnc = line0_task, param_fnc = batch_wrapper(line_params) )
+
+sine_line2_task = Task_sampler(task_fnc = {'sine': sine1_task, 'line': line1_task}, param_fnc = None) 
+
+
+###########################################
+#  2D regression (Image -reconstruction ) task
+
+from .image_reconstruction import img_reconst_task_gen
+
+mnist_lv2_fnc, in_fnc_2d_coord = img_reconst_task_gen('mnist')
+
+mnist0_task = Partial_Task_sampler(mnist_lv2_fnc, in_fnc_2d_coord)  # lv0 : pixel
+mnist1_task = Partial_Task_sampler(mnist0_task, None)               # lv1 : choose image 
+mnist2_task = Task_sampler(mnist1_task, None)                       # lv2 : choose label 
+
+# mnist1_task(label = 1) : level1 task with digit =1 only
+# mnist1_task(label = None)  : level1 task with all digits
+
+fmnist_lv2_fnc, in_fnc_2d_coord = img_reconst_task_gen('fmnist')
+
+fmnist0_task = Partial_Task_sampler(fmnist_lv2_fnc, in_fnc_2d_coord)  # lv0 : pixel
+fmnist1_task = Partial_Task_sampler(fmnist0_task, None)               # lv1 : choose image 
+fmnist2_task = Task_sampler(fmnist1_task, None)                       # lv2 : choose label 
+
+mnist_fmnist3_task = Task_sampler({'mnist_lv2': mnist2_task, 'fmnist_lv2': fmnist2_task}, None)
+
+################################################
+# LQR tasks -  to be fixed
+from .LQR import sample_LQR_LV2, sample_LQR_LV1, sample_LQR_LV0 
+
+
+task_dict={
+    'sine_lv1':      sine1_task,
+    'line_lv1':      line1_task,
+    'sine+line_lv2': sine_line2_task,
+#     'sine+line_lv1': sine_line2_task(None),
+#
+#     'mnist_lv0'  : mnist2_task(None, None), 
+    'mnist_lv1'  : mnist2_task(None), 
+    'mnist_lv2'  : mnist2_task, 
+    'fmnist_lv1' : fmnist2_task(None), 
+    'fmnist_lv2' : fmnist2_task, 
+    'mnist+fmnist_lv3' : mnist_fmnist3_task,
+#     'mnist+fmnist_lv2' : mnist_fmnist3_task(None),
+#     
+    'LQR_lv2': sample_LQR_LV2,
+    'LQR_lv1': sample_LQR_LV1,
+    'LQR_lv0': (sample_LQR_LV0, None),
+}
+

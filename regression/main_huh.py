@@ -1,15 +1,13 @@
-import argparse
-
-# from arguments import run_argparse
-from train_huh import run #, get_loggers
 import os
-from utils import set_seed, Logger
-from functools import partial
-
+import argparse
 import torch
 from pytorch_lightning.loggers import TensorBoardLogger # https://pytorch-lightning.readthedocs.io/en/latest/_modules/pytorch_lightning/loggers/tensorboard.html
 
-from pdb import set_trace
+from train_huh import run, get_Hierarchical_Model, get_Hierarchical_Task
+from utils import set_seed, Logger
+
+
+# from pdb import set_trace
 
 # default_save_path = 
 default_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # use the GPU if available
@@ -17,18 +15,17 @@ default_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") 
 def main(hparams):
     # Load arguments
 
-    log_save_path = os.path.join(hparams.save_path, "logs")
-    hparams.log_save_path = log_save_path
-    hparams.log_name = hparams.log_name or hparams.task #+'_test'
-    
-    if not os.path.exists(log_save_path):
-        os.makedirs(log_save_path)
+    if not os.path.exists(hparams.log_save_path):
+        os.makedirs(hparams.log_save_path)
 
     set_seed(hparams.seed)  
-    logger = TensorBoardLogger(log_save_path, name=hparams.log_name, version=hparams.v_num) 
+    logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
     # logger.log_hyperparams(hparams) # Commenting out b/c causing errors with logging hyperparameters of lists
     
-    run(hparams, logger)         # Start train
+    model = get_Hierarchical_Model(hparams, logger)
+    supertask = get_Hierarchical_Task(hparams)
+    
+    run(hparams, model, supertask)         # Start train
 
     
 ###############
@@ -41,6 +38,8 @@ def get_args(*args):
     parser = argparse.ArgumentParser(description='Regression experiments')
 
     parser.add_argument('--save-path', type=str, default="/nobackup/users/benhuh/Projects/cavia/shared_results")
+    parser.add_argument('--private', dest='save_path', action='store_false')
+    
     parser.add_argument('--device',    type=str, default=default_device)     # "cuda:0" or "cpu"
     parser.add_argument('--v_num',     type=int, default=None, help='version number for resuming') #type=str)
     parser.add_argument('--seed',      type=int, default=42)
@@ -83,8 +82,37 @@ def get_args(*args):
     parser_ = parser  #  = MODEL.add_model_specific_args(parser)
     args, unknown = parser_.parse_known_args(*args) 
     
+    args = check_hparam_default(args)
     return args
 
+
+###################
+def check_hparam_default(hparams):
+    ## Default copy replacing None
+    
+    hparams.save_path = hparams.save_path or os.getcwd()
+    hparams.log_save_path = os.path.join(hparams.save_path, "logs")
+    hparams.log_name = hparams.log_name or hparams.task  #+'_test'
+    
+    hparams.levels         = len(hparams.n_contexts) + 1 #len(decoder_model.parameters_all) #- 1
+    
+    hparams.for_iters     = hparams.for_iters or [1]*hparams.levels
+    hparams.lrs           = hparams.lrs or [0.01]*hparams.levels
+    
+    hparams.k_batch_train = hparams.k_batch_train or [None]*hparams.levels
+    hparams.n_batch_train = hparams.n_batch_train or [1]*hparams.levels  #hparams.k_batch_train
+    
+    ## maybe duplicate k_batch_train/n_batch_train 
+    hparams.k_batch_test  = hparams.k_batch_test  or hparams.k_batch_train
+    hparams.k_batch_valid = hparams.k_batch_valid or hparams.k_batch_train
+    hparams.n_batch_test  = hparams.n_batch_test  or hparams.n_batch_train
+    hparams.n_batch_valid = hparams.n_batch_valid or hparams.n_batch_train
+    
+    
+    for name in ['lrs', 'n_iters', 'for_iters', 'k_batch_train', 'k_batch_test', 'k_batch_valid', 'n_batch_train', 'n_batch_test', 'n_batch_valid']:
+        assert len(getattr(hparams,name)) == hparams.levels, "wrong level "+name
+        
+    return hparams
 
 if __name__ == '__main__':
     hparams = get_args()

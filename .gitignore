@@ -9,8 +9,7 @@ docker
 mujoco_key.txt
 
 # data folders
-data/miniimagenet/images
-data/CelebA/
+data/
 
 # result folders
 saves/
@@ -22,3 +21,5 @@ results/
 
 # Folders
 venv/
+regression/data/
+regression/.vscode/settings.json

@@ -5,9 +5,9 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
-from hierarchical import Hierarchical_Model  #,  get_hierarchical_task
-from dataset import Hierarchical_Task #, get_hierarchical_task
-from task.make_tasks_new import get_task_dict 
+from hierarchical import Hierarchical_Model  
+from dataset import Hierarchical_Task 
+from task.make_tasks import task_dict 
 from utils import get_vis_fn #, print_args
 
 from pdb import set_trace
@@ -49,7 +49,7 @@ def get_encoder_model(encoder_types, hparams):
     return encoders
 
 
-def get_task(hparams):
+def get_batch_dict(hparams):
     
     def make_batch_dict(n_trains, n_tests, n_valids):
         return [   {'train': n_train, 'test': n_test, 'valid': n_valid} 
@@ -60,10 +60,7 @@ def get_task(hparams):
     
     batch_dict=(k_batch_dict, n_batch_dict)
 
-    task_func = get_task_dict[hparams.task]  #     task_name = hparams.task 
-
-
-    return task_func, batch_dict
+    return batch_dict
 
 #     task = Hierarchical_Task(task_func, idx=0, batch_dict=(k_batch_dict, n_batch_dict))
 #     return [task]
@@ -75,42 +72,29 @@ def get_num_test(hparams):
 ##     Seungwook's comment: This is dividing up the total outer loop # of iterations by the test interval and at each test interval, creating a reconstruction/visaulization.
 ##     To be Fixed: Cleaned up.. 
 
-#     if hparams.test_interval == 0:
-#         hparams.test_interval = hparams.n_iters[-1]
-#     num_test = hparams.n_iters[-1] // hparams.test_interval 
-#     hparams.n_iters[-1] = hparams.test_interval   # To fix: This is bad: changing outer-loop n_iter without any warning. 
-    num_test = 1
+    if hparams.test_interval == 0:
+        hparams.test_interval = hparams.n_iters[-1]
+    num_test = hparams.n_iters[-1] // hparams.test_interval 
+    hparams.n_iters[-1] = hparams.test_interval   # To fix: This is bad: changing outer-loop n_iter without any warning. 
+#     num_test = 1
     return num_test
 
 
 
 ###############################################################
 
+def run(hparams, model, supertask): #loggers, test_loggers):
 
-def run(hparams, logger): #loggers, test_loggers):
-
-    hparams, levels = check_hparam_default(hparams)
-    
     num_test = get_num_test(hparams)
     save_dir = get_save_dir(hparams)    
     
-    base_model      = get_base_model(hparams) 
-    encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
-    model   = Hierarchical_Model(levels, base_model, encoder_models, logger, 
-                                 hparams.n_contexts, hparams.n_iters, hparams.for_iters, hparams.lrs, 
-                                 hparams.loss_logging_levels, hparams.ctx_logging_levels, 
-                                 hparams.higher_flag, hparams.data_parallel)
-    
-    if hparams.v_num is not None: #if hparams.load_model:
-        model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
-    task_func, batch_dict = get_task(hparams)
-    supertask = Hierarchical_Task(task_func, batch_dict=batch_dict, idx=0)
-    
     print('start model training')
     
+    test_loss = []
     for i in range(num_test):
-        test_loss, outputs = model([supertask], optimizer=Adam, reset=False, return_outputs=True) # grad_clip = hparams.clip ) #TODO: gradient clipping?
-        print('outer-loop idx', i, 'test loss', test_loss.item())
+        loss, outputs = model([supertask], optimizer=Adam, reset=False, return_outputs=True) # grad_clip = hparams.clip ) #TODO: gradient clipping?
+        test_loss.append(loss.item())
+        print('outer-loop idx', i, 'test loss', loss.item())
         
         if hparams.viz:  # should this be needed? Utilize model run below directly 
             print('Saving reconstruction')
@@ -118,32 +102,26 @@ def run(hparams, logger): #loggers, test_loggers):
             vis_save_fn(outputs, save_dir, i*hparams.test_interval)
 
         save_model(model, save_dir)  
-    
-    return test_loss.item() 
 
+    return test_loss
 
-###################
-def check_hparam_default(hparams):
-    ## Default copy replacing None
-    
-    levels   = len(hparams.n_contexts) + 1 #len(decoder_model.parameters_all) #- 1
+###############################################################
 
-    hparams.for_iters     = hparams.for_iters or [1]*levels
-    hparams.lrs           = hparams.lrs or [0.01]*levels
+def get_Hierarchical_Model(hparams, logger):
+    base_model      = get_base_model(hparams) 
+    encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
+    model   = Hierarchical_Model(hparams.levels, base_model, encoder_models, logger, 
+                                 hparams.n_contexts, hparams.n_iters, hparams.for_iters, hparams.lrs, 
+                                 hparams.loss_logging_levels, hparams.ctx_logging_levels, 
+                                 hparams.higher_flag, hparams.data_parallel)
     
-    hparams.k_batch_train = hparams.k_batch_train or [None]*levels
-    hparams.n_batch_train = hparams.n_batch_train or [1]*levels  #hparams.k_batch_train
-    
-    hparams.k_batch_test  = hparams.k_batch_test  or hparams.k_batch_train
-    hparams.k_batch_valid = hparams.k_batch_valid or hparams.k_batch_train
-    hparams.n_batch_test  = hparams.n_batch_test  or hparams.n_batch_train
-    hparams.n_batch_valid = hparams.n_batch_valid or hparams.n_batch_train
-    
-    
-    for name in ['lrs', 'n_iters', 'for_iters', 'k_batch_train', 'k_batch_test', 'k_batch_valid', 'n_batch_train', 'n_batch_test', 'n_batch_valid']:
-        assert len(getattr(hparams,name)) == levels, "wrong level "+name
-        
-    return hparams, levels
+    if hparams.v_num is not None: #if hparams.load_model:
+        model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
+
+    return model
+
+def get_Hierarchical_Task(hparams):
+    return Hierarchical_Task(task_dict[hparams.task], batch_dict=get_batch_dict(hparams), idx=0)
 
 ###################################################
 

@@ -29,7 +29,7 @@ print_forward_test = False
 print_forward_return = False #True
 # print_task_loader = True
 print_optimize_level_iter = False
-print_optimize_level_over = True #False
+print_optimize_level_over = False
 
 ##############################################################################
 # set self.ctx as parameters # BAD IDEA
@@ -169,7 +169,6 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, optimizer, reset,
                     optim = optimizer([param_all[level]], lr=lr)
                     optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
             else: # use regular optim: for outer-loop
-                set_trace()
                 optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
                 
         return param_all, optim
