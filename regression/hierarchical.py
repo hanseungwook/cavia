@@ -135,7 +135,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
     ######################################
     def log_ctx(self, ctx, status, iter_num):   #   def log_ctx(self, prev_status, current_status, ctx):
-        if ctx is None or ctx.numel() == 0 or logger is None:
+        if ctx is None or ctx.numel() == 0 or self.logger is None:
             pass
         else:
             # Log each context changing separately if size <= 3
