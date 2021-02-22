@@ -75,10 +75,10 @@ def get_num_test(hparams):
 ##     Seungwook's comment: This is dividing up the total outer loop # of iterations by the test interval and at each test interval, creating a reconstruction/visaulization.
 ##     To be Fixed: Cleaned up.. 
 
-#     if hparams.test_interval == 0:
-#         hparams.test_interval = hparams.n_iters[-1]
-#     num_test = hparams.n_iters[-1] // hparams.test_interval 
-#     hparams.n_iters[-1] = hparams.test_interval   # To fix: This is bad: changing outer-loop n_iter without any warning. 
+    if hparams.test_interval == 0:
+        hparams.test_interval = hparams.n_iters[-1]
+    num_test = hparams.n_iters[-1] // hparams.test_interval 
+    hparams.n_iters[-1] = hparams.test_interval   # To fix: This is bad: changing outer-loop n_iter without any warning. 
     num_test = 1
     return num_test
 
