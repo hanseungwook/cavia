@@ -27,7 +27,7 @@ class Task_sampler():
 #         if isinstance(tasks,int):     # if 'tasks' == total number of tasks 
 #             tasks = list(range(tasks))  # list of task indices/labels 
             
-        # self.task_fnc = task_fnc  # function that takes task label and returns actual tasks 
+        self.task_gen_fnc = task_gen_fnc  # function that takes task label and returns actual tasks 
         self.task_dict={}
         self.split(tasks, batch_cumsum)
         

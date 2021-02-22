@@ -151,7 +151,7 @@ def regression_input_function(batch_size, full=False):
     if batch_size == 0:
         return torch.linspace(reg_input_range[0], reg_input_range[1], steps=100).unsqueeze(1)
 
-    inputs = torch.randn(batch_size, 1)
+    inputs = torch.rand(batch_size, 1)
     inputs = inputs * (reg_input_range[1] - reg_input_range[0]) + reg_input_range[0]
     return inputs
 

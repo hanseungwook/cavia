@@ -43,7 +43,7 @@ def get_args(jupyter_flag = False):
     parser.add_argument('--save-path', type=str, default="/nobackup/users/benhuh/Projects/cavia/shared_results")
     parser.add_argument('--device',      type=str, default=default_device)     # "cuda:0" or "cpu"
 
-    parser.add_argument('--task', type=str,  nargs='+', help="Supertasks to solve",)
+    parser.add_argument('--task', type=str, help="Supertasks to solve",)
 #                         choices=['sine', 'linear', 'quadratic', 'cubic', 'celeba', 'cifar10', 'hier-imagenet', 'celeba_airplane', 'airplane', 
 #                                  'mnist', 'fashion_mnist', 'mnist_fmnist', 'mnist_fmnist_3level'])
     parser.add_argument('--classes', type=int, nargs='+', default=[], help="Specified classes of dataset to use (if not specified, all)")
