@@ -141,9 +141,10 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             # Log each context changing separately if size <= 3
             if ctx.numel() <= 3:
                 for i, ctx_ in enumerate(ctx.flatten()): #range(ctx.size):
-                    self.logger.experiment.add_scalar("ctx{}/{}".format(prev_status,i), {current_status: ctx_}, iter_num)
+                    # self.logger.experiment.add_scalar("ctx{}/{}".format(prev_status,i), {current_status: ctx_}, iter_num)
+                    self.logger.experiment.add_scalar("ctx{}/{}".format(status,i), {current_status: ctx_}, iter_num)
             else:
-                self.logger.experiment.add_histogram("ctx{}".format(prev_status), {current_status: ctx}, iter_num)
+                self.logger.experiment.add_histogram("ctx{}".format(status), {current_status: ctx}, iter_num)
 
 
 ####################################   
