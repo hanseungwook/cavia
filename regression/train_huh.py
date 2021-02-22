@@ -118,7 +118,7 @@ def run(hparams, logger): #loggers, test_loggers):
             vis_save_fn(outputs, save_dir, i*hparams.test_interval)
 
         save_model(model, save_dir)  
-        logger.save()
+        model.logger.save()
     
     return test_loss.item() 
 

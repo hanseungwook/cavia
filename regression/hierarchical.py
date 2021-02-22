@@ -201,7 +201,7 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, optimizer, reset,
             if log_loss_flag:
                 model.logging(loss, prev_status+current_status, cur_iter)  #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
             if log_ctx_flag:
-                model.log_ctx(param_all[level], prev_status + current_status)  #  log the adapted ctx for the level
+                model.log_ctx(param_all[level], prev_status + current_status, cur_iter)  #  log the adapted ctx for the level
                 
     ######################################
     

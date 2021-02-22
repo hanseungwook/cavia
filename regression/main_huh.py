@@ -26,7 +26,7 @@ def main(hparams):
 
     set_seed(hparams.seed)  
     logger = TensorBoardLogger(log_save_path, name=hparams.log_name, version=hparams.v_num) 
-    # logger.log_hyperparams(hparams) # Commenting out b/c causing errors with logging hyperparameters of lists
+    logger.log_hyperparams(hparams) # Commenting out b/c causing errors with logging hyperparameters of lists
     
     run(hparams, logger)         # Start train
     logger.save()
