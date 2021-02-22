@@ -210,7 +210,7 @@ def get_dataloader_dict(level, task, batch_dict, idx):
             task_params, subtask_list = task.get_data(sample_type) #, total_batch_) 
             data = [Hierarchical_Task(subtask, batch_dict_next, idx_) for (idx_, subtask) in enumerate(subtask_list)]   # Recursive
             dataloader = Meta_DataLoader(Dataset_helper(data, None), batch_size=mini_batch_, name=str(task), idx=idx)  # returns a minibatch of Tasks
-            print(sample_type, task_params) #data, idx, task)
+            # print(sample_type, task_params) #data, idx, task)
             return dataloader
 
     loader_dict = {key: get_dataloader(key, mini_batch[key]) for key in ['train', 'test', 'valid']}

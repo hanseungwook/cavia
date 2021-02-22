@@ -122,15 +122,15 @@ sine_line2_task = Task_sampler(task_fnc = sine_line2_dict, param_fnc = None)
 
 
 get_task_dict={
-    'sine':   sine1_task,
-    'linear': line1_task,
+    # 'sine':   sine1_task,
+    # 'linear': line1_task,
     'sine+linear': sine_line2_task,
 #     
-    'LQR_lv2': sample_LQR_LV2,
-    'LQR_lv1': sample_LQR_LV1,
-    'LQR_lv0': (sample_LQR_LV0, None),
+    # 'LQR_lv2': sample_LQR_LV2,
+    # 'LQR_lv1': sample_LQR_LV1,
+    # 'LQR_lv0': (sample_LQR_LV0, None),
 #
-    'mnist'  : sample_label_mnist, 
+    # 'mnist'  : sample_label_mnist, 
 #     'fmnist' : sample_label_fmnist, 
 #     'mnist+fmnist' : sample_label_mnist_fmnist,
 }

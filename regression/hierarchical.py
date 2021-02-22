@@ -169,7 +169,7 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, optimizer, reset,
                     optim = optimizer([param_all[level]], lr=lr)
                     optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
             else: # use regular optim: for outer-loop
-                set_trace()
+                # set_trace()
                 optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
                 
         return param_all, optim
