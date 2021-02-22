@@ -79,7 +79,7 @@ def get_num_test(hparams):
         hparams.test_interval = hparams.n_iters[-1]
     num_test = hparams.n_iters[-1] // hparams.test_interval 
     hparams.n_iters[-1] = hparams.test_interval   # To fix: This is bad: changing outer-loop n_iter without any warning. 
-    num_test = 1
+    # num_test = 1
     return num_test
 
 
