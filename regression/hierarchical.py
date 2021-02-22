@@ -44,42 +44,69 @@ print_optimize_level_over = True #False
 #  Model Hierarchy
 
 class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, decoder_model, encoders, logger, n_contexts, max_iters, for_iters, lrs, ctx_logging_levels = [], Higher_flag = False, data_parallel=False): 
+    def __init__(self, levels, decoder_model, encoder_model, logger, n_contexts, max_iters, for_iters, lrs, loss_logging_levels = [], ctx_logging_levels = [], Higher_flag = False, data_parallel=False): 
+        
         super().__init__()
-
-        if data_parallel:
-            decoder_model = nn.DataParallel(decoder_model)
-            
-        self.decoder_model  = decoder_model            
-        self.n_contexts = n_contexts
-        self.args_dict = {'max_iters' : max_iters,
-                          'for_iters' : for_iters, 
-                          'lrs'       : lrs,
-#                           'loggers'   : loggers,
-                          }
+        
+#         levels           = len(n_contexts) + 1 #len(decoder_model.parameters_all) #- 1
+        self.levels      = levels
+        self.n_contexts  = n_contexts
+        self.max_iters   = max_iters
+        self.for_iters   = for_iters #or [1]*levels
+        self.lrs         = lrs #or [0.01]*levels
+#         self.args_dict      = {'max_iters' : max_iters,
+#                                'for_iters' : for_iters or [1]*levels, 
+#                                'lrs'       : lrs or [0.01]*levels}
         self.logger = logger
+        self.loss_logging_levels = loss_logging_levels
         self.ctx_logging_levels = ctx_logging_levels
-        self.Higher_flag = Higher_flag  # Use Higher ?
+        self.Higher_flag        = Higher_flag 
         
-        print('max_iters', max_iters)
-        
-        self.device    = decoder_model.device
-        self.level_max = len(decoder_model.parameters_all) #- 1
-
+        if data_parallel:
+            decoder_model  = nn.DataParallel(decoder_model)
+        self.decoder_model = decoder_model            
+        self.device        = decoder_model.device
         # self.adaptation = optimize if encoder_model is None else encoder_model 
+        print('max_iters', max_iters)
+
+    def high_level_foward(self, task, level, status, optimizer, reset, return_outputs):
+        status_idx = status +'_task'#+str(task.idx)  # prev_status = prev_status+current_status+'/'   # current_status = 'lv'+str(level)+'_task'+str(task.idx)
+
+        # inner-loop optimization
+        optimize(self, task.load('train'), level, self.lrs[level], self.max_iters[level], self.for_iters[level], #self.args_dict, 
+                        optimizer=optimizer, reset=reset, prev_status=status_idx+'/train', current_status = '' , # 'train' + current_status, 
+                        device=self.device, Higher_flag = self.Higher_flag, 
+                        log_loss_flag = (level in self.loss_logging_levels),
+                        log_ctx_flag = (level in self.ctx_logging_levels))
+
+        # evaluate on one mini-batch from test dataloader
+        l, outputs_ = self(task.load('test'), level, return_outputs=return_outputs, prev_status=status_idx + '/test') #, current_status = 'test' + current_status)    # test only 1 minibatch
+        return l, outputs_
+
+        
 
     def forward(self, task_list, level=None, optimizer=SGD, reset=True, return_outputs=False, prev_status='', current_status='', viz=None):        
         '''
         args: minibatch of tasks 
-        returns:  mean_test_loss, mean_train_loss, outputs
+        returns:  mean_loss, outputs
 
         Encoder(Adaptation) + Decoder model:
         Takes train_samples, adapt to them, then 
         Applies adaptation on train-tasks and then evaluates the generalization loss on test-tasks 
         '''
+        
+
+        def get_average_loss(model, task_list):
+            loss = []
+            for t_ in tasks:
+                l = model(t_)
+                loss.append(l)
+            return  torch.stack(loss).mean() 
+
+        
         if level is None:
-            level = self.level_max 
-        next_level = level-1
+            level = self.levels 
+        lower_level = level-1
                 
         if level == 0:
             loss, outputs = self.decoder_model(move_to_device(task_list, self.device))
@@ -87,67 +114,44 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         else:
             loss, outputs = [], []
 
-            for task in task_list:   # Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
-                status_idx = prev_status + '/lv'+str(next_level)+'_task'+str(task.idx)
-#                 prev_status = prev_status+current_status+'/'
-#                 current_status = 'lv'+str(next_level)+'_task'+str(task.idx)
-                
-#                 set_trace()
-                ctx_opt = optimize(self, task.load('train'), next_level, self.args_dict, 
-                                    optimizer=optimizer, reset=reset, prev_status=status_idx+'/train', current_status = '' , # 'train' + current_status, 
-                                    device=self.device, Higher_flag = self.Higher_flag)
-    
-                if level in self.ctx_logging_levels:   
-                    self.log_ctx(ctx_opt, prev_status + current_status)  # log_ctx(logger, task_idx, ctx_opt)  # log the adapted ctx for the level
-
-                # evaluate on one mini-batch from test dataloader
-                l, outputs_ = self(task.load('test'), next_level, return_outputs=return_outputs, prev_status=status_idx + '/test') #, current_status = 'test' + current_status)    # test only 1 minibatch
-                if print_forward_test:
-                    print('next_level', next_level, 'test loss', l.item())
-                
+            for task in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
+                l, outputs_ = self.high_level_foward(task, lower_level, prev_status + '/lv'+str(lower_level), optimizer, reset, return_outputs)
                 loss.append(l)
                 if return_outputs:
                     outputs.append(outputs_)
-                
+            
+#                 if print_forward_test:          
+#                     print('lower_level', lower_level, 'test loss', l.item())
+
             loss = torch.stack(loss).mean() 
             
 #             if status == viz:
 #                 visualize_output(outputs)
-#         if print_forward_return: # and level>0:
-#             print(status+'loss', loss.item()) 
-            
-#         self.logging(loss, prev_status + current_status)
         return loss, outputs
     
-    def logging(self, loss, status): #, name):
-        self.logger.experiment.add_scalar("loss{}".format(status), loss) #, self.iter)
-#         self.logger.experiment.add_scalars("loss{}".format(status), {name :loss } ) #, self.iter)
-    
-#         if not self.no_print and not (self.iter % self.update_iter):
-#             self.log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
-
-#         self.iter += 1
+    ############################    
+    def logging(self, loss, status, iter_num): #, name):
+        self.logger.experiment.add_scalar("loss{}".format(status), loss, iter_num)   #  .add_scalars("loss{}".format(status), {name: loss}, iter_num)
 
     ######################################
-    def log_ctx(self, ctx, status):   #   def log_ctx(self, prev_status, current_status, ctx):
+    def log_ctx(self, ctx, status, iter_num):   #   def log_ctx(self, prev_status, current_status, ctx):
         if ctx is None or ctx.numel() == 0 or logger is None:
             pass
         else:
             # Log each context changing separately if size <= 3
             if ctx.numel() <= 3:
                 for i, ctx_ in enumerate(ctx.flatten()): #range(ctx.size):
-                    self.logger.experiment.add_scalar("ctx{}/{}".format(prev_status,i), {current_status:ctx_}) #, self.iter)
+                    self.logger.experiment.add_scalar("ctx{}/{}".format(prev_status,i), {current_status: ctx_}, iter_num)
             else:
-                self.logger.experiment.add_histogram("ctx{}".format(prev_status), {current_status:ctx}) #, self.iter)
+                self.logger.experiment.add_histogram("ctx{}".format(prev_status), {current_status: ctx}, iter_num)
 
-    
 
 ####################################   
 ## Optimize
 
-def optimize(model, dataloader, level, args_dict, optimizer, reset, prev_status, current_status, device, Higher_flag):       
+def optimize(model, dataloader, level, lr, max_iter, for_iter, optimizer, reset, prev_status, current_status, device, Higher_flag, log_loss_flag, log_ctx_flag):       
     ## optimize parameter for a given 'task'
-    lr, max_iter, for_iter = get_args(args_dict, level)
+#     lr, max_iter, for_iter = get_args(args_dict, level)
     task_idx = dataloader.task_idx if hasattr(dataloader,'task_idx') else None
 #     task_name = dataloader.task_name if hasattr(dataloader,'task_name') else None
     
@@ -165,6 +169,7 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, prev_status,
                     optim = optimizer([param_all[level]], lr=lr)
                     optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
             else: # use regular optim: for outer-loop
+                set_trace()
                 optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
                 
         return param_all, optim
@@ -191,6 +196,14 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, prev_status,
                 optim.step()  
                 
     ######################################
+    def logging(loss, param, cur_iter):
+#         if not (cur_iter % update_iter[level]):
+            if log_loss_flag:
+                model.logging(loss, prev_status+current_status, cur_iter)  #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
+            if log_ctx_flag:
+                model.log_ctx(param_all[level], prev_status + current_status)  #  log the adapted ctx for the level
+                
+    ######################################
     
     param_all, optim = initialize()  
     cur_iter = 0
@@ -199,26 +212,19 @@ def optimize(model, dataloader, level, args_dict, optimizer, reset, prev_status,
     while True:
         for i, task_batch in enumerate(dataloader):
             for _ in range(for_iter):          # Seungwook: for_iter is to replicate cavia’s implementation where they use the same mini-batch for the inner loop steps
-                if cur_iter >= max_iter:      # Terminate after max_iter of batches/iter
+                if cur_iter >= max_iter:       # Terminate! 
+                    if print_optimize_level_over and loss is not None:
+                        print('optimize'+prev_status+current_status, 'loss_final', loss.item())
+                    return None   # param_all[level] # for log_ctx
 
-                    if print_optimize_level_over:
-                        print('optimize'+prev_status+current_status, 'loss_f', loss.item() if loss is not None else None)
-                    return param_all[level] #False  #loss_all   # Loss-profile
-
-                loss = model(task_batch, level, prev_status=prev_status, current_status = current_status)[0]     # Loss to be optimized
-                model.logging(loss, prev_status + current_status, cur_iter)
-
-#                 if print_optimize_level_iter:
-#                     print('level',level, 'batch', i, 'cur_iter', cur_iter, 'loss', loss.item())
-                    
-#                 if logger is not None:      # - logging -
-#                     logger.log_loss(loss.item(), level, num_adapt=cur_iter)
-                    
+                loss, output = model(task_batch, level, prev_status=prev_status, current_status = current_status)    # Loss to be optimized
+                
+                logging(loss.item(), param_all[level], cur_iter)
+                if print_optimize_level_iter:
+                    print('level',level, 'batch', i, 'cur_iter', cur_iter, 'loss', loss.item())
+                
                 update_step()
-                    
                 cur_iter += 1   
-#     return cur_iter 
-        
 
 ##############################
 

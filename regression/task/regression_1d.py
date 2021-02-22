@@ -23,9 +23,9 @@ seed = 2020
 ###################################
 
 import numpy as np
+from pdb import set_trace
 
-from torchmeta.utils.data import Task, MetaDataset
-
+# from torchmeta.utils.data import Task, MetaDataset
 
 # class Sinusoid(MetaDataset):
 #     """
@@ -146,64 +146,85 @@ from torchmeta.utils.data import Task, MetaDataset
 
 ###################################
 
-def regression_input_function(batch_size, full=False):
-    # Full inputs over the whole regression input range
-    if batch_size == 0:
-        return torch.linspace(reg_input_range[0], reg_input_range[1], steps=100).unsqueeze(1)
+# def regression_input_function(batch_size, full=False):
+#     # Full inputs over the whole regression input range
+#     if batch_size == 0:
+#         return torch.linspace(reg_input_range[0], reg_input_range[1], steps=100).unsqueeze(1)
 
-    inputs = torch.rand(batch_size, 1)
-    inputs = inputs * (reg_input_range[1] - reg_input_range[0]) + reg_input_range[0]
-    return inputs
+    # inputs = torch.rand(batch_size, 1)
+    # inputs = inputs * (reg_input_range[1] - reg_input_range[0]) + reg_input_range[0]
+    # return inputs
 
 ###########
 
 
-def sample_sin_fnc(sample_type):
-    return regression_input_function, get_sin_function() #*get_sin_params())
+# def sample_sin_fnc(sample_type):
+#     return regression_input_function, get_sin_function() #*get_sin_params())
 
-def sample_linear_fnc(sample_type):
-    return regression_input_function, get_linear_function() #(*get_linear_params())
+# def sample_linear_fnc(sample_type):
+#     return regression_input_function, get_linear_function() #(*get_linear_params())
 
-def sample_quadratic_fnc(sample_type):
-    return regression_input_function, get_quadratic_function() #(*get_quadratic_params())
+# def sample_quadratic_fnc(sample_type):
+#     return regression_input_function, get_quadratic_function() #(*get_quadratic_params())
 
-def sample_cubic_fnc(sample_type):
-    return regression_input_function, get_cubic_function() #(*get_cubic_params())
+# def sample_cubic_fnc(sample_type):
+#     return regression_input_function, get_cubic_function() #(*get_cubic_params())
 
 
 ########################
 
 
+input_range_1d = [-5, 5]
 
-def get_sin_function():
+def input_gen_1d(batch, grid=False):         # Full inputs over the whole regression input range
+    if batch == 101 or grid:
+        return torch.linspace(input_range_1d[0], input_range_1d[1], steps=batch).unsqueeze(1)
+    else:
+        return torch.rand(batch, 1) * (input_range_1d[1] - input_range_1d[0]) + input_range_1d[0]
 
-    def get_sin_params():
-        # Sample n_batch number of parameters
-        amplitude = np.random.uniform(0.1, 5.)
-        phase = np.random.uniform(0., np.pi)
-        return amplitude, phase
+
+def sine_params():       # Sample n_batch number of parameters
+    amplitude = np.random.uniform(0.1, 5.)
+    phase = np.random.uniform(0., np.pi)
+    return amplitude, phase
+
+
+def line_params():
+    slope = np.random.uniform(-3., 3.)
+    bias = np.random.uniform(-3., 3.)
+    return slope, bias
+
+
+def sine1_fnc(params, x):
+    amplitude, phase = params
+    return np.sin(x - phase) * amplitude
+
+def line1_fnc(params, x):
+    slope, bias = params
+    return slope * x + bias
+
+
+
+# def get_sin_function(args):
+#     amplitude, phase = args
+# #     amplitude, phase = get_sin_params()
     
-    amplitude, phase = get_sin_params()
-    
-    def sin_function(x):
-        return np.sin(x - phase) * amplitude
+#     def sin_function(x):
+#         set_trace()
+#         return np.sin(x - phase) * amplitude
 
-    return sin_function
+#     return sin_function
 
 
-def get_linear_function():
-    
-    def get_linear_params():
-        slope = np.random.uniform(-3., 3.)
-        bias = np.random.uniform(-3., 3.)
-        return slope, bias
 
-    slope, bias = get_linear_params()
+# def get_linear_function(args):
+#     slope, bias = args
+# #     slope, bias = get_linear_params()
 
-    def linear_function(x):
-        return slope * x + bias
+#     def linear_function(x):
+#         return slope * x + bias
 
-    return linear_function
+#     return linear_function
 
 def get_quadratic_function():
 
