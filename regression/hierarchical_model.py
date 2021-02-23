@@ -92,7 +92,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
         else:                  # base-level evaluation (level 0)
             inputs, targets, _ = move_to_device(task_list, self.device)
-            assert isinstance(inputs, torch.FloatTensor)
+            assert isinstance(inputs, (torch.FloatTensor, torch.DoubleTensor, torch.cuda.FloatTensor, torch.cuda.DoubleTensor))
             outputs = self.decoder_model(inputs)
             loss = self.base_loss(outputs, targets)
 
