@@ -5,10 +5,6 @@ import numpy as np
 import torch
 
 
-# import IPython
-# from pdb import set_trace
-
-
 input_range_1d = [-5, 5]
 
 def input_fnc_1d(batch, grid=False):         # Full inputs over the whole regression input range
@@ -38,6 +34,10 @@ def line1_fnc(params, x):
     slope, bias = params
     return slope * x + bias
 
+def sine_linear2_fnc(param2, params1, x):
+    a1, a0 = param2
+    b1, b0 = params1
+    return (a1*x+a0) * np.sin(b1*x+b0)
 
 # def get_quadratic_function():
 

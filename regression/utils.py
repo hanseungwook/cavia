@@ -20,6 +20,45 @@ from pdb import set_trace
 DEBUG_LEVELS = []  # [1] #[0]  #[2]
 
 
+def set_seed(seed, cudnn=True):
+    """
+    Seed everything we can!
+    Note that gym environments might need additional seeding (env.seed(seed)),
+    and num_workers needs to be set to 1.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.random.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    # note: the below slows down the code but makes it reproducible
+    if (seed is not None) and cudnn:
+        torch.backends.cudnn.deterministic = True
+
+##################################
+def move_to_device(input_tuple, device):
+    if device is None:
+        return input_tuple
+    else:
+        return [k.to(device) for k in input_tuple]
+    
+
+###############################
+def send_to(input, device, DOUBLE_precision):
+    if DOUBLE_precision:
+        return input.double().to(device)
+    else:
+        return input.double().float().to(device)    # somehow needed for manual_optim to work.... otherwise get leaf node error. 
+
+###############################
+def get_args(args_dict, level):
+    # return (arg[name][level] for arg, name in args_dict.items())
+    lr = args_dict['lrs'][level] 
+    max_iter = args_dict['max_iters'][level] 
+    for_iter = args_dict['for_iters'][level]
+#     logger = args_dict['loggers'][level] 
+    return lr, max_iter, for_iter, #logger
+
 #################################################################################
 # LOGGING
 #################################################################################
@@ -107,20 +146,6 @@ def print_args(args):
     for arg, value in sorted(vars(args).items()):
         print("{}: {}".format(arg, value), file=sys.stderr)
 
-def set_seed(seed, cudnn=True):
-    """
-    Seed everything we can!
-    Note that gym environments might need additional seeding (env.seed(seed)),
-    and num_workers needs to be set to 1.
-    """
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.random.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    # note: the below slows down the code but makes it reproducible
-    if (seed is not None) and cudnn:
-        torch.backends.cudnn.deterministic = True
 
 
 #####################################
@@ -152,23 +177,6 @@ class manual_optim():
             # par.data -= self.lr * par.grad            # does not construct computational graph. 
             # par = par - self.lr * par.grad            # GOOOD !!!
             par -= par.grad * self.lr                 # # also good
-
-
-###############################
-def send_to(input, device, DOUBLE_precision):
-    if DOUBLE_precision:
-        return input.double().to(device)
-    else:
-        return input.double().float().to(device)    # somehow needed for manual_optim to work.... otherwise get leaf node error. 
-
-###############################
-def get_args(args_dict, level):
-    # return (arg[name][level] for arg, name in args_dict.items())
-    lr = args_dict['lrs'][level] 
-    max_iter = args_dict['max_iters'][level] 
-    for_iter = args_dict['for_iters'][level]
-#     logger = args_dict['loggers'][level] 
-    return lr, max_iter, for_iter, #logger
 
 
 #################################################################################
