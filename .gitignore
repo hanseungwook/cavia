@@ -23,3 +23,5 @@ results/
 venv/
 regression/data/
 regression/.vscode/settings.json
+
+shared_results/
