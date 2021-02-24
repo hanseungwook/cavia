@@ -30,7 +30,6 @@ class Hierarchical_Task():
 #             print('Task_loader Level', level, 'task', task_sampler)
 
     def load(self, sample_type):   
-        print('Pre-sampling dataset')
         loader = self.dataloaders[sample_type] or self.dataloaders['train']  # duplicate 'train' loader, if 'test'/'valid' loader == None
         if sample_type == 'train':
             return loader                            # return dataloader
