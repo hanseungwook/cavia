@@ -103,7 +103,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             set_trace()
         
         if status != '' and (level in self.log_loss_levels):
-            self.log_loss(loss.item(), status, iter_num, print=(level in self.print_loss_levels))              #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
+            self.log_loss(loss.item(), status, iter_num)              #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
         return loss, outputs
     
 
@@ -129,7 +129,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                         run_test = run_test, test_interval = self.test_intervals[level],
                         device = self.device, Higher_flag = self.Higher_flag, 
                         # log_loss_flag = (level in self.log_loss_levels),
-                        log_ctx_flag = (level in self.log_ctx_levels))
+                        log_ctx_flag = (level in self.log_ctx_levels), print_loss_flag = (level in self.print_loss_levels))
 
         test_loss_opt = run_test(iter_num=self.max_iters[level]) # final test-loss
         return test_loss_opt
@@ -137,11 +137,8 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         
     #################
     ####  Logging 
-    def log_loss(self, loss, status, iter_num, print=False): #, name):
+    def log_loss(self, loss, status, iter_num): #, name):
         self.logger.experiment.add_scalar("loss{}".format(status), loss, iter_num)   #  .add_scalars("loss{}".format(status), {name: loss}, iter_num)
-
-        if print:
-            print('Loss {} Itr {}'.format(status, iter_num))
 
     def log_ctx(self, ctx, status, iter_num):   #   def log_ctx(self, status, current_status, ctx):
         if ctx is None or ctx.numel() == 0 or self.logger is None:
@@ -181,7 +178,7 @@ def optimize(model, dataloader, level,
             status, # current_status, 
             run_test, test_interval, 
             device, Higher_flag, 
-            log_ctx_flag):  #log_loss_flag, 
+            log_ctx_flag, print_loss_flag):  #log_loss_flag, 
     ## optimize parameter for a given 'task'
     grad_clip_value = 100 #1000
     # print(level)
@@ -259,7 +256,7 @@ def optimize(model, dataloader, level,
                 # Run Test-loss
                 if not (cur_iter % test_interval) and cur_iter <= max_iter - test_interval:
                     test_loss, test_outputs = run_test(iter_num = cur_iter)  # get test_loss 
-                    if level>0:
+                    if print_loss_flag:
                         print('level',level, 'cur_iter', cur_iter, 'test loss', test_loss.item())
 
                 cur_iter += 1  
