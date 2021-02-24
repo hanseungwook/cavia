@@ -13,6 +13,7 @@ from torch.nn.utils.clip_grad import clip_grad_value_
 # import higher 
 
 from pdb import set_trace
+import IPython
 
 print_forward_test = False
 print_forward_return = False #True
@@ -101,7 +102,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             print("loss is nan")
             set_trace()
         
-        if status is not '' and (level in self.log_loss_levels):
+        if status != '' and (level in self.log_loss_levels):
             self.log_loss(loss.item(), status, iter_num, print=(level in self.print_loss_levels))              #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
         return loss, outputs
     
@@ -109,7 +110,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
     def meta_eval(self, task, task_idx, level, status, 
                         optimizer, reset, return_outputs, iter_num, task_merge_flag):
         '''  Applies adaptation on train-tasks and then evaluates the generalization loss on test-tasks     '''
-        if not task_merge_flag and status is not '':
+        if not task_merge_flag and status != '':
 
             status += '/task' + str(task_idx)  # current_status = 'lv'+str(level)+'_task'+str(task.idx)
 
