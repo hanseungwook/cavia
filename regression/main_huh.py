@@ -19,8 +19,10 @@ def main(hparams):
     logger.log_hyperparams(hparams) 
 
     model = get_Hierarchical_Model(hparams, logger)
+    print('Pre-sampling dataset')
     supertask = get_Hierarchical_Task(hparams)
-    
+    print('Finished pre-sampling & starting training')
+
     # directly get 'test-loss' without pre-training: zero-shot on super-task env.
     loss, outputs = model(hparams.levels, supertask.load('test'), optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
     print('Finished training')
