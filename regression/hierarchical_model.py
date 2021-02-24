@@ -144,7 +144,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             print('Loss {} Itr {}'.format(status, iter_num))
 
     def log_ctx(self, ctx, status, iter_num):   #   def log_ctx(self, status, current_status, ctx):
-        IPython.embed()
         if ctx is None or ctx.numel() == 0 or self.logger is None:
             pass
         else:      # Log each context changing separately if size <= 3
