@@ -49,7 +49,7 @@ def get_Hierarchical_Model(hparams, logger):
                                  base_model, encoder_models, base_loss, logger, 
                                  hparams.n_contexts, hparams.n_iters, hparams.for_iters, hparams.lrs, 
                                  hparams.test_intervals,
-                                 hparams.log_level_loss, hparams.log_level_ctx, hparams.task_merge_flags,
+                                 hparams.log_loss_levels, hparams.log_ctx_levels, hparams.task_separate_levels,
                                  hparams.higher_flag, hparams.data_parallel)
     
     if hparams.v_num is not None: #if hparams.load_model:

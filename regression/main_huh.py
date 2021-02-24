@@ -60,9 +60,9 @@ def get_args(*args):
     
     parser.add_argument('--encoders',      type=str,   nargs='+', default=[None, None, None])      # task encoder-models for model-based Meta-learning. Optimization-based if None (e.g. MAML) 
     
-    parser.add_argument('--log_level_loss', type=bool, nargs='+', default=[]) 
-    parser.add_argument('--log_level_ctx',  type=bool, nargs='+', default=[]) 
-    parser.add_argument('--task_merge_flags', type=bool, nargs='+', default=[]) 
+    parser.add_argument('--log_loss_levels', type=int, nargs='+', default=[]) 
+    parser.add_argument('--log_ctx_levels',  type=int, nargs='+', default=[]) 
+    parser.add_argument('--task_separate_levels', type=int, nargs='+', default=[]) 
 
     parser.add_argument('--higher_flag',   action='store_true', default=False, help='Use Higher optimizer')
     parser.add_argument('--data_parallel', action='store_true', default=False, help='Use data parallel for inner model (decoder)')
@@ -97,8 +97,9 @@ def check_hparam_default(hparams):
     hparams.lrs           = hparams.lrs       or [0.01]*hparams.levels
     hparams.test_intervals= hparams.test_intervals or [100]*hparams.levels
     
-    hparams.log_level_loss = hparams.log_level_ctx or [False]*hparams.levels #*(hparams.levels+1)
-    hparams.log_level_ctx = hparams.log_level_ctx or [False]*hparams.levels
+    # hparams.log_loss_levels = hparams.log_loss_levels or [] # [False]*hparams.levels #*(hparams.levels+1)
+    # hparams.log_ctx_levels  = hparams.log_ctx_levels or [] #[False]*hparams.levels
+    # hparams.task_separate_levels = hparams.task_separate_levels or [] # [False]*hparams.levels
 
     hparams.k_batch_train = hparams.k_batch_train or [None]*hparams.levels # ## maybe duplicate k_batch_train/n_batch_train 
     hparams.k_batch_test  = hparams.k_batch_test  or [None]*hparams.levels # hparams.k_batch_train

@@ -38,7 +38,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                         decoder_model, encoder_model, base_loss, logger, 
                         n_contexts, max_iters, for_iters, lrs, 
                         test_intervals,
-                        log_level_loss, log_level_ctx, task_merge_flags,
+                        log_loss_levels, log_ctx_levels, task_separate_levels,
                         Higher_flag = False, data_parallel=False): 
         
         super().__init__()
@@ -58,9 +58,9 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         self.lrs         = lrs 
         self.test_intervals = test_intervals
 
-        self.log_level_loss = log_level_loss
-        self.log_level_ctx  = log_level_ctx
-        self.task_merge_flags     = task_merge_flags
+        self.log_loss_levels = log_loss_levels
+        self.log_ctx_levels  = log_ctx_levels
+        self.task_separate_levels     = task_separate_levels
         self.Higher_flag         = Higher_flag 
         self.device        = decoder_model.device
         
@@ -84,7 +84,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             status += '_lv'+str(level)
 
         if level > 0:      # meta-level evaluation
-            task_merge_flag = self.task_merge_flags[level-1] #len(task_list) > task_merge_len
+            task_merge_flag = (level-1) in self.task_separate_levels #[level-1] #len(task_list) > task_merge_len
             meta_eval_partial = partial(self.meta_eval, level = level-1, status =  status, optimizer=optimizer, reset=reset, return_outputs=return_outputs, iter_num=iter_num, task_merge_flag=task_merge_flag)
             loss, outputs = get_average_loss(meta_eval_partial, task_list, return_outputs) 
 
@@ -101,7 +101,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             print("loss is nan")
             set_trace()
         
-        if status is not '' and self.log_level_loss[level]:
+        if status is not '' and (level in self.log_loss_levels):
             self.log_loss(loss.item(), status, iter_num)              #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
         return loss, outputs
     
@@ -110,6 +110,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                         optimizer, reset, return_outputs, iter_num, task_merge_flag):
         '''  Applies adaptation on train-tasks and then evaluates the generalization loss on test-tasks     '''
         if not task_merge_flag and status is not '':
+
             status += '/task' + str(task_idx)  # current_status = 'lv'+str(level)+'_task'+str(task.idx)
 
         def run_test(iter_num):       # evaluate on one mini-batch from test-loader
@@ -126,8 +127,8 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                         # current_status =  'train' + current_status, 
                         run_test = run_test, test_interval = self.test_intervals[level],
                         device = self.device, Higher_flag = self.Higher_flag, 
-                        log_loss_flag = self.log_level_loss[level], # (level in self.log_level_loss),
-                        log_ctx_flag = self.log_level_ctx[level]) #(level in self.log_level_ctx))
+                        # log_loss_flag = (level in self.log_loss_levels),
+                        log_ctx_flag = (level in self.log_ctx_levels))
 
         test_loss_opt = run_test(iter_num=self.max_iters[level]) # final test-loss
         return test_loss_opt
@@ -144,8 +145,8 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         else:      # Log each context changing separately if size <= 3
             if ctx.numel() <= 3:
                 for i, ctx_ in enumerate(ctx.flatten()): #range(ctx.size):
-                    # self.logger.experiment.add_scalar("ctx{}/{}".format(status,i), {current_status: ctx_}, iter_num)
                     self.logger.experiment.add_scalar("ctx{}".format(status,i), ctx_, iter_num)
+                    # self.logger.experiment.add_scalar("ctx{}/{}".format(status,i), {current_status: ctx_}, iter_num)
             else:
                 self.logger.experiment.add_histogram("ctx{}".format(status), ctx, iter_num)
 
@@ -176,7 +177,7 @@ def optimize(model, dataloader, level,
             status, # current_status, 
             run_test, test_interval, 
             device, Higher_flag, 
-            log_loss_flag, log_ctx_flag): 
+            log_ctx_flag):  #log_loss_flag, 
     ## optimize parameter for a given 'task'
     grad_clip_value = 100 #1000
     # print(level)
