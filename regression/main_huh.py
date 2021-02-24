@@ -67,6 +67,7 @@ def get_args(*args):
     parser.add_argument('--log_loss_levels', type=int, nargs='+', default=[]) 
     parser.add_argument('--log_ctx_levels',  type=int, nargs='+', default=[]) 
     parser.add_argument('--task_separate_levels', type=int, nargs='+', default=[]) 
+    parser.add_argument('--print_loss_levels', type=int, nargs='+', default=[]) 
 
     parser.add_argument('--higher_flag',   action='store_true', default=False, help='Use Higher optimizer')
     parser.add_argument('--data_parallel', action='store_true', default=False, help='Use data parallel for inner model (decoder)')

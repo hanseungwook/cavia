@@ -38,7 +38,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                         decoder_model, encoder_model, base_loss, logger, 
                         n_contexts, max_iters, for_iters, lrs, 
                         test_intervals,
-                        log_loss_levels, log_ctx_levels, task_separate_levels,
+                        log_loss_levels, log_ctx_levels, task_separate_levels, print_loss_levels,
                         Higher_flag = False, data_parallel=False): 
         
         super().__init__()
@@ -58,11 +58,12 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         self.lrs         = lrs 
         self.test_intervals = test_intervals
 
-        self.log_loss_levels = log_loss_levels
-        self.log_ctx_levels  = log_ctx_levels
-        self.task_separate_levels     = task_separate_levels
-        self.Higher_flag         = Higher_flag 
-        self.device        = decoder_model.device
+        self.log_loss_levels    = log_loss_levels
+        self.log_ctx_levels     = log_ctx_levels
+        self.task_separate_levels = task_separate_levels
+        self.print_loss_levels  = print_loss_levels
+        self.Higher_flag        = Higher_flag 
+        self.device             = decoder_model.device
         
 
     def forward(self, level, task_list, 
@@ -102,7 +103,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             set_trace()
         
         if status is not '' and (level in self.log_loss_levels):
-            self.log_loss(loss.item(), status, iter_num)              #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
+            self.log_loss(loss.item(), status, iter_num, print=(level in self.print_loss_levels))              #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
         return loss, outputs
     
 
@@ -136,8 +137,11 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         
     #################
     ####  Logging 
-    def log_loss(self, loss, status, iter_num): #, name):
+    def log_loss(self, loss, status, iter_num, print=False): #, name):
         self.logger.experiment.add_scalar("loss{}".format(status), loss, iter_num)   #  .add_scalars("loss{}".format(status), {name: loss}, iter_num)
+
+        if print:
+            print('Loss {} Itr {}'.format(status, iter_num))
 
     def log_ctx(self, ctx, status, iter_num):   #   def log_ctx(self, status, current_status, ctx):
         if ctx is None or ctx.numel() == 0 or self.logger is None:
