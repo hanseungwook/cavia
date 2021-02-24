@@ -81,7 +81,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 # lv2: mean(sine + line)/2
 # lv1: mean sines
 # lv0: mean pixel (1 sine)
-        if status is not '':
+        if status != '':
             status += '_lv'+str(level)
 
         if level > 0:      # meta-level evaluation
