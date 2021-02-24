@@ -25,7 +25,9 @@ def main(hparams):
 
     # directly get 'test-loss' without pre-training: zero-shot on super-task env.
     loss, outputs = model(hparams.levels, supertask.load('test'), optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
-    print('Finished training')
+    print('Finished training and saving logger')
+    
+    logger.save()
 
     # run(hparams, model, supertask)         # obsolete
 
