@@ -18,7 +18,6 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
             Higher_flag = False, 
             grad_clip = 100): 
 
-     #1000
     
     ################
     def initialize():     ## Initialize param & optim
@@ -62,20 +61,19 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
     # main code
 
     param_all, optim = initialize()  
-    cur_iter = 0
-    loss = None
+    i = 0
 
     while True:
         for task_batch in dataloader:
             for _ in range(for_iter):          # Seungwook: for_iter is to replicate cavia’s implementation where they use the same mini-batch for the inner loop steps
-                if cur_iter >= max_iter:       # Terminate! 
+                if i >= max_iter:       # Terminate! 
                     return None   # param_all[level]    # for log_ctx
 
-                loss, output = model.forward(level, task_batch, status = status, iter_num = cur_iter)    # Loss to be optimized
+                loss, output = model.forward(level, task_batch, status = status, iter_num = i)    # Loss to be optimized
                 update_step()
 
                 # Run Test-loss
-                if not (cur_iter % test_interval) and cur_iter <= max_iter - test_interval:
-                    test_loss, test_outputs = run_test(iter_num = cur_iter)  # get test_loss 
+                if not (i % test_interval) and i <= max_iter - test_interval:
+                    test_loss, test_outputs = run_test(i)  # get test_loss 
 
-                cur_iter += 1  
+                i += 1  

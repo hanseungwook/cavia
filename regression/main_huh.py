@@ -3,7 +3,10 @@ import argparse
 import torch
 from pytorch_lightning.loggers import TensorBoardLogger # https://pytorch-lightning.readthedocs.io/en/latest/_modules/pytorch_lightning/loggers/tensorboard.html
 
-from train_huh import get_Hierarchical_Eval, get_Hierarchical_Task  # , run
+from train_huh import get_Hierarchical_Eval, get_batch_dict 
+from hierarchical_task import Hierarchical_Task, Task_sampler
+from make_tasks import get_task
+
 from utils import set_seed #, Logger
 from torch.optim import Adam, SGD
 
@@ -18,10 +21,11 @@ def main(hparams):
     logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
     logger.log_hyperparams(hparams) 
 
+    print('building Hierarchical_Environment') 
     meta_eval = get_Hierarchical_Eval(hparams, logger)
-    print('Pre-sampling dataset')
-    supertask = get_Hierarchical_Task(hparams)
-    print('Finished pre-sampling & starting training')
+    print('generating Hierarchical_Task') 
+    supertask = Hierarchical_Task(get_task(hparams.task), batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
+    print('start training')
 
     # directly get 'test-loss' without pre-training: zero-shot on super-task env.
     loss, outputs = meta_eval(hparams.levels, supertask.load('test'), optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 

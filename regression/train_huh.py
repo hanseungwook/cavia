@@ -5,9 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
 from hierarchical_eval import Hierarchical_Eval  
-from hierarchical_task import Hierarchical_Task, Task_sampler
-from make_tasks import task_dict 
-from utils import get_vis_fn #, print_args
+# from utils import get_vis_fn
 
 from pdb import set_trace
 import IPython
@@ -21,18 +19,11 @@ image_flag = False #True
 
 ###############################################################
 
-
 def get_Hierarchical_Eval(hparams, logger):
     base_model      = get_base_model(hparams) 
     encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
     base_loss       = torch.nn.MSELoss()                    # loss function
-    model   = Hierarchical_Eval(#hparams.levels, 
-                                 base_model, encoder_models, base_loss, logger, 
-                                 hparams)
-                                #  hparams.n_contexts, hparams.max_iters, hparams.for_iters, hparams.lrs, 
-                                #  hparams.log_intervals, hparams.test_intervals,
-                                #  hparams.log_loss_levels, hparams.log_ctx_levels, hparams.task_separate_levels, hparams.print_loss_levels,
-                                #  hparams.use_higher, hparams.data_parallel)
+    model   = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger)
     
     if hparams.v_num is not None: #if hparams.load_model:
         model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
@@ -40,10 +31,12 @@ def get_Hierarchical_Eval(hparams, logger):
     return model
 
 def get_Hierarchical_Task(hparams):
-    task_fnc = task_dict[hparams.task]
-    supertask_fnc = Task_sampler(task_fnc = {None: task_fnc}, param_fnc = None) 
-    supertask = Hierarchical_Task(supertask_fnc, batch_dict=get_batch_dict(hparams)) 
-    return supertask
+    task_fnc, params_fnc_list = get_task(hparams.task)
+    return Hierarchical_Task(task_fnc, params_fnc_list, batch_dict=get_batch_dict(hparams)) 
+
+
+
+
 ####################################################
     
 def get_base_model(hparams):

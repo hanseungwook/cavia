@@ -20,8 +20,8 @@ from pdb import set_trace
 class Hierarchical_Task():   
     # Top-down generation of task hierarchy.
     
-    def __init__(self, task_sampler, batch_dict):
-        self.dataloaders = get_dataloader_dict(task_sampler, batch_dict) 
+    def __init__(self, task, batch_dict):
+        self.dataloaders = get_dataloader_dict(task, batch_dict) 
 
     def load(self, sample_type):   
         loader = self.dataloaders[sample_type] or self.dataloaders['train']  # duplicate 'train' loader, if 'test'/'valid' loader == None
@@ -34,23 +34,27 @@ class Hierarchical_Task():
 ######################
 # get_dataloader_dict
 
-def get_dataloader_dict(task_sampler, batch_dict):
+def get_dataloader_dict(task, batch_dict):
     batch_dict_next = (batch_dict[0][:-1], batch_dict[1][:-1])
     total_batch, mini_batch = batch_dict[0][-1], batch_dict[1][-1]           # mini_batch: mini batch # of samples
+    # batch_dict_next = (batch_dict[0][1:], batch_dict[1][1:])
+    # total_batch, mini_batch = batch_dict[0][0], batch_dict[1][0]           # mini_batch: mini batch # of samples
+
+    sampler = Task_sampler(*task, total_batch) 
 
     def get_dataloader(sample_type, mini_batch_):   
-        input_params, target_samplers = task_sampler.get_data(sample_type)
+        input_params, task_list_next = sampler.get_data(sample_type)
 
         if len(input_params) == 0:     # No dataloader for empty dataset sampler
             return None
         else:
-            if isinstance(target_samplers[0], Task_sampler):  #high-level:
-                data = [Hierarchical_Task(target_sampler, batch_dict_next) for target_sampler in target_samplers]
-                return Meta_DataLoader(get_Dataset(input_params, data), batch_size=mini_batch_)
+            if len(batch_dict_next[0]) > 0:  #high-level
+                task_list = [Hierarchical_Task(task_next, batch_dict_next) for task_next in task_list_next]
+                return Meta_DataLoader(get_Dataset(input_params, task_list), batch_size=mini_batch_)
             else:    # if level == 0: 
-                return DataLoader(get_Dataset(input_params, target_samplers), batch_size=mini_batch_, shuffle=(sample_type == 'train')) 
+                inputs, targets = input_params, task_list_next
+                return DataLoader(get_Dataset(inputs, targets), batch_size=mini_batch_, shuffle=(sample_type == 'train')) 
 
-    task_sampler.pre_sample(total_batch)  # pre-sampling 
     loader_dict = {key: get_dataloader(key, mini_batch[key]) for key in ['train', 'test', 'valid']}
     return loader_dict
 
@@ -60,17 +64,15 @@ def get_dataloader_dict(task_sampler, batch_dict):
 # Task_sampler
 
 class Task_sampler():
-    def __init__(self, task_fnc, param_fnc = None): 
+    def __init__(self, task_fnc, param_fnc, k_batches): 
         if isinstance(task_fnc, dict):
             assert param_fnc is None
             param_fnc = list(task_fnc.keys())
             task_fnc = task_fnc.get
         self.task_fnc  = task_fnc    # function that takes task label and returns actual tasks
         self.param_fnc = param_fnc   # 
-        self.params = None
-
-    def pre_sample(self, k_batches: dict):              # pre-sample k_batches of params  
-        self.params = sample_shuffle_split(self.param_fnc, k_batches)
+    # def pre_sample(self, k_batches: dict):              # pre-sample k_batches of params  
+        self.params = sample_shuffle_split(param_fnc, k_batches)
 
     def get_data(self, sample_type): 
         assert self.params is not None, "run pre_sample first"
@@ -110,7 +112,6 @@ def sample_shuffle_split(input, k_batches: dict):
     # set_trace()
     if input is None:
         input = list(range(total_batch))
-# 
     inputs = input(total_batch) if callable(input) else random.sample(input, total_batch)   #  # inputs = sample(input, sum(k_list))     # list of sampled params
     # assert isinstance(inputs, (list, torch.FloatTensor)), "wrong type of inputs"  # , np.ndarray
     

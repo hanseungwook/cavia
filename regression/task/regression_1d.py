@@ -3,41 +3,62 @@
 
 import numpy as np
 import torch
+from hierarchical_task2 import batch_wrapper
 
 
 input_range_1d = [-5, 5]
 
-def input_fnc_1d(batch, grid=False):         # Full inputs over the whole regression input range
+def x_coord0_params(batch, grid=False):         # Full inputs over the whole regression input range
     if batch == 101 or grid:
         return torch.linspace(input_range_1d[0], input_range_1d[1], steps=batch).unsqueeze(1)
     else:
         return torch.rand(batch, 1) * (input_range_1d[1] - input_range_1d[0]) + input_range_1d[0]
 
+###############################
 
-def sine_params():       # Sample n_batch number of parameters
+def sine1_fnc(params):
+    amplitude, phase = params
+    def lv0_fnc(x):
+        return np.sin(x - phase) * amplitude
+    return lv0_fnc, x_coord0_params
+
+def sine1_params():       # Sample n_batch number of parameters
     amplitude = np.random.uniform(0.1, 5.)
     phase = np.random.uniform(0., np.pi)
     return amplitude, phase
 
+sine1_task = (sine1_fnc, batch_wrapper(sine1_params))
 
-def line_params():
+###############################
+
+def line1_fnc(params):
+    slope, bias = params
+    def lv0_fnc(x):
+        return slope * x + bias
+    return lv0_fnc, x_coord0_params
+
+def line1_params():
     slope = np.random.uniform(-3., 3.)
     bias = np.random.uniform(-3., 3.)
     return slope, bias
 
+line1_task = (line1_fnc, batch_wrapper(line1_params))
 
-def sine1_fnc(params, x):
-    amplitude, phase = params
-    return np.sin(x - phase) * amplitude
+###############################
 
-def line1_fnc(params, x):
-    slope, bias = params
-    return slope * x + bias
-
-def sine_linear2_fnc(param2, params1, x):
+def sine_linear2_fnc(param2):
     a1, a0 = param2
-    b1, b0 = params1
-    return (a1*x+a0) * np.sin(b1*x+b0)
+    def lv1_fnc(params1):
+        b1, b0 = params1
+        def lv0_fnc(x):
+            return (a1*x+a0) * np.sin(b1*x+b0)
+        return lv0_fnc, x_coord0_params
+    return lv1_fnc, batch_wrapper(sine1_params)
+
+sine_linear2_task =  (sine_linear2_fnc, batch_wrapper(line1_params))
+
+###############################
+
 
 # def get_quadratic_function():
 

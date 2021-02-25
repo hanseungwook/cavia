@@ -11,6 +11,7 @@ import copy
 import IPython
 from pdb import set_trace
 
+from hierarchical_task2 import batch_wrapper
 
 ### TODO: Can we make k_batch, n_batch automatic?
 ### TODO: Can we make the sampling of classes mutually exclusive?
@@ -39,20 +40,18 @@ transforms_dict = {
 
 def img_reconst_task_gen(data_name, root = None): #dataset):
 
-    dataset_    = dataset_dict   [data_name]
-    transforms_ = transforms_dict[data_name]
-    img_size    = img_size_dict  [data_name]
-
     root = root or os.path.join(os.getcwd(),'data')
    
     ############################
 
-    def get_dataset(split):
-        train_flag = (split == 'train')
-        return dataset_(root, train=train_flag, transform=transforms_, download=True)    
+    def get_dataset(key, split = 'train'):
+        dataset_    = dataset_dict   [key]
+        transforms_ = transforms_dict[key]
+        img_size    = img_size_dict  [key]
+        return dataset_(root, train=(split == 'train'), transform=transforms_, download=True) , img_size   
 
-    def get_labeled_dataset(label, split = 'train'):  # level0  # default: only use images-data from 'train.pth'
-        dataset = get_dataset(split)
+    def get_labeled_dataset(dataset, label):  # level0  # default: only use images-data from 'train.pth'
+        # dataset = get_dataset(split)
         targets = dataset.targets if torch.is_tensor(dataset.targets) else torch.tensor(dataset.targets)    # for cifar10
 
         if label is  None:  
@@ -78,13 +77,11 @@ def img_reconst_task_gen(data_name, root = None): #dataset):
 
     ####################################
     # task_fnc
-    def img_recon_lv2_fnc(label, idx, xy):
-        labeled_dataset = get_labeled_dataset(label)  # level2 
-        img = get_image(labeled_dataset, idx)         # level1 
-        return get_pixel(img,xy)                      # level0
+
+    dataset, img_size = get_dataset(data_name)
 
     # input_fnc
-    def input_fnc_2d_coord(batch, order_pixels=False):
+    def xy_coord0_params(batch, order_pixels=False):
         # Returning full range (in sorted order) if batch size is the full image size
         idx_full = list(range(img_size[0] * img_size[1]))
         if batch == 0:
@@ -104,4 +101,14 @@ def img_reconst_task_gen(data_name, root = None): #dataset):
         coordinates[:, 1] /= img_size[1]
         return coordinates
 
-    return img_recon_lv2_fnc, input_fnc_2d_coord 
+    # task_fnc 
+    def lv2_fnc(label):
+        labeled_dataset = get_labeled_dataset(dataset, label)
+        def lv1_fnc(idx):
+            img = get_image(labeled_dataset, idx)         # level1 
+            def lv0_fnc(xy):
+                return get_pixel(img,xy)                      # level0
+            return lv0_fnc, xy_coord0_params
+        return lv1_fnc, None
+
+    return lv2_fnc, None

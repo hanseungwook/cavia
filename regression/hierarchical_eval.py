@@ -31,7 +31,7 @@ task_merge_len = 10 #5
 #  Model Hierarchy
 
 class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
-    def __init__(self,  decoder_model, encoder_model, base_loss, logger, hparams):
+    def __init__(self, hparams, decoder_model, encoder_model, base_loss, logger):
         
         super().__init__()
 
@@ -102,8 +102,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
                         Higher_flag     = self.use_higher,
                         grad_clip       = self.grad_clip)
 
-        test_loss_optim = run_test(iter_num=self.max_iters[level]) # final test-loss
-        return test_loss_optim
+        return run_test(iter_num=self.max_iters[level]) # return  test-loss after adaptation
 
         
     #################
