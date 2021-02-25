@@ -3,7 +3,7 @@
 
 import numpy as np
 import torch
-from hierarchical_task2 import batch_wrapper
+from hierarchical_task import batch_wrapper
 
 
 input_range_1d = [-5, 5]
