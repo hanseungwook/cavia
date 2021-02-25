@@ -13,10 +13,11 @@ print_hierarhicial_task = False
 ##############################
 
 def get_Dataset(data, target = None):
-    if isinstance(data,tuple):
-        assert len(data)==3
-        return Basic_Dataset_LQR(data)
+    if isinstance(target,list) and isinstance(target[0],dict):
+    # if isinstance(target,list) and isinstance(target[0],dict) and data is None:
+        return Basic_Dataset_LQR(target)
     else: 
+        # print('non-LQR data!')
         return Basic_Dataset(data, target)
 
 
@@ -43,13 +44,15 @@ class Basic_Dataset(Dataset):
 # Basic_Dataset_LQR
 
 class Basic_Dataset_LQR(Dataset):  # Temporary code. to be properly written
-    def __init__(self, data, target=None):
-        assert isinstance(data,tuple) and len(data)==3
-        kbm, goal, x0 = data
-        self.kbm = kbm
-        self.goal = goal
-        self.x0 = x0
-
+    def __init__(self, target):
+        self.kbm = target[0]['kbm']   # same kbm
+        self.goal= target[0]['goal']  # same goal
+        self.x0 = []
+        # names = ['kbm', 'goal', 'x0']
+        for t in target:
+            self.x0.append(t['x0'])
+            # for name in names: 
+            #     getattr(self, name).append(t[name])
     def __len__(self):
         return len(self.x0)
     
@@ -69,10 +72,7 @@ class Meta_DataLoader():
     def create_mini_batches(self):
         # Create indices of batches
         batch_idx = list(BatchSampler(RandomSampler(self.dataset), self.minibatch_size, drop_last=True))
-        # self.batch_idx = batch_idx # for monitoring
-        # print(batch_idx)
-        # set_trace()
-
+        
         # since collate does not work for tasks (only works for torch.tensors / arrays ...)
         # Create dataset of minibatches of the form [mini-batch of (hierarchical tasks), ...]
         mini_dataset = []

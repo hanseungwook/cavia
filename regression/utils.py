@@ -39,7 +39,7 @@ def move_to_device(input_tuple, device):
     else:
         return [k.to(device) for k in input_tuple]
     
-def check_nan_loss(loss):
+def check_nan(loss):
     if torch.isnan(loss):
         print("loss is nan")
         set_trace()

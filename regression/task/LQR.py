@@ -7,24 +7,45 @@ from torch.nn.utils.clip_grad import clip_grad_value_
 
 from pdb import set_trace
 
-def LQR_tasks(x_dim, batch_nums, x_range = 4, kbm_zero=False):
+# def LQR_tasks(x_dim, batch_nums, x_range = 4, kbm_zero=False):
 
-    batch_lv0, batch_lv1, batch_lv2 = batch_nums
+#     batch_lv0, batch_lv1, batch_lv2 = batch_nums
 
-    #level 2 - dynamics
-    kbm = (0.,0.,0.) if kbm_zero  else (0.0*np.random.randn(batch_lv2), 0.5*np.random.randn(batch_lv2), 0.5*np.random.randn(batch_lv2))
+#     #level 2 - dynamics
+#     kbm = (0.,0.,0.) if kbm_zero  else (0.0*np.random.randn(batch_lv2), 0.5*np.random.randn(batch_lv2), 0.5*np.random.randn(batch_lv2))
 
-    #level 1 - targets
-    target   = x_range * torch.randn(1, batch_lv1*batch_lv2)   # Delete this
-#     target   = x_range * torch.randn(1, batch_lv1, batch_lv2)
+#     #level 1 - goals
+#     goal   = x_range * torch.randn(1, batch_lv1*batch_lv2)   # Delete this
+# #     goal   = x_range * torch.randn(1, batch_lv1, batch_lv2)
     
-    #level 0 - initial locations
-    x0       = torch.zeros(x_dim, batch_lv0*batch_lv1*batch_lv2)   # Delete this
-    x0[0,:]  = x_range*torch.randn(1, batch_lv0*batch_lv1*batch_lv2)   # Delete this
-#     x0       = torch.zeros(x_dim, batch_lv0, batch_lv1, batch_lv2)
-#     x0[0,:]  = x_range*torch.randn(1, batch_lv0, batch_lv1, batch_lv2)
+#     #level 0 - initial locations
+#     x0       = torch.zeros(x_dim, batch_lv0*batch_lv1*batch_lv2)   # Delete this
+#     x0[0,:]  = x_range*torch.randn(1, batch_lv0*batch_lv1*batch_lv2)   # Delete this
+# #     x0       = torch.zeros(x_dim, batch_lv0, batch_lv1, batch_lv2)
+# #     x0[0,:]  = x_range*torch.randn(1, batch_lv0, batch_lv1, batch_lv2)
 
-    return kbm, target, x0
+#     return kbm, goal, x0
+
+def LQR2_fnc(kbm, goal, x0):
+    dict_ = {'kbm': kbm, 'goal': goal, 'x0': x0}
+    print(dict_)
+    return dict_  # Input is None 
+
+def LQR_param_lv0(x_dim=2, x_range = 4):                    #level 0 - initial locations
+    x0       = torch.zeros(x_dim)  
+    x0[0]  = x_range*torch.randn(1) 
+    return x0
+
+def LQR_param_lv1(x_dim=2, x_range = 4, kbm_zero=False):    #level 1 - goals
+    goal   = x_range * torch.randn(1)
+    return goal
+
+def LQR_param_lv2(x_dim=2, x_range = 4, kbm_zero=False):    #level 2 - dynamics
+    # kbm = (0.,0.,0.) if kbm_zero  else (0.0*np.random.randn(1), 0.5*np.random.randn(1), 0.5*np.random.randn(1))
+    kbm = (0.,0.,0.) if kbm_zero  else (0.0*np.random.rand(1), 0.5*np.random.rand(1), 0.5*np.random.rand(1))
+    kbm = torch.tensor(kbm).squeeze()
+    # set_trace()
+    return kbm
 
 
 def make_AB(x_dim, kbm): # = (0.,0.,0.)):
@@ -64,31 +85,30 @@ class LQR_environment():
         
 #         if task is None:
 #             task = LQR_tasks(self.x_dim, self.batch_nums, self.x_range, kbm_zero)
-        kbm, target, x0 = task   #      A, B, target, x0 = task
-        # kbm and target are collated by dataloader.. all repeated. so just take [0] element
+        kbm, goal, x0 = task   #      A, B, goal, x0 = task
+
+
+        # kbm and goal are collated by dataloader.. all repeated. so just take [0] element
         kbm    = kbm[0].float() # [k[0].float() for k in kbm] #[:x_dim]
-        target = target[0].float()
+        goal = goal[0].float()
         
-        x0    = x0.view(1,-1).float()
+        x0    = x0.t().float()        # x0    = x0.view(1,-1).float()
         batch = x0.shape[1]
-        x0    = torch.cat([x0,torch.zeros(x_dim-1, batch)], dim=0)
-        
+        # x0    = torch.cat([x0,torch.zeros(x_dim-1, batch)], dim=0)
         
         A, B = make_AB(x_dim, kbm)
-#         print('kbm', kbm, 'target', target, 'x0', x0)
-#         print('A', A)
-#         print('B', B)
+        # print('kbm', kbm, 'goal', goal, 'x0', x0)
 
         def dynamics(x,u):
             return A @ x + B @ u  #  x + (A @ x + B * u) * dt
 
-        def cost_fnc(x,u):
-            target_cost = ((x[0,:]-target)**2).mean() / 3 #if sq_loss else 1 - (-pos**2).exp()
-            return target_cost + (u**2).mean()
+        def loss_fnc(x,u):
+            goal_cost = ((x[0,:]-goal)**2).mean() / 3 #if sq_loss else 1 - (-pos**2).exp()
+            return goal_cost + (u**2).mean()
 
         self.dynamics = dynamics #dyn_gen(A, B)
-        self.cost_fnc = cost_fnc     #cost_gen(target)
-        self.A, self.B, self.target = A, B, target
+        self.loss_fnc = loss_fnc     #cost_gen(goal)
+        self.A, self.B, self.goal = A, B, goal
         self.state    = x0
         
 #         return self.observe() 
@@ -97,41 +117,41 @@ class LQR_environment():
         return self.state  # full state observation
     
     def step(self, u):
-        loss = self.cost_fnc(self.state, u)
+        loss = self.loss_fnc(self.state, u)
         self.state = self.dynamics(self.state, u)
         return loss, self.observe() #self.state
     
 
 class Linear_Policy(nn.Module):
-    def __init__(self, x_dim): #(ab,target):
+    def __init__(self, x_dim): #(ab,goal):
         super().__init__()
         self.x_dim = x_dim
-#         self.ctx_target = nn.Parameter(torch.zeros(1)) #  Level 0 ctx
+#         self.ctx_goal = nn.Parameter(torch.zeros(1)) #  Level 0 ctx
 #         self.ctx_coeff = nn.Parameter(torch.zeros(x_dim).t()) #  Level 1 ctx
-#         self.ctx_target = nn.Parameter(torch.randn(1))  #  Level 0 ctx
+#         self.ctx_goal = nn.Parameter(torch.randn(1))  #  Level 0 ctx
 #         self.ctx_coeff = nn.Parameter(torch.randn(x_dim).t())  #  Level 1 ctx
-#         self.parameters_all = [self.ctx_target,  self.ctx_coeff, None] 
+#         self.parameters_all = [self.ctx_goal,  self.ctx_coeff, None] 
         
-#     def __init__(self, x_dim, batch_nums): #(ab,target):
+#     def __init__(self, x_dim, batch_nums): #(ab,goal):
 #         super().__init__()
 #         batch_lv0, batch_lv1, batch_lv2 = batch_nums
         
 #         self.ctx_coeff = nn.Parameter(torch.zeros(x_dim).t()) #, requires_grad = True))
-#         self.ctx_target = nn.Parameter(torch.zeros(1,batch_lv1*batch_lv2)) # nn.Parameter(torch.zeros(1)) 
-#         self.parameters_all = [self.ctx_target,  self.ctx_coeff] 
+#         self.ctx_goal = nn.Parameter(torch.zeros(1,batch_lv1*batch_lv2)) # nn.Parameter(torch.zeros(1)) 
+#         self.parameters_all = [self.ctx_goal,  self.ctx_coeff] 
         
     def forward(self, obs, t, ctx):  # action = function ( observation, time )
 #         ctx = torch.cat(ctx)
         ctx = ctx[0]
-        ctx_target, ctx_coeff = ctx[:1], ctx[1:] 
-        action = ctx_coeff[:1] @ ( obs[:1,:] - ctx_target )   #         action = self.coeff @ ( x - self.target ) 
+        ctx_goal, ctx_coeff = ctx[:1], ctx[1:] 
+        action = ctx_coeff[:1] @ ( obs[:1,:] - ctx_goal )   #         action = self.coeff @ ( x - self.goal ) 
         if ctx_coeff.shape[0]>1:
             action += ctx_coeff[1:] @ obs[1:,:]
         return action.view(1,-1)
 
 
 # class Action_trajectory(nn.Module):
-#     def __init__(self, T, batch_nums): #(ab,target):
+#     def __init__(self, T, batch_nums): #(ab,goal):
 #         super().__init__()
 #         batch_lv0, batch_lv1, batch_lv2 = batch_nums
         
@@ -139,31 +159,24 @@ class Linear_Policy(nn.Module):
 # #         self.u_all = nn.Parameter(torch.zeros(T,batch_lv0, batch_lv1, batch_lv2))
 #     def forward(self, obs, t):
 #         action = self.u_all[t,:]
-#         return action
-    
-def make_ctx(n, device):
-    # if DOUBLE_precision:
-    #     return torch.zeros(1,n, requires_grad=True).double()
-    # else:
-        return torch.zeros(1,n, requires_grad=True, device=device)
-      
+#         return action  
 
 
 class Combine_NN_ENV(nn.Module):
     device = 'cpu'
-    
+    name = 'LQR_env'
     def __init__(self, policy = None, x_dim=2, levels = None, batch_nums = (1,3,1), kbm_zero = True, random_task = False, T = 12, traj_opt = False, x_range = 4):
         super().__init__()
         
 #         n_ctx = [1,2]
         
-        ctx_target = torch.zeros(1, device=self.device) 
+        ctx_goal = torch.zeros(1, device=self.device) 
         ctx_coeff = torch.zeros(x_dim, device=self.device)   
         if levels == 2:  #         for "LQR_lv2"
-#             self.parameters_all = [ctx_target, ctx_coeff, None] # [self.layers.parameters]
-            self.parameters_all = [torch.cat([ctx_target, ctx_coeff]), None, None] # [self.layers.parameters]
+#             self.parameters_all = [ctx_goal, ctx_coeff, None] # [self.layers.parameters]
+            self.parameters_all = [torch.cat([ctx_goal, ctx_coeff]), None, None] # [self.layers.parameters]
         elif levels == 1:  #         for "LQR_lv1"
-            self.parameters_all = [torch.cat([ctx_target, ctx_coeff]), None] # [self.layers.parameters]
+            self.parameters_all = [torch.cat([ctx_goal, ctx_coeff]), None] # [self.layers.parameters]
         else:
             error()
             
@@ -177,7 +190,7 @@ class Combine_NN_ENV(nn.Module):
     
         self.policy = policy
 #         self.parameters_all = policy.parameters_all
-#         self.parameters_all = [policy.ctx_target,  policy.ctx_coeff, None] 
+#         self.parameters_all = [policy.ctx_goal,  policy.ctx_coeff, None] 
         
         self.T = T
 #         self.env = LQR_environment(x_dim, batch_nums, x_range = x_range) #, kbm=kbm)
@@ -230,10 +243,10 @@ class Combine_NN_ENV(nn.Module):
 #         else:
 # #             if optim is None:
 #                 optim = torch.optim.SGD([{"params": self.policy.ctx_coeff},
-#                                          {"params": self.policy.ctx_target, "lr": lr*self.env.batch_all*4}  ],
+#                                          {"params": self.policy.ctx_goal, "lr": lr*self.env.batch_all*4}  ],
 #                                          lr=lr, momentum = 0.9)
 
-#         l_all, coeff_all, target_all  = [], [], []
+#         l_all, coeff_all, goal_all  = [], [], []
 
 #         for iter_ in range(epoch):
 #             l, x, u = self.train_step(task, optim)
@@ -241,12 +254,12 @@ class Combine_NN_ENV(nn.Module):
         
 #             if not self.traj_opt:
 #                 coeff_all.append(self.policy.ctx_coeff.clone().detach())
-#                 target_all.append(self.policy.ctx_target.squeeze().clone().detach())
+#                 goal_all.append(self.policy.ctx_goal.squeeze().clone().detach())
 
 #         if self.traj_opt:
-#             return l_all, x, u, coeff_all, target_all, self.env.target.numpy(), self.policy, 
+#             return l_all, x, u, coeff_all, goal_all, self.env.goal.numpy(), self.policy, 
 #         else:
-#             return l_all, x, u, torch.stack(coeff_all).numpy(), torch.stack(target_all).numpy(), self.env.target.numpy(), self.policy, 
+#             return l_all, x, u, torch.stack(coeff_all).numpy(), torch.stack(goal_all).numpy(), self.env.goal.numpy(), self.policy, 
         
     
 #############################
@@ -255,43 +268,43 @@ class Combine_NN_ENV(nn.Module):
 ## LQR task
 
 x_range = 4
-def sample_LQR_LV2(sample_type):                      #level 2 - dynamics
-    kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
-    def sample_LV1(sample_type):                      #level 1 - goal
-        goal   = x_range * np.random.randn(1)
-        def sample_LV0(batch_size, sample_type):      #level 0 - initial  x0
-            pos0   = x_range * np.random.randn(batch_size)
-            task_env = kbm, goal, pos0
-            return task_env
-        return sample_LV0, None    # returning input_sampler (and target_sampler = None) for level0
-    return sample_LV1
+# def sample_LQR_LV2(sample_type):                      #level 2 - dynamics
+#     kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+#     def sample_LV1(sample_type):                      #level 1 - goal
+#         goal   = x_range * np.random.randn(1)
+#         def sample_LV0(batch_size, sample_type):      #level 0 - initial  x0
+#             pos0   = x_range * np.random.randn(batch_size)
+#             task_env = kbm, goal, pos0
+#             return task_env
+#         return sample_LV0, None    # returning input_sampler (and goal_sampler = None) for level0
+#     return sample_LV1
 
-def sample_LQR_LV1(sample_type):                         #level  - dynamics, goal
-    kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
-    goal   = x_range * np.random.randn(1)
-    def sample_LV0(batch_size, sample_type):      #level 0 - initial  x0
-        pos0   = x_range * np.random.randn(batch_size)
-        task_env = kbm, goal, pos0
-        return task_env
-    return sample_LV0, None    # returning input_sampler (and target_sampler = None) for level0
+# def sample_LQR_LV1(sample_type):                         #level  - dynamics, goal
+#     kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+#     goal   = x_range * np.random.randn(1)
+#     def sample_LV0(batch_size, sample_type):      #level 0 - initial  x0
+#         pos0   = x_range * np.random.randn(batch_size)
+#         task_env = kbm, goal, pos0
+#         return task_env
+#     return sample_LV0, None    # returning input_sampler (and goal_sampler = None) for level0
 
-def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
-    kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
-    goal   = x_range * np.random.randn(1)
-    pos0   = x_range * np.random.randn(batch_size)
-    task_env = kbm, goal, pos0
-    return task_env
+# def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
+#     kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
+#     goal   = x_range * np.random.randn(1)
+#     pos0   = x_range * np.random.randn(batch_size)
+#     task_env = kbm, goal, pos0
+#     return task_env
 
 
 
 #############################
 
-def plot_all(l_all, u_opt, x_opt, coeff_all, target_all, target0, traj_opt = False):
+def plot_all(l_all, u_opt, x_opt, coeff_all, goal_all, goal0, traj_opt = False):
     plt.figure()
     plt.plot(u_opt)
     plt.plot(x_opt)
 #     plt.legend(['control', 'position', 'velocity', 'acceleration'])
-    plt.plot(target0.repeat(len(u_opt),axis=0),':')
+    plt.plot(goal0.repeat(len(u_opt),axis=0),':')
     
     plt.show()
 
@@ -302,7 +315,7 @@ def plot_all(l_all, u_opt, x_opt, coeff_all, target_all, target0, traj_opt = Fal
     if not traj_opt:
         plt.figure()
         plt.plot(coeff_all)
-        plt.plot(target_all) # - target0)
+        plt.plot(goal_all) # - goal0)
         plt.legend(['c1', 'c2', 'c3'][:len(coeff_all[0])] + ['tar1', 'tar2', 'tar3'])
-        plt.plot(target0.repeat(len(coeff_all),axis=0),':')
+        plt.plot(goal0.repeat(len(coeff_all),axis=0),':')
         plt.show()

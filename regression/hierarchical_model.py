@@ -1,16 +1,15 @@
 import torch
 import torch.nn as nn
-from torch.nn.utils import clip_grad_value_
 from torch.optim import Adam, SGD
 import numpy as np
 from functools import partial
 
-from utils import move_to_device #, get_args  #, vis_img_recon #manual_optim, send_to
+from optimize import optimize
+from utils import move_to_device, check_nan #, get_args  #, vis_img_recon #manual_optim, send_to
 # from finite_diff import debug_top
 # from torch.autograd import gradcheck
 
 from torch.nn.utils.clip_grad import clip_grad_value_
-# import higher 
 
 from pdb import set_trace
 # import IPython/
@@ -18,8 +17,6 @@ from pdb import set_trace
 print_forward_test = False
 print_forward_return = False #True
 # print_task_loader = True
-print_optimize_level_iter = False #True #
-print_optimize_level_over = False
 
 task_merge_len = 10 #5
 
@@ -66,9 +63,8 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         
 
     def forward(self, level, task_list, 
-                        optimizer=SGD, reset=True, return_outputs=False, 
-                        status='', #current_status='', 
-                        viz=None, iter_num = None):        
+                optimizer=SGD, reset=True, return_outputs=False, status='', #current_status='', 
+                viz=None, iter_num = None):        
         '''
         Compute average loss over multiple tasks in task_list
         returns:  mean_loss, outputs
@@ -76,10 +72,6 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         Encoder(Adaptation) + Decoder model:
         '''
                 
-# lv3: root: 1 env. static (same as lv2 loss)
-# lv2: mean(sine + line)/2
-# lv1: mean sines
-# lv0: mean pixel (1 sine)
         if status is not '':
             status += '_lv'+str(level)
 
@@ -88,29 +80,32 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
             meta_eval_partial = partial(self.meta_eval, level = level-1, status =  status, optimizer=optimizer, reset=reset, return_outputs=return_outputs, iter_num=iter_num, task_merge_flag=task_merge_flag)
             loss, outputs = get_average_loss(meta_eval_partial, task_list, return_outputs) 
 
-#             if status == viz:   #visualize_output(outputs)
-
         else:                  # base-level evaluation (level 0)
-            inputs, targets, _ = move_to_device(task_list, self.device)
-            assert isinstance(inputs, (torch.FloatTensor, torch.DoubleTensor, torch.cuda.FloatTensor, torch.cuda.DoubleTensor))
-            outputs = self.decoder_model(inputs)
-            loss = self.base_loss(outputs, targets)
+            if hasattr(self.decoder_model, 'name') and self.decoder_model.name == 'LQR_env':
+                inputs = task_list
+                loss, outputs = self.decoder_model(inputs)
+            else:
+                assert isinstance(task_list[0], (torch.FloatTensor, torch.DoubleTensor)) #, torch.cuda.FloatTensor, torch.cuda.DoubleTensor)):
+                inputs, targets, _ = move_to_device(task_list, self.device)
+                if hasattr(self.decoder_model, 'loss_fnc'):
+                    loss, outputs = self.decoder_model(inputs, targets)
+                else:
+                    outputs = self.decoder_model(inputs)
+                    loss = self.base_loss(outputs, targets)
 
-        # assert not torch.isnan(loss), "loss is nan"
-        if torch.isnan(loss):
-            print("loss is nan")
-            set_trace()
+        check_nan(loss)          # assert not torch.isnan(loss), "loss is nan"
         
         if status is not '' and (level in self.log_loss_levels):
             self.log_loss(loss.item(), status, iter_num)              #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
+        
+        # if status == viz:   #visualize_output(outputs)
+
         return loss, outputs
     
 
-    def meta_eval(self, task, task_idx, level, status, 
-                        optimizer, reset, return_outputs, iter_num, task_merge_flag):
-        '''  Applies adaptation on train-tasks and then evaluates the generalization loss on test-tasks     '''
+    def meta_eval(self, task, task_idx, level, status, optimizer, reset, return_outputs, iter_num, task_merge_flag):
+        # '''  Applies adaptation on train-tasks and then evaluates the generalization loss on test-tasks     '''
         if not task_merge_flag and status is not '':
-
             status += '/task' + str(task_idx)  # current_status = 'lv'+str(level)+'_task'+str(task.idx)
 
         def run_test(iter_num):       # evaluate on one mini-batch from test-loader
@@ -130,12 +125,13 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                         # log_loss_flag = (level in self.log_loss_levels),
                         log_ctx_flag = (level in self.log_ctx_levels))
 
-        test_loss_opt = run_test(iter_num=self.max_iters[level]) # final test-loss
-        return test_loss_opt
+        test_loss_optim = run_test(iter_num=self.max_iters[level]) # final test-loss
+        return test_loss_optim
 
         
     #################
     ####  Logging 
+
     def log_loss(self, loss, status, iter_num): #, name):
         self.logger.experiment.add_scalar("loss{}".format(status), loss, iter_num)   #  .add_scalars("loss{}".format(status), {name: loss}, iter_num)
 
@@ -152,6 +148,8 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
 
 ##################################
+# get_average_loss - Parallelize! 
+
 def get_average_loss(model, task_list, return_outputs):
     loss, outputs = [], []
 
@@ -165,97 +163,3 @@ def get_average_loss(model, task_list, return_outputs):
 
 
 
-
-
-
-##########################################################################################################################################   
-# optimize
-##########################################################################################################################################   
-
-def optimize(model, dataloader, level, 
-            lr, max_iter, for_iter, optimizer, reset, 
-            status, # current_status, 
-            run_test, test_interval, 
-            device, Higher_flag, 
-            log_ctx_flag):  #log_loss_flag, 
-    ## optimize parameter for a given 'task'
-    grad_clip_value = 100 #1000
-    # print(level)
-    
-    ################
-    def initialize():     ## Initialize param & optim
-        param_all = model.decoder_model.module.parameters_all if isinstance(model.decoder_model, nn.DataParallel) else model.decoder_model.parameters_all
-
-        optim = None
-        if param_all[level] is not None:
-            if reset:  # use manual optim or higher 
-                param_all[level] = torch.zeros_like(param_all[level], requires_grad=True, device=device)   # Reset
-                if Higher_flag: # using higher 
-                    optim = optimizer([param_all[level]], lr=lr)
-                    optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
-            else: # use regular optim: for outer-loop
-                optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
-                
-        return param_all, optim
-
-    def update_step():
-        if param_all[level] is not None:      
-            if reset:  # use manual SGD or higher 
-                if Higher_flag:
-                    param_all[level], = optim.step(loss, params=[param_all[level]])    # syntax for diff_optim
-                else: # manual SGD step
-                    first_order = False
-                    if param_all[level+1] is None:  # for LQR_.. without network model parameters
-                        first_order = True
-                        
-                    grad = torch.autograd.grad(loss, param_all[level], create_graph=not first_order)
-                    for g in grad: #filter(lambda p: p.grad is not None, parameters):
-                        g.data.clamp_(min=-grad_clip_value, max=grad_clip_value)
-                    param_all[level] = param_all[level] - lr * grad[0]
-
-            else: # use regular optim: for outer-loop
-                optim.zero_grad()
-                loss.backward()
-                clip_grad_value_(param_all[level](), clip_value=grad_clip_value) #20)
-                optim.step()  
-                
-#     def logging(loss, param, cur_iter):
-# #         if not (cur_iter % update_iter[level]):
-#             # if log_loss_flag:
-#             #     model.log_loss(loss, status+current_status, cur_iter)  #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
-#             if log_ctx_flag:
-#                 model.log_ctx(param, status + current_status, cur_iter)  #  log the adapted ctx for the level
-                
-    ######################################
-    # main code
-    # task_idx = dataloader.task_idx if hasattr(dataloader,'task_idx') else None
-    # task_name = dataloader.task_name if hasattr(dataloader,'task_name') else None
-    
-    param_all, optim = initialize()  
-    cur_iter = 0
-    loss = None
-    # status = status # + current_status
-    while True:
-        for i, task_batch in enumerate(dataloader):
-            for _ in range(for_iter):          # Seungwook: for_iter is to replicate cavia’s implementation where they use the same mini-batch for the inner loop steps
-                if cur_iter >= max_iter:       # Terminate! 
-                    # if print_optimize_level_over and loss is not None:
-                    #     print('optimize '+ status, 'loss_final', loss.item())
-                    return None   # param_all[level]    # for log_ctx
-
-                loss, output = model.forward(level, task_batch, status = status, #current_status = current_status, 
-                                                                iter_num = cur_iter)    # Loss to be optimized
-                update_step()
-
-                if log_ctx_flag and reset:
-                    model.log_ctx(param_all[level], status + '_lv'+str(level), cur_iter)  #  log the adapted ctx for the level
-                # logging(loss.item(), param_all[level], cur_iter)
-
-
-                # Run Test-loss
-                if not (cur_iter % test_interval) and cur_iter <= max_iter - test_interval:
-                    test_loss, test_outputs = run_test(iter_num = cur_iter)  # get test_loss 
-                    if level>0:
-                        print('level',level, 'cur_iter', cur_iter, 'test loss', test_loss.item())
-
-                cur_iter += 1  
