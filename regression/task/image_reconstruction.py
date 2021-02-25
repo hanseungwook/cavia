@@ -20,7 +20,7 @@ dataset_dict = {
     'mnist' : datasets.MNIST,
     'fmnist': datasets.FashionMNIST, 
     'celebA': datasets.CelebA,
-    'cifar10': datasets.Cifar10, 
+    'cifar10': datasets.CIFAR10, 
 }
 
 img_size_dict = {
@@ -33,7 +33,7 @@ img_size_dict = {
 transforms_dict = {
     'mnist':  transforms.ToTensor(),
     'fmnist': transforms.ToTensor(),
-    'cifar10': transform = transforms.Compose( [transforms.ToTensor(),     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
+    'cifar10': transforms.Compose( [transforms.ToTensor(),     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]),
     'celebA': transforms.Compose([lambda x: Image.open(x).convert('RGB'),
                                   transforms.Resize(img_size_dict['celebA'][0:2], Image.LANCZOS), 
                                   transforms.ToTensor() ])
