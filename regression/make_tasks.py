@@ -28,6 +28,8 @@ from task.regression_1d import sine1_task, line1_task, sine_linear2_task
 
 from task.image_reconstruction import img_reconst_task_gen
 
+cifar10_task = img_reconst_task_gen('cifar10')
+
 mnist2_task = img_reconst_task_gen('mnist')
 fmnist2_task = img_reconst_task_gen('fmnist')
 mnist_fmnist3_task = make_composite_task({'mnist_lv2': mnist2_task, 'fmnist_lv2': fmnist2_task})
@@ -46,8 +48,9 @@ task_dict={
 #
     'mnist_lv2'  : mnist2_task,
     'fmnist_lv2' : fmnist2_task,
-    'mnist+fmnist_lv3' : make_composite_task({'mnist_lv2': mnist2_task, 'fmnist_lv2': fmnist2_task})
-
+    'mnist+fmnist_lv3' : make_composite_task({'mnist_lv2': mnist2_task, 'fmnist_lv2': fmnist2_task}),
+# 
+    'cifar10_lv2'  : cifar10_task,
     # 'LQR_lv2': LQR2_task,
 }
 

@@ -51,10 +51,10 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         # '''   Compute average loss over multiple tasks in task_list     '''
         status = update_status(status, level = level)
 
-        log_loss_flag = (level in self.log_loss_levels)
-        log_ctx_flag = (level in self.log_ctx_levels)
-        task_merge_flag = (level-1) in self.task_separate_levels
-        print_loss_flag = (level-1) in self.print_levels 
+        log_loss_flag   = level     in self.log_loss_levels
+        log_ctx_flag    = level     in self.log_ctx_levels
+        task_merge_flag = level-1 in self.task_separate_levels
+        print_loss_flag = level-1 in self.print_levels 
 
         if level > 0:          # meta-level evaluation
             eval_fnc = partial(self.meta_eval, level = level-1, status =  status, optimizer=optimizer, reset=reset, return_outputs=return_outputs, iter_num=iter_num, task_merge_flag=task_merge_flag, print_loss_flag=print_loss_flag)
