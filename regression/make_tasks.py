@@ -1,5 +1,4 @@
-# from hierarchical_task import Task_sampler, Partial_sampler
-from hierarchical_task2 import Task_sampler, Partial_sampler, batch_wrapper
+from hierarchical_task import Task_sampler, Partial_sampler, batch_wrapper
 
 import random 
 
