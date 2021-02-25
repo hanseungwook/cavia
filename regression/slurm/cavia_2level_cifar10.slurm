@@ -65,8 +65,8 @@ date
 
 python3 main_huh.py \
 --log_interval=50 --log_name=cifar10_2level_ctx100_28_tasks7_3_lr0.001_biggercap \
---k_batch_train 100 6000 7  --k_batch_test 0 1000 3 --n_batch_train 100 15 1  --n_batch_test 0 15 1 \
---architecture 2 128 128 128 128 128 128 128 3 --n_iters 5 3 10000 --for_iters 5 3 1 \
+--k_train 100 6000 7  --k_test 0 1000 3 --n_train 100 15 1  --n_test 0 15 1 \
+--architecture 2 128 128 128 128 128 128 128 3 --max_iters 5 3 10000 --for_iters 5 3 1 \
 --task cifar10 --n_contexts 100 28 --lrs 1.0 0.001 0.001 --test_interval 100
 
 

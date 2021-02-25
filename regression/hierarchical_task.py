@@ -20,8 +20,8 @@ from pdb import set_trace
 class Hierarchical_Task():   
     # Top-down generation of task hierarchy.
     
-    def __init__(self, task_sampler, batch_dict, idx=0): 
-        self.dataloaders = get_dataloader_dict(task_sampler, batch_dict, idx)
+    def __init__(self, task_sampler, batch_dict):
+        self.dataloaders = get_dataloader_dict(task_sampler, batch_dict) 
 
     def load(self, sample_type):   
         loader = self.dataloaders[sample_type] or self.dataloaders['train']  # duplicate 'train' loader, if 'test'/'valid' loader == None
@@ -34,21 +34,20 @@ class Hierarchical_Task():
 ######################
 # get_dataloader_dict
 
-def get_dataloader_dict(task_sampler, batch_dict, idx):    
+def get_dataloader_dict(task_sampler, batch_dict):
     batch_dict_next = (batch_dict[0][:-1], batch_dict[1][:-1])
     total_batch, mini_batch = batch_dict[0][-1], batch_dict[1][-1]           # mini_batch: mini batch # of samples
 
-    def get_dataloader(sample_type, mini_batch_):     #     sample_type = 'train' or 'test'  
+    def get_dataloader(sample_type, mini_batch_):   
         input_params, target_samplers = task_sampler.get_data(sample_type)
-        # print(input_params, target_samplers)
 
         if len(input_params) == 0:     # No dataloader for empty dataset sampler
             return None
         else:
             if isinstance(target_samplers[0], Task_sampler):  #high-level:
-                data = [Hierarchical_Task(target_sampler, batch_dict_next, idx_) for (idx_, target_sampler) in enumerate(target_samplers)]
-                return Meta_DataLoader(get_Dataset(input_params, data), batch_size=mini_batch_, idx=idx)   # , name=str(task_sampler)
-            else:    # if level == 0:  #if isinstance(target_samplers, (np.ndarray, torch.FloatTensor)) :    
+                data = [Hierarchical_Task(target_sampler, batch_dict_next) for target_sampler in target_samplers]
+                return Meta_DataLoader(get_Dataset(input_params, data), batch_size=mini_batch_)
+            else:    # if level == 0: 
                 return DataLoader(get_Dataset(input_params, target_samplers), batch_size=mini_batch_, shuffle=(sample_type == 'train')) 
 
     task_sampler.pre_sample(total_batch)  # pre-sampling 
@@ -72,18 +71,11 @@ class Task_sampler():
 
     def pre_sample(self, k_batches: dict):              # pre-sample k_batches of params  
         self.params = sample_shuffle_split(self.param_fnc, k_batches)
-        # for type_ in ['test', 'valid']:
-        #     if len(self.params[type_]) == 0:
-        #         self.params[type_] = self.params['train']   # duplicate train and test params.
 
     def get_data(self, sample_type): 
-        if self.params is None: 
-            error()
+        assert self.params is not None, "run pre_sample first"
         params = self.params[sample_type]
         return params, batch_wrapper(self.task_fnc)(params) 
-
-#     def __str__(self):
-#         return self.param_fnc.__name__ if hasattr(self.param_fnc, '__name__')  else 'None' # self.task_fnc.__name__ #self.params
 
 #####################
 # Partial_sampler
@@ -115,34 +107,32 @@ def sample_shuffle_split(input, k_batches: dict):
         assert len(x_list) == 3, "wrong number of x_list items"
         return x_list
 
-    def sample(input, total_batch):
-        if input is None:
-            return list(range(total_batch))
-        elif callable(input):
-            return input(total_batch) 
-        else:
-            return input
+    # def sample(input, total_batch):
+    #     if input is None:
+    #         pass     # return list(range(total_batch))
+    #     elif callable(input):
+    #         return input(total_batch) 
+    #     else:
+    #         return random.sample(input, total_batch)
 
     ################
     # main code
-    k_list = make_list(k_batches)
+    k_list = make_list(k_batches); 
+    total_batch = sum(k_list)
+    inputs = input(sum(total_batch)) if callable(input) else random.sample(input, total_batch)   # Sample inputs
+    
     inputs = sample(input, sum(k_list))     # list of sampled params
     assert isinstance(inputs, (list, torch.FloatTensor)), "wrong type of inputs"  # , np.ndarray
-        
+    
     ###  shuffle and split and make_dict 
     idx = np.cumsum([0]+k_list);   # np.cumsum(filter(None, [0]+k_list))  #  # total_batch = idx[-1]
 
-    if isinstance(inputs, list): 
-        random.shuffle(inputs)
-        return make_dict([inputs[idx[i]:idx[i+1]] for i in range(len(idx)-1)])
+    return make_dict([inputs[idx[i]:idx[i+1]] for i in range(len(idx)-1)])
 
-    elif isinstance(inputs, torch.FloatTensor):
-        rnd_idx = torch.randperm(inputs.shape[0])
-        inputs = inputs[rnd_idx].view(inputs.shape)  # shuffled tensor
-        return make_dict([inputs[idx[i]:idx[i+1], :] for i in range(len(idx)-1)])
-
-    # else:
-    #     error()
+    # elif isinstance(inputs, torch.FloatTensor): should already be randomly generated
+        # rnd_idx = torch.randperm(inputs.shape[0])
+        # inputs = inputs[rnd_idx].view(inputs.shape)  # shuffled tensor
+        # return make_dict([inputs[idx[i]:idx[i+1], :] for i in range(len(idx)-1)])
 
 
 ##################

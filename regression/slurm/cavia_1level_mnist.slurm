@@ -66,8 +66,8 @@ date
 
 python3 main_huh.py \
 --log_interval=50 --log_name=mnist_c10_1level_ctx13 \
---k_batch_train 10 6000 10  --k_batch_test 0 1000 10 --n_batch_train 10 15 10  --n_batch_test 0 15 10 \
---architecture 2 128 128 128 128 128 1 --n_iters 5 0 10000 --for_iters 5 3 1 \
+--k_train 10 6000 10  --k_test 0 1000 10 --n_train 10 15 10  --n_test 0 15 10 \
+--architecture 2 128 128 128 128 128 1 --max_iters 5 0 10000 --for_iters 5 3 1 \
 --task mnist --n_contexts 13 0 --lrs 1.0 0.0 0.001 --test_interval 100
 
 

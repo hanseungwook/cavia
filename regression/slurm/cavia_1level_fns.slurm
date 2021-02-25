@@ -65,8 +65,8 @@ date
 
 python3 main_huh.py \
 --log_interval=50 --log_name=fns_1level_ctx2 \
---k_batch_train 10 10000 4  --k_batch_test 10 1000 4 --n_batch_train 10 50 4  --n_batch_test 10 50 4 \
---architecture 1 40 40 1 --n_iters 3 0 10000 --for_iters 5 3 1 \
+--k_train 10 10000 4  --k_test 10 1000 4 --n_train 10 50 4  --n_test 10 50 4 \
+--architecture 1 40 40 1 --max_iters 3 0 10000 --for_iters 5 3 1 \
 --task sine linear quadratic cubic --n_contexts 2 0 --lrs 0.03 0.0 0.001 --test_interval 100
 
 

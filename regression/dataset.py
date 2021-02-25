@@ -28,6 +28,8 @@ class Basic_Dataset(Dataset):
     def __init__(self, input, target=None):
         self.input = input
         self.target = target
+        self.str_input = isinstance(self.input[0], str)
+
         if target is not None:
             assert len(input) == len(target)
 
@@ -36,9 +38,11 @@ class Basic_Dataset(Dataset):
     
     def __getitem__(self, idx):
         if self.target is None:
-            return self.input[idx]
+            pass
+            # return self.input[idx]
         else: 
-            return self.input[idx], self.target[idx], idx
+            idx_output = self.input[idx] if self.str_input else idx
+            return self.input[idx], self.target[idx], idx_output
 
 ##############################
 # Basic_Dataset_LQR
@@ -63,14 +67,11 @@ class Basic_Dataset_LQR(Dataset):  # Temporary code. to be properly written
 ##################################
 # Meta_DataLoader
 class Meta_DataLoader():
-    def __init__(self, dataset, batch_size, idx): #, name
+    def __init__(self, dataset, batch_size):
         self.dataset = dataset             # pre-sampled list of tasks
         self.minibatch_size = max(1, min(batch_size, len(dataset)))   #   1<=batch_size<=len(dataset)
-        self.task_idx = idx
-        # self.task_name = name
 
-    def create_mini_batches(self):
-        # Create indices of batches
+    def create_mini_batches(self):         # Create indices of batches
         batch_idx = list(BatchSampler(RandomSampler(self.dataset), self.minibatch_size, drop_last=True))
         
         # since collate does not work for tasks (only works for torch.tensors / arrays ...)
@@ -88,5 +89,4 @@ class Meta_DataLoader():
     def __iter__(self):
         mini_dataset = self.create_mini_batches()
         return iter(mini_dataset)
-
 

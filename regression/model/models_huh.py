@@ -346,9 +346,9 @@ class Encoder_Core(nn.Module):
     def _mean_over_batch(self, input, mean_num, n_task):
         return input.view(-1, mean_num, input.shape[1]).mean(dim=1, keepdim=False).view(n_task,-1,input.shape[1])
         
-    def _progressive_mean_over_batch(self, input, n_batch, n_batch_log, n_task, progressive):
+    def _progressive_mean_over_batch(self, input, n_batch, n_log, n_task, progressive):
         if progressive:
-            temp = [self._mean_over_batch(input, 2**n, n_task) for n in range(n_batch_log+1)]
+            temp = [self._mean_over_batch(input, 2**n, n_task) for n in range(n_log+1)]
             temp = torch.cat(temp[::-1], dim=1)
         else: 
             temp = self._mean_over_batch(input, n_batch, n_task)
@@ -356,11 +356,11 @@ class Encoder_Core(nn.Module):
 
     def _forward(self, input, progressive = False):
         n_task, n_batch, _ = input.shape        
-        n_batch_log = int(torch.tensor(n_batch).float().log2())
+        n_log = int(torch.tensor(n_batch).float().log2())
         
         x = self._reshape_batch(input)
         x = F.relu(self.fc1(x))
-        x = self._progressive_mean_over_batch(x, n_batch, n_batch_log, n_task, progressive)
+        x = self._progressive_mean_over_batch(x, n_batch, n_log, n_task, progressive)
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
         

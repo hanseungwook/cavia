@@ -65,8 +65,8 @@ date
 
 python3 main_huh.py \
 --log_interval=50 --log_name=fns_sine_lin_1level_ctx4_full \
---k_batch_train 10 10000 2  --k_batch_test 0 1000 2 --n_batch_train 10 50 2  --n_batch_test 0 1 1 \
---architecture 1 40 40 1 --n_iters 3 0 5000 --for_iters 3 3 1 \
+--k_train 10 10000 2  --k_test 0 1000 2 --n_train 10 50 2  --n_test 0 1 1 \
+--architecture 1 40 40 1 --max_iters 3 0 5000 --for_iters 3 3 1 \
 --task sine linear --n_contexts 4 0 --lrs 0.03 0.0 0.001 --test_interval 100
 
 
