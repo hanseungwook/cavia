@@ -11,7 +11,7 @@ import copy
 import IPython
 from pdb import set_trace
 
-from hierarchical_task2 import batch_wrapper
+from hierarchical_task import batch_wrapper
 
 ### TODO: Can we make k_batch, n_batch automatic?
 ### TODO: Can we make the sampling of classes mutually exclusive?
