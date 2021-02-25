@@ -12,7 +12,7 @@ from utils import move_to_device, check_nan #, get_args  #, vis_img_recon #manua
 from torch.nn.utils.clip_grad import clip_grad_value_
 
 from pdb import set_trace
-# import IPython/
+import IPython
 
 print_forward_test = False
 print_forward_return = False #True
@@ -35,7 +35,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                         decoder_model, encoder_model, base_loss, logger, 
                         n_contexts, max_iters, for_iters, lrs, 
                         test_intervals,
-                        log_loss_levels, log_ctx_levels, task_separate_levels,
+                        log_loss_levels, log_ctx_levels, task_separate_levels, print_loss_levels,
                         Higher_flag = False, data_parallel=False): 
         
         super().__init__()
@@ -55,11 +55,12 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         self.lrs         = lrs 
         self.test_intervals = test_intervals
 
-        self.log_loss_levels = log_loss_levels
-        self.log_ctx_levels  = log_ctx_levels
-        self.task_separate_levels     = task_separate_levels
-        self.Higher_flag         = Higher_flag 
-        self.device        = decoder_model.device
+        self.log_loss_levels    = log_loss_levels
+        self.log_ctx_levels     = log_ctx_levels
+        self.task_separate_levels = task_separate_levels
+        self.print_loss_levels  = print_loss_levels
+        self.Higher_flag        = Higher_flag 
+        self.device             = decoder_model.device
         
 
     def forward(self, level, task_list, 
@@ -95,7 +96,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
 
         check_nan(loss)          # assert not torch.isnan(loss), "loss is nan"
         
-        if status is not '' and (level in self.log_loss_levels):
+        if status != '' and (level in self.log_loss_levels):
             self.log_loss(loss.item(), status, iter_num)              #log[self.log_name].info("At iteration {}, meta-loss: {:.3f}".format(self.iter, loss))
         
         # if status == viz:   #visualize_output(outputs)
@@ -123,7 +124,7 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
                         run_test = run_test, test_interval = self.test_intervals[level],
                         device = self.device, Higher_flag = self.Higher_flag, 
                         # log_loss_flag = (level in self.log_loss_levels),
-                        log_ctx_flag = (level in self.log_ctx_levels))
+                        log_ctx_flag = (level in self.log_ctx_levels), print_loss_flag = (level in self.print_loss_levels))
 
         test_loss_optim = run_test(iter_num=self.max_iters[level]) # final test-loss
         return test_loss_optim
@@ -139,9 +140,9 @@ class Hierarchical_Model(nn.Module):            # Bottom-up hierarchy
         if ctx is None or ctx.numel() == 0 or self.logger is None:
             pass
         else:      # Log each context changing separately if size <= 3
-            if ctx.numel() <= 3:
+            if ctx.numel() <= 4:
                 for i, ctx_ in enumerate(ctx.flatten()): #range(ctx.size):
-                    self.logger.experiment.add_scalar("ctx{}".format(status,i), ctx_, iter_num)
+                    self.logger.experiment.add_scalar("ctx{}/{}".format(status, i), ctx_, iter_num)
                     # self.logger.experiment.add_scalar("ctx{}/{}".format(status,i), {current_status: ctx_}, iter_num)
             else:
                 self.logger.experiment.add_histogram("ctx{}".format(status), ctx, iter_num)
