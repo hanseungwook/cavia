@@ -72,7 +72,7 @@ def get_args(*args):
     parser.add_argument('--log_loss_levels',      type=int, nargs='+', default=None) 
     parser.add_argument('--log_ctx_levels',       type=int, nargs='+', default=None) 
     parser.add_argument('--task_separate_levels', type=int, nargs='+', default=None) 
-    parser.add_argument('--print_loss_levels',    type=int, nargs='+', default=None) 
+    parser.add_argument('--print_levels',    type=int, nargs='+', default=None) 
 
     parser.add_argument('--use_higher',    action='store_true', default=False, help='Use Higher optimizer')
     parser.add_argument('--data_parallel', action='store_true', default=False, help='Use data parallel for inner model (decoder)')
@@ -110,7 +110,7 @@ def check_hparam_default(hparams):
     hparams.log_loss_levels      = hparams.log_loss_levels or [] # [False]*hparams.levels #*(hparams.levels+1)
     hparams.log_ctx_levels       = hparams.log_ctx_levels or [] #[False]*hparams.levels
     hparams.task_separate_levels = hparams.task_separate_levels or [] # [False]*hparams.levels
-    hparams.print_loss_levels    = hparams.print_loss_levels or []
+    hparams.print_levels    = hparams.print_levels or []
 
     hparams.k_train = hparams.k_train or [None]*hparams.levels # ## maybe duplicate k_train/n_train 
     hparams.k_test  = hparams.k_test  or [None]*hparams.levels # hparams.k_train

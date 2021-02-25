@@ -35,7 +35,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         
         super().__init__()
 
-        h_names = ['n_contexts', 'max_iters', 'for_iters', 'lrs', 'log_intervals', 'test_intervals', 'log_loss_levels', 'log_ctx_levels', 'task_separate_levels', 'print_loss_levels', 'use_higher', 'grad_clip']
+        h_names = ['n_contexts', 'max_iters', 'for_iters', 'lrs', 'log_intervals', 'test_intervals', 'log_loss_levels', 'log_ctx_levels', 'task_separate_levels', 'print_levels', 'use_higher', 'grad_clip']
         for name in h_names:
             setattr(self, name, getattr(hparams, name))
 
@@ -54,7 +54,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         log_loss_flag = (level in self.log_loss_levels)
         log_ctx_flag = (level in self.log_ctx_levels)
         task_merge_flag = (level-1) in self.task_separate_levels
-        print_loss_flag = (level-1) in self.print_loss_levels 
+        print_loss_flag = (level-1) in self.print_levels 
 
         if level > 0:          # meta-level evaluation
             eval_fnc = partial(self.meta_eval, level = level-1, status =  status, optimizer=optimizer, reset=reset, return_outputs=return_outputs, iter_num=iter_num, task_merge_flag=task_merge_flag, print_loss_flag=print_loss_flag)

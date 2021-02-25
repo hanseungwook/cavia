@@ -21,6 +21,7 @@ class Hierarchical_Task():
     # Top-down generation of task hierarchy.
     
     def __init__(self, task, batch_dict):
+        self.task = task
         self.dataloaders = get_dataloader_dict(task, batch_dict) 
 
     def load(self, sample_type):   

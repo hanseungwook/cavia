@@ -42,18 +42,19 @@ def img_reconst_task_gen(data_name, root = None): #dataset):
 
     root = root or os.path.join(os.getcwd(),'data')
    
+    dataset_    = dataset_dict   [data_name]
+    transforms_ = transforms_dict[data_name]
+    img_size    = img_size_dict  [data_name]
     ############################
 
-    def get_dataset(key, split = 'train'):
-        dataset_    = dataset_dict   [key]
-        transforms_ = transforms_dict[key]
-        img_size    = img_size_dict  [key]
-        return dataset_(root, train=(split == 'train'), transform=transforms_, download=True) , img_size   
+    def get_dataset(split = 'train'):
+        return dataset_(root, train=(split == 'train'), transform=transforms_, download=True)    
 
-    def get_labeled_dataset(dataset, label):  # level0  # default: only use images-data from 'train.pth'
-        # dataset = get_dataset(split)
+    def get_labeled_dataset(label):  # level0  # default: only use images-data from 'train.pth'
+        dataset = get_dataset()
+        print(dataset.data.shape)
         targets = dataset.targets if torch.is_tensor(dataset.targets) else torch.tensor(dataset.targets)    # for cifar10
-
+    
         if label is  None:  
             pass # Huh: if label is None: reduce a level: lv2 -> lv1 (not picking any labels)
         else:
@@ -78,7 +79,7 @@ def img_reconst_task_gen(data_name, root = None): #dataset):
     ####################################
     # task_fnc
 
-    dataset, img_size = get_dataset(data_name)
+    # dataset, img_size = get_dataset(data_name)
 
     # input_fnc
     def xy_coord0_params(batch, order_pixels=False):
@@ -103,7 +104,7 @@ def img_reconst_task_gen(data_name, root = None): #dataset):
 
     # task_fnc 
     def lv2_fnc(label):
-        labeled_dataset = get_labeled_dataset(dataset, label)
+        labeled_dataset = get_labeled_dataset(label)
         def lv1_fnc(idx):
             img = get_image(labeled_dataset, idx)         # level1 
             def lv0_fnc(xy):
