@@ -85,7 +85,6 @@ def Partial_sampler(task_fnc, input_fnc): #, which = 'task' ):
         return Task_sampler(task_fnc = partial(task_fnc, *params), param_fnc = input_fnc)
     return fnc_
 
-
 ########################
 # sample_shuffle_split
 
@@ -97,42 +96,28 @@ def sample_shuffle_split(input, k_batches: dict):
         return {k:v for (k,v) in zip(keys, vals)}
 
     def make_list(x):
-        if x is None and hasattr(input, '__len__'): 
-            x_list = [len(input),0,0]
-        else:
-            assert  keys == list(x.keys()), "wrong keys for x dict"
-            x_list = list(x.values())
-
-        x_list = [a if a is not None else 0 for a in x_list]        # replace None with 0
-        assert len(x_list) == 3, "wrong number of x_list items"
+        if isinstance(x, dict):
+            x_list = list(x.values());    assert  keys == list(x.keys()), "wrong keys for x dict"
+            x_list = [a if a is not None else 0 for a in x_list]        # replace None with 0
+        else: 
+            x_list = [len(input),0,0];    assert  x is None and hasattr(input, '__len__')
         return x_list
-
-    # def sample(input, total_batch):
-    #     if input is None:
-    #         pass     # return list(range(total_batch))
-    #     elif callable(input):
-    #         return input(total_batch) 
-    #     else:
-    #         return random.sample(input, total_batch)
 
     ################
     # main code
     k_list = make_list(k_batches); 
     total_batch = sum(k_list)
-    inputs = input(sum(total_batch)) if callable(input) else random.sample(input, total_batch)   # Sample inputs
-    
-    inputs = sample(input, sum(k_list))     # list of sampled params
-    assert isinstance(inputs, (list, torch.FloatTensor)), "wrong type of inputs"  # , np.ndarray
+    # set_trace()
+    if input is None:
+        input = list(range(total_batch))
+# 
+    inputs = input(total_batch) if callable(input) else random.sample(input, total_batch)   #  # inputs = sample(input, sum(k_list))     # list of sampled params
+    # assert isinstance(inputs, (list, torch.FloatTensor)), "wrong type of inputs"  # , np.ndarray
     
     ###  shuffle and split and make_dict 
     idx = np.cumsum([0]+k_list);   # np.cumsum(filter(None, [0]+k_list))  #  # total_batch = idx[-1]
 
     return make_dict([inputs[idx[i]:idx[i+1]] for i in range(len(idx)-1)])
-
-    # elif isinstance(inputs, torch.FloatTensor): should already be randomly generated
-        # rnd_idx = torch.randperm(inputs.shape[0])
-        # inputs = inputs[rnd_idx].view(inputs.shape)  # shuffled tensor
-        # return make_dict([inputs[idx[i]:idx[i+1], :] for i in range(len(idx)-1)])
 
 
 ##################
