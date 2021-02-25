@@ -34,11 +34,15 @@ def set_seed(seed, cudnn=True):
 
 ##################################
 def move_to_device(input_tuple, device):
-    if device is None:
+    if device in (None, 'cpu') :
         return input_tuple
     else:
         return [k.to(device) for k in input_tuple]
     
+def check_nan_loss(loss):
+    if torch.isnan(loss):
+        print("loss is nan")
+        set_trace()
 
 ###############################
 def send_to(input, device, DOUBLE_precision):

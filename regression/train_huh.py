@@ -6,7 +6,7 @@ import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
 from hierarchical_model import Hierarchical_Model  
 from hierarchical_task import Hierarchical_Task, Task_sampler
-from task.make_tasks import task_dict 
+from make_tasks import task_dict 
 from utils import get_vis_fn #, print_args
 
 from pdb import set_trace

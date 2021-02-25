@@ -6,6 +6,8 @@ from functools import partial
 from dataset import Meta_DataLoader, get_Dataset
 from torch.utils.data import DataLoader #, Dataset, Subset
 
+from pdb import set_trace
+
 ##############################################################################
 #  Task Hierarchy
 #  A 'task' has built-in sample() method, which returns a 'list of subtasks', and so on..
@@ -19,15 +21,7 @@ class Hierarchical_Task():
     # Top-down generation of task hierarchy.
     
     def __init__(self, task_sampler, batch_dict, idx=0): 
-        # level = len(batch_dict[0]) - 1          # print(self.level, total_batch_dict)
         self.dataloaders = get_dataloader_dict(task_sampler, batch_dict, idx)
-        
-#         if print_hierarhicial_task:
-#             print('level', level, 'batch', batch_dict[0][-1]['train'])
-#             print('task', task_sampler)
-
-#         if print_task_loader and level>0:
-#             print('Task_loader Level', level, 'task', task_sampler)
 
     def load(self, sample_type):   
         loader = self.dataloaders[sample_type] or self.dataloaders['train']  # duplicate 'train' loader, if 'test'/'valid' loader == None
@@ -46,15 +40,16 @@ def get_dataloader_dict(task_sampler, batch_dict, idx):
 
     def get_dataloader(sample_type, mini_batch_):     #     sample_type = 'train' or 'test'  
         input_params, target_samplers = task_sampler.get_data(sample_type)
+        # print(input_params, target_samplers)
+
         if len(input_params) == 0:     # No dataloader for empty dataset sampler
             return None
         else:
-            if isinstance(target_samplers, (np.ndarray, torch.FloatTensor)):       # if level == 0:
-                # input_data, target = input_params, target_samplers   # returns tensors
-                return DataLoader(get_Dataset(input_params, target_samplers), batch_size=mini_batch_, shuffle=(sample_type == 'train')) 
-            else:
+            if isinstance(target_samplers[0], Task_sampler):  #high-level:
                 data = [Hierarchical_Task(target_sampler, batch_dict_next, idx_) for (idx_, target_sampler) in enumerate(target_samplers)]
                 return Meta_DataLoader(get_Dataset(input_params, data), batch_size=mini_batch_, idx=idx)   # , name=str(task_sampler)
+            else:    # if level == 0:  #if isinstance(target_samplers, (np.ndarray, torch.FloatTensor)) :    
+                return DataLoader(get_Dataset(input_params, target_samplers), batch_size=mini_batch_, shuffle=(sample_type == 'train')) 
 
     task_sampler.pre_sample(total_batch)  # pre-sampling 
     loader_dict = {key: get_dataloader(key, mini_batch[key]) for key in ['train', 'test', 'valid']}
