@@ -104,7 +104,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
 
         return run_test(iter_num=self.max_iters[level]) # return  test-loss after adaptation
 
-        
+
     #################
     ####  Logging 
 
@@ -113,10 +113,9 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
             if status != '' and log_loss_flag:
                 self.log_loss(loss, status, iter_num)
 
-            if status != '' and log_ctx_flag: #  and reset:
+           if status != '' and log_ctx_flag: #  and reset:
                 decoder = self.decoder_model.module if isinstance(self.decoder_model, nn.DataParallel) else self.decoder_model
-                param = decoder.parameters_all[level]
-                self.log_ctx(param, status, iter_num, )  #log the adapted ctx  #not for the outer-loop
+                self.log_ctx(decoder.parameters_all[level], status, iter_num, )  #log the adapted ctx  #not for the outer-loop
 
     def log_loss(self, loss, status, iter_num):
         self.logger.experiment.add_scalar("loss{}".format(status), loss, iter_num)   #  .add_scalars("loss{}".format(status), {name: loss}, iter_num)
@@ -125,7 +124,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
     def log_ctx(self, ctx, status, iter_num):
         if ctx is None or callable(ctx) or ctx.numel() == 0:  #or self.logger is None:
             pass
-        else:    
+        else:
             if ctx.numel() <= 4:   # Log each context 
                 for i, ctx_ in enumerate(ctx.flatten()): #range(ctx.size):
                     self.logger.experiment.add_scalar("ctx{}/{}".format(status, i), ctx_, iter_num)

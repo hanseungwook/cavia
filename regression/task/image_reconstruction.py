@@ -5,16 +5,11 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from PIL import Image
 import copy
-# from functools import partial 
-# import csv
 
 import IPython
 from pdb import set_trace
 
 from hierarchical_task import batch_wrapper
-
-### TODO: Can we make k_batch, n_batch automatic?
-### TODO: Can we make the sampling of classes mutually exclusive?
 
 dataset_dict = {
     'mnist' : datasets.MNIST,
@@ -40,37 +35,36 @@ transforms_dict = {
 }
 
 
-def img_reconst_task_gen(data_name, root = None): #dataset):
+def img_reconst_gen(data_name, root = None): #dataset):
 
     root = root or os.path.join(os.getcwd(),'data')
    
-    dataset_    = dataset_dict   [data_name]
-    transforms_ = transforms_dict[data_name]
-    img_size    = img_size_dict  [data_name]
     ############################
 
-    def get_dataset(split = 'train'):
-        return dataset_(root, train=(split == 'train'), transform=transforms_, download=True)    
+    def get_dataset(data_name, split = 'train'):
+        dataset_    = dataset_dict   [data_name]
+        transforms_ = transforms_dict[data_name]
+        img_size_   = img_size_dict  [data_name]
+        return dataset_(root, train=(split == 'train'), transform=transforms_, download=True), img_size_
 
-    def get_labeled_dataset(label):  # level0  # default: only use images-data from 'train.pth'
-        dataset = get_dataset()
-        print(dataset.data.shape)
+    def get_labeled_dataset(dataset, label):  # level0  # default: only use images-data from 'train.pth'
+        dataset_ = copy.deepcopy(dataset)
         targets = dataset.targets if torch.is_tensor(dataset.targets) else torch.tensor(dataset.targets)    # for cifar10
     
         if label is  None:  
             pass # Huh: if label is None: reduce a level: lv2 -> lv1 (not picking any labels)
         else:
-            dataset.data = dataset.data[targets == label]
-            dataset.target = None
+            dataset_.data = dataset.data[targets == label]
+            dataset_.target = None
 #         insert dataset shuffle
-        return dataset
+        return dataset_
 
     def get_image(labeled_dataset, idx):  # level1 
         img, _ = labeled_dataset[idx]
         return img.permute(1, 2, 0)
 
 
-    def get_pixel(img, xy):               # level0
+    def get_pixel(img, img_size, xy):               # level0
         assert img.shape[2] <= 3, "color dimension should be at the end"       # Usual H x W x C img dimensions
 
         xy = copy.deepcopy(xy)          # Huh: why deepcopy?
@@ -80,38 +74,42 @@ def img_reconst_task_gen(data_name, root = None): #dataset):
 
     ####################################
     # task_fnc
+    def task_gen():
+        dataset, img_size = get_dataset(data_name)
+        print(data_name, 'dataset loaded')
 
-    # dataset, img_size = get_dataset(data_name)
+        def generate_xy_coord(batch, order_pixels=False):
+            # Returning full range (in sorted order) if batch size is the full image size
+            idx_full = list(range(img_size[0] * img_size[1]))
+            if batch == 0:
+                flattened_indices = idx_full
+            else: 
+                if order_pixels:
+                    flattened_indices = idx_full[:batch]
+                else:
+                    flattened_indices = np.random.choice(idx_full, batch, replace=False)
 
-    # input_fnc
-    def xy_coord0_params(batch, order_pixels=False):
-        # Returning full range (in sorted order) if batch size is the full image size
-        idx_full = list(range(img_size[0] * img_size[1]))
-        if batch == 0:
-            flattened_indices = idx_full
-        else: 
-            if order_pixels:
-                flattened_indices = idx_full[:batch]
-            else:
-                flattened_indices = np.random.choice(idx_full, batch, replace=False)
+            x, y = np.unravel_index(flattened_indices, (img_size[0], img_size[1]))
+            coordinates = np.vstack((x, y)).T
+            coordinates = torch.from_numpy(coordinates).float()
+            
+            # Normalize coordinates
+            coordinates[:, 0] /= img_size[0]
+            coordinates[:, 1] /= img_size[1]
+            return coordinates
 
-        x, y = np.unravel_index(flattened_indices, (img_size[0], img_size[1]))
-        coordinates = np.vstack((x, y)).T
-        coordinates = torch.from_numpy(coordinates).float()
-        
-        # Normalize coordinates
-        coordinates[:, 0] /= img_size[0]
-        coordinates[:, 1] /= img_size[1]
-        return coordinates
+        # task_fnc 
 
-    # task_fnc 
-    def lv2_fnc(label):
-        labeled_dataset = get_labeled_dataset(label)
-        def lv1_fnc(idx):
-            img = get_image(labeled_dataset, idx)         # level1 
-            def lv0_fnc(xy):
-                return get_pixel(img,xy)                      # level0
-            return lv0_fnc, xy_coord0_params
-        return lv1_fnc, None
+        def lv2_fnc(label):
+            labeled_dataset = get_labeled_dataset(dataset, label)
+            def lv1_fnc(idx):
+                img = get_image(labeled_dataset, idx)       
+                def lv0_fnc(xy):
+                    return get_pixel(img, img_size, xy) 
+                return (lv0_fnc, generate_xy_coord) # lv0_task
+            return (lv1_fnc, None)                  # lv1_task
 
-    return lv2_fnc, None
+        return (lv2_fnc, None)                      # lv2_task 
+
+
+    return task_gen

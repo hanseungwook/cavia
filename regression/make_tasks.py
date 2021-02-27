@@ -7,6 +7,9 @@ from pdb import set_trace
 ###############################################
 # make_composite_task
 
+def combine_names(names):
+    return "".join([name+'+' for name in names])[:-1]
+
 def make_composite_task(task_dict):
     names = list(task_dict.keys())
     def high_level_params():
@@ -15,24 +18,18 @@ def make_composite_task(task_dict):
     def high_level_fnc(name):
         return task_dict[name]  
 
-    return high_level_fnc, batch_wrapper(high_level_params)
+    return (high_level_fnc, batch_wrapper(high_level_params))
 
 ###########################################
 #  1D regression task
 
-from task.regression_1d import sine1_task, line1_task, sine_linear2_task
+from task.regression_1d import sine_gen, line_gen, sine_linear_gen
 
 
 ###########################################
 #  2D regression (Image -reconstruction ) task
 
-from task.image_reconstruction import img_reconst_task_gen
-
-cifar10_task = img_reconst_task_gen('cifar10')
-
-mnist2_task = img_reconst_task_gen('mnist')
-fmnist2_task = img_reconst_task_gen('fmnist')
-mnist_fmnist3_task = make_composite_task({'mnist_lv2': mnist2_task, 'fmnist_lv2': fmnist2_task})
+from task.image_reconstruction import img_reconst_gen
 
 ################################################
 # LQR tasks 
@@ -41,21 +38,29 @@ mnist_fmnist3_task = make_composite_task({'mnist_lv2': mnist2_task, 'fmnist_lv2'
 ################################################
 
 task_dict={
-    'sine_lv1':      sine1_task,
-    'line_lv1':      line1_task,
-    'sine+line_lv2': make_composite_task({'sine': sine1_task, 'line': line1_task}),
-    'sine_linear_lv2': sine_linear2_task,
+    'sine':      sine_gen,
+    'line':      line_gen,
+    'sine_linear': sine_linear_gen,
 #
-    'mnist_lv2'  : mnist2_task,
-    'fmnist_lv2' : fmnist2_task,
-    'mnist+fmnist_lv3' : make_composite_task({'mnist_lv2': mnist2_task, 'fmnist_lv2': fmnist2_task}),
-# 
-    'cifar10_lv2'  : cifar10_task,
-    # 'LQR_lv2': LQR2_task,
+    'mnist'  : img_reconst_gen('mnist'),
+    'fmnist' : img_reconst_gen('fmnist'),
+    'cifar10': img_reconst_gen('cifar10'),
+    # 
+    # 'LQR_lv2': LQR2_gen,
 }
 
-def get_task(name):
-    return make_composite_task({'root': task_dict[name]})
+
+def get_task(name_):
+    # assert isinstance(names, (list,tuple)), "task names should be a list or tuple."
+    names = name_.split("+")  # split into a list of tasks
+    task = make_composite_task({name:task_dict[name]() for name in names})
+    if len(names) == 1: 
+        return task
+    else: 
+        # name = combine_names(names)
+        supertask = make_composite_task({name_:task})  # 
+        return supertask
+
 
 # lv3: dataset f( .  , rnd, type)    -> dataset    (e.g. MNIST vs fMNIST)
 # lv2: label   f(dataset, rnd, type) -> label                -> Loss( theta | dataset )           -> averaged over labels

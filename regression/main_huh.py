@@ -23,14 +23,14 @@ def main(hparams):
 
     print('building Hierarchical_Environment') 
     meta_eval = get_Hierarchical_Eval(hparams, logger)
+
     print('generating Hierarchical_Task') 
     supertask = Hierarchical_Task(get_task(hparams.task), batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
-    print('start training')
 
-    # directly get 'test-loss' without pre-training: zero-shot on super-task env.
+    print('start evaluation')     # evaluate 'test-loss' on super-task without training.
     loss, outputs = meta_eval(hparams.levels, supertask.load('test'), optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
+
     print('Finished training and saving logger')
-    
     logger.save()
 
 ###############

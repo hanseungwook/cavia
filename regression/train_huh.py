@@ -30,11 +30,6 @@ def get_Hierarchical_Eval(hparams, logger):
 
     return model
 
-def get_Hierarchical_Task(hparams):
-    task_fnc, params_fnc_list = get_task(hparams.task)
-    return Hierarchical_Task(task_fnc, params_fnc_list, batch_dict=get_batch_dict(hparams)) 
-
-
 
 
 ####################################################

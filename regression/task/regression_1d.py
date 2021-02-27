@@ -27,7 +27,8 @@ def sine1_params():       # Sample n_batch number of parameters
     phase = np.random.uniform(0., np.pi)
     return amplitude, phase
 
-sine1_task = (sine1_fnc, batch_wrapper(sine1_params))
+def sine_gen():
+    return (sine1_fnc, batch_wrapper(sine1_params))  # sine1_task
 
 ###############################
 
@@ -42,7 +43,8 @@ def line1_params():
     bias = np.random.uniform(-3., 3.)
     return slope, bias
 
-line1_task = (line1_fnc, batch_wrapper(line1_params))
+def line_gen():
+    return (line1_fnc, batch_wrapper(line1_params))  #line1_task
 
 ###############################
 
@@ -55,7 +57,8 @@ def sine_linear2_fnc(param2):
         return lv0_fnc, x_coord0_params
     return lv1_fnc, batch_wrapper(sine1_params)
 
-sine_linear2_task =  (sine_linear2_fnc, batch_wrapper(line1_params))
+def sine_linear_gen():
+    return  (sine_linear2_fnc, batch_wrapper(line1_params))  # sine_linear2_task
 
 ###############################
 
