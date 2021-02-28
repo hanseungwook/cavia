@@ -20,12 +20,13 @@ image_flag = False #True
 ###############################################################
 
 def get_Hierarchical_Eval(hparams, logger):
-    base_model      = get_base_model(hparams) 
+    print('generating Hierarchical_Task') 
+
+    base_model, base_loss  = get_base_model(hparams) 
     encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
-    base_loss       = torch.nn.MSELoss()                    # loss function
-    model   = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger)
+    model  = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger)
     
-    if hparams.v_num is not None: #if hparams.load_model:
+    if hparams.v_num is not None: # fix load_model ! 
         model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
 
     return model
@@ -38,17 +39,19 @@ def get_base_model(hparams):
     task_name = hparams.task
     LQR_flag = (task_name in ['LQR', 'LQR_lv2','LQR_lv1','LQR_lv0'])
     if LQR_flag: 
+        base_loss = None
         print(task_name)
         if task_name == 'LQR_lv2':
-            return Combine_NN_ENV(x_dim=2, levels = 2) 
+            return Combine_NN_ENV(x_dim=2, levels = 2) , base_loss
         elif task_name == 'LQR_lv1':
-            return Combine_NN_ENV(x_dim=2, levels = 1) 
+            return Combine_NN_ENV(x_dim=2, levels = 1) , base_loss
         else:
             error()
     else:
+        base_loss =  torch.nn.MSELoss()                    # loss function
         MODEL_TYPE = get_model_type(hparams.model_type)
         n_contexts=hparams.n_contexts    #  sum(hparams.n_contexts)
-        return MODEL_TYPE(n_arch=hparams.architecture, n_contexts=n_contexts, device=hparams.device).to(hparams.device)
+        return MODEL_TYPE(n_arch=hparams.architecture, n_contexts=n_contexts, device=hparams.device).to(hparams.device), base_loss
 
 def get_encoder_model(encoder_types, hparams):
     encoders = []

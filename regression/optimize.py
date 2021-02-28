@@ -10,8 +10,8 @@ import torch.nn as nn
 ## optimize parameter for a given 'task'
 
 def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval, 
-            status, 
-            run_test, 
+            status, status_dict,
+            test_eval, 
             optimizer, 
             reset, 
             device, 
@@ -64,16 +64,16 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
     i = 0
 
     while True:
-        for task_batch in dataloader:
+        for task_list in dataloader:     # task_list = sampled mini-batch
             for _ in range(for_iter):          # Seungwook: for_iter is to replicate cavia’s implementation where they use the same mini-batch for the inner loop steps
                 if i >= max_iter:       # Terminate! 
                     return None   # param_all[level]    # for log_ctx
 
-                loss, output = model.forward(level, task_batch, status = status, iter_num = i)    # Loss to be optimized
+                loss, output = model.forward(task_list, sample_type = 'train', level=level, status = status, status_dict = status_dict, iter_num = i)    # Loss to be optimized
                 update_step()
 
-                # Run Test-loss
+                # Run Test-loss (for logging)
                 if not (i % test_interval) and i <= max_iter - test_interval:
-                    test_loss, test_outputs = run_test(i)  # get test_loss 
+                    test_eval(i)  # test_loss, test_outputs = test_eval(i)  # get test_loss 
 
                 i += 1  

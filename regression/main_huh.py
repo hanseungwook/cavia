@@ -3,7 +3,8 @@ import argparse
 import torch
 from pytorch_lightning.loggers import TensorBoardLogger # https://pytorch-lightning.readthedocs.io/en/latest/_modules/pytorch_lightning/loggers/tensorboard.html
 
-from train_huh import get_Hierarchical_Eval, get_batch_dict 
+from hierarchical_eval import update_status
+from train_huh import get_Hierarchical_Eval, get_batch_dict, save_model, load_model
 from hierarchical_task import Hierarchical_Task, Task_sampler
 from make_tasks import get_task
 
@@ -21,17 +22,17 @@ def main(hparams):
     logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
     logger.log_hyperparams(hparams) 
 
-    print('building Hierarchical_Environment') 
-    meta_eval = get_Hierarchical_Eval(hparams, logger)
-
-    print('generating Hierarchical_Task') 
-    supertask = Hierarchical_Task(get_task(hparams.task), batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
+    evaluator = get_Hierarchical_Eval(hparams, logger)
+    task      = Hierarchical_Task(get_task(hparams.task), batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
 
     print('start evaluation')     # evaluate 'test-loss' on super-task without training.
-    loss, outputs = meta_eval(hparams.levels, supertask.load('test'), optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
+    # loss, outputs = evaluator(hparams.top_level, task.load('test'), status= update_status("", sample_type='test', level = hparams.top_level), optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
+    # loss, outputs = evaluator(task.load('test'), level = None, status= "", sample_type='test', optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
+    loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
 
-    print('Finished training and saving logger')
     logger.save()
+    save_model()  # fix save_model()!  also load_model()
+    print('Finished training and saving logger')
 
 ###############
 
@@ -47,9 +48,6 @@ def get_args(*args):
     parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1], help="Architecture of neural network")
     parser.add_argument('--model-type',   type=str, choices=["CAVIA", "ADDITIVE", "MULTIPLICATIVE", "ADD_MULTIPLICATIVE"], default="CAVIA") 
     
-    parser.add_argument('--log_intervals', type=int, nargs='+', default=None)
-    parser.add_argument('--test_intervals',type=int, nargs='+', default=None)
-
     parser.add_argument('--device',    type=str, default=default_device)     # "cuda:0" or "cpu"
     parser.add_argument('--v_num',     type=int, default=None, help='version number for resuming') #type=str)
     parser.add_argument('--seed',      type=int, default=42)
@@ -69,6 +67,9 @@ def get_args(*args):
 
     parser.add_argument('--encoders',  type=str,   nargs='+', default=[None, None, None])      # task encoder-models for model-based Meta-learning. Optimization-based if None (e.g. MAML) 
     
+    parser.add_argument('--log_intervals', type=int, nargs='+', default=None)
+    parser.add_argument('--test_intervals',type=int, nargs='+', default=None)
+
     parser.add_argument('--log_loss_levels',      type=int, nargs='+', default=None) 
     parser.add_argument('--log_ctx_levels',       type=int, nargs='+', default=None) 
     parser.add_argument('--task_separate_levels', type=int, nargs='+', default=None) 
@@ -98,23 +99,23 @@ def check_hparam_default(hparams):
     if not os.path.exists(hparams.log_save_path):
         os.makedirs(hparams.log_save_path)
     
-    hparams.levels         = len(hparams.n_contexts) + 1 #len(decoder_model.parameters_all) #- 1
+    hparams.top_level     = len(hparams.n_contexts) + 1 #len(decoder_model.parameters_all) #- 1
     
-    hparams.for_iters     = hparams.for_iters or [1]*hparams.levels
-    hparams.lrs           = hparams.lrs       or [0.01]*hparams.levels
-    hparams.log_intervals = hparams.log_intervals or [1]*hparams.levels
-    hparams.test_intervals= hparams.test_intervals or [100]*hparams.levels
+    hparams.for_iters     = hparams.for_iters or [1]*hparams.top_level
+    hparams.lrs           = hparams.lrs       or [0.01]*hparams.top_level
+    hparams.log_intervals = hparams.log_intervals or [1]*hparams.top_level
+    hparams.test_intervals= hparams.test_intervals or [100]*hparams.top_level
 
-    # hparams.grad_clip = grad_clip or [100]*hparams.levels
+    # hparams.grad_clip = grad_clip or [100]*hparams.top_level
     
-    hparams.log_loss_levels      = hparams.log_loss_levels or [] # [False]*hparams.levels #*(hparams.levels+1)
-    hparams.log_ctx_levels       = hparams.log_ctx_levels or [] #[False]*hparams.levels
-    hparams.task_separate_levels = hparams.task_separate_levels or [] # [False]*hparams.levels
-    hparams.print_levels    = hparams.print_levels or []
+    hparams.log_loss_levels      = hparams.log_loss_levels or [] # [False]*hparams.top_level #*(hparams.top_level+1)
+    hparams.log_ctx_levels       = hparams.log_ctx_levels or [] #[False]*hparams.top_level
+    hparams.task_separate_levels = hparams.task_separate_levels or [] # [False]*hparams.top_level
+    hparams.print_levels         = hparams.print_levels or []
 
-    hparams.k_train = hparams.k_train or [None]*hparams.levels # ## maybe duplicate k_train/n_train 
-    hparams.k_test  = hparams.k_test  or [None]*hparams.levels # hparams.k_train
-    hparams.k_valid = hparams.k_valid or [None]*hparams.levels # hparams.k_train
+    hparams.k_train = hparams.k_train or [None]*hparams.top_level # ## maybe duplicate k_train/n_train 
+    hparams.k_test  = hparams.k_test  or [None]*hparams.top_level # hparams.k_train
+    hparams.k_valid = hparams.k_valid or [None]*hparams.top_level # hparams.k_train
 
     hparams.n_train = hparams.n_train or hparams.k_train
     hparams.n_test  = hparams.n_test  or hparams.k_test  
@@ -123,8 +124,9 @@ def check_hparam_default(hparams):
     
     for name in ['lrs', 'max_iters', 'for_iters', 'k_train', 'k_test', 'k_valid', 'n_train', 'n_test', 'n_valid', 'log_intervals', 'test_intervals']:
         temp = getattr(hparams,name)
-        assert temp is None or len(getattr(hparams,name)) == hparams.levels, "hparams."+name+" has wrong length"
+        assert temp is None or len(getattr(hparams,name)) == hparams.top_level, "hparams."+name+" has wrong length"
         
+    hparams.log_intervals += [1]  # for top+1 super-level
     return hparams
 
 

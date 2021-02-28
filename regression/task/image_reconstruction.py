@@ -101,6 +101,7 @@ def img_reconst_gen(data_name, root = None): #dataset):
         # task_fnc 
 
         def lv2_fnc(label):
+            print('getting labeled_dataset for label', label)
             labeled_dataset = get_labeled_dataset(dataset, label)
             def lv1_fnc(idx):
                 img = get_image(labeled_dataset, idx)       
