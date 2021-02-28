@@ -50,16 +50,13 @@ task_dict={
 }
 
 
-def get_task(name_):
-    # assert isinstance(names, (list,tuple)), "task names should be a list or tuple."
-    names = name_.split("+")  # split into a list of tasks
-    task = make_composite_task({name:task_dict[name]() for name in names})
-    if len(names) == 1: 
+def get_task(name_str: str):
+    name_list = name_str.split("+")  # split into a list of task names
+    task = make_composite_task({name:task_dict[name]() for name in name_list})
+    if len(name_list) == 1: 
         return task
     else: 
-        # name = combine_names(names)
-        supertask = make_composite_task({name_:task})  # 
-        return supertask
+        return make_composite_task({name_str:task})  # supertask
 
 
 # lv3: dataset f( .  , rnd, type)    -> dataset    (e.g. MNIST vs fMNIST)
