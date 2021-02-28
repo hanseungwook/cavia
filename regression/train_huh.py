@@ -40,13 +40,13 @@ def get_base_model(hparams):
     LQR_flag = (task_name in ['LQR', 'LQR_lv2','LQR_lv1','LQR_lv0'])
     if LQR_flag: 
         base_loss = None
-        print(task_name)
-        if task_name == 'LQR_lv2':
-            return Combine_NN_ENV(x_dim=2, levels = 2) , base_loss
-        elif task_name == 'LQR_lv1':
-            return Combine_NN_ENV(x_dim=2, levels = 1) , base_loss
-        else:
-            error()
+        # print(task_name)
+        # if task_name == 'LQR_lv2':
+        return Combine_NN_ENV(x_dim=2, levels = 2) , base_loss
+        # elif task_name == 'LQR_lv1':
+        #     return Combine_NN_ENV(x_dim=2, levels = 1) , base_loss
+        # else:
+        #     error()
     else:
         base_loss =  torch.nn.MSELoss()                    # loss function
         MODEL_TYPE = get_model_type(hparams.model_type)

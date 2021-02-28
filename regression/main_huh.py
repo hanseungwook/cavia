@@ -91,6 +91,10 @@ def get_args(*args):
 
 def check_hparam_default(hparams):
     ## Default copy replacing None
+
+    if hparams.task == 'LQR':
+        hparams.model_type = None
+        hparams.architecture = None
     
     hparams.save_path = hparams.save_path or os.getcwd()
     hparams.log_save_path = os.path.join(hparams.save_path, "logs")

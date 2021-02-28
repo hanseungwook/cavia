@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch import nn
 from torch.nn.utils.clip_grad import clip_grad_value_
+from utils import batch_wrapper
 
 from pdb import set_trace
 
@@ -26,10 +27,6 @@ from pdb import set_trace
 
 #     return kbm, goal, x0
 
-def LQR2_fnc(kbm, goal, x0):
-    dict_ = {'kbm': kbm, 'goal': goal, 'x0': x0}
-    print(dict_)
-    return dict_  # Input is None 
 
 def LQR_param_lv0(x_dim=2, x_range = 4):                    #level 0 - initial locations
     x0       = torch.zeros(x_dim)  
@@ -43,9 +40,19 @@ def LQR_param_lv1(x_dim=2, x_range = 4, kbm_zero=False):    #level 1 - goals
 def LQR_param_lv2(x_dim=2, x_range = 4, kbm_zero=False):    #level 2 - dynamics
     # kbm = (0.,0.,0.) if kbm_zero  else (0.0*np.random.randn(1), 0.5*np.random.randn(1), 0.5*np.random.randn(1))
     kbm = (0.,0.,0.) if kbm_zero  else (0.0*np.random.rand(1), 0.5*np.random.rand(1), 0.5*np.random.rand(1))
-    kbm = torch.tensor(kbm).squeeze()
+    kbm = torch.tensor(kbm).squeeze().float()
     # set_trace()
     return kbm
+
+def LQR_gen():
+    def lv2_fnc(kbm):
+        def lv1_fnc(goal):
+            def lv0_fnc(x0):
+                dict_ = {'kbm': kbm, 'goal': goal, 'x0': x0}
+                return dict_
+            return lv0_fnc, batch_wrapper(LQR_param_lv0)
+        return lv1_fnc, batch_wrapper(LQR_param_lv1 )
+    return lv2_fnc, batch_wrapper(LQR_param_lv2)
 
 
 def make_AB(x_dim, kbm): # = (0.,0.,0.)):
@@ -142,8 +149,10 @@ class Linear_Policy(nn.Module):
         
     def forward(self, obs, t, ctx):  # action = function ( observation, time )
 #         ctx = torch.cat(ctx)
-        ctx = ctx[0]
-        ctx_goal, ctx_coeff = ctx[:1], ctx[1:] 
+        # set_trace()
+        # ctx = ctx[0];        ctx_goal, ctx_coeff = ctx[:1], ctx[1:] 
+        ctx_goal, ctx_coeff = ctx[0], ctx[1]
+
         action = ctx_coeff[:1] @ ( obs[:1,:] - ctx_goal )   #         action = self.coeff @ ( x - self.goal ) 
         if ctx_coeff.shape[0]>1:
             action += ctx_coeff[1:] @ obs[1:,:]
@@ -167,19 +176,19 @@ class Combine_NN_ENV(nn.Module):
     name = 'LQR_env'
     def __init__(self, policy = None, x_dim=2, levels = None, batch_nums = (1,3,1), kbm_zero = True, random_task = False, T = 12, traj_opt = False, x_range = 4):
         super().__init__()
-        
+
 #         n_ctx = [1,2]
-        
+
         ctx_goal = torch.zeros(1, device=self.device) 
         ctx_coeff = torch.zeros(x_dim, device=self.device)   
-        if levels == 2:  #         for "LQR_lv2"
-#             self.parameters_all = [ctx_goal, ctx_coeff, None] # [self.layers.parameters]
-            self.parameters_all = [torch.cat([ctx_goal, ctx_coeff]), None, None] # [self.layers.parameters]
-        elif levels == 1:  #         for "LQR_lv1"
-            self.parameters_all = [torch.cat([ctx_goal, ctx_coeff]), None] # [self.layers.parameters]
-        else:
-            error()
-            
+        # if levels == 2:  #         for "LQR_lv2"
+        self.parameters_all = [ctx_goal, ctx_coeff, None] # [self.layers.parameters]
+        #     self.parameters_all = [torch.cat([ctx_goal, ctx_coeff]), None, None] # [self.layers.parameters]
+        # elif levels == 1:  #         for "LQR_lv1"
+        #     self.parameters_all = [torch.cat([ctx_goal, ctx_coeff]), None] # [self.layers.parameters]
+        # else:
+        #     error()
+
 #         if policy is None:
 #             if traj_opt:
 #                 assert random_task is False
@@ -187,16 +196,16 @@ class Combine_NN_ENV(nn.Module):
 #             else:
 #                 policy = Linear_Policy(x_dim, batch_nums)
         policy = Linear_Policy(x_dim)
-    
+
         self.policy = policy
 #         self.parameters_all = policy.parameters_all
 #         self.parameters_all = [policy.ctx_goal,  policy.ctx_coeff, None] 
-        
+
         self.T = T
 #         self.env = LQR_environment(x_dim, batch_nums, x_range = x_range) #, kbm=kbm)
 #         self.random_task = random_task
 #         self.traj_opt = traj_opt
-        
+
 #         self.obs0 = None if random_task else self.env.make_env(self.env.task0)            
 
     def forward(self, task, record = True): #:
@@ -279,21 +288,6 @@ x_range = 4
 #         return sample_LV0, None    # returning input_sampler (and goal_sampler = None) for level0
 #     return sample_LV1
 
-# def sample_LQR_LV1(sample_type):                         #level  - dynamics, goal
-#     kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
-#     goal   = x_range * np.random.randn(1)
-#     def sample_LV0(batch_size, sample_type):      #level 0 - initial  x0
-#         pos0   = x_range * np.random.randn(batch_size)
-#         task_env = kbm, goal, pos0
-#         return task_env
-#     return sample_LV0, None    # returning input_sampler (and goal_sampler = None) for level0
-
-# def sample_LQR_LV0(batch_size, sample_type):      #level 0 - initial  x0
-#     kbm =  np.stack([np.random.uniform(0,0), np.random.uniform(-0, 0.5),  np.random.uniform(-0, 0.5)], axis=0)
-#     goal   = x_range * np.random.randn(1)
-#     pos0   = x_range * np.random.randn(batch_size)
-#     task_env = kbm, goal, pos0
-#     return task_env
 
 
 

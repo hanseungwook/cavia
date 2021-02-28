@@ -17,6 +17,25 @@ from pdb import set_trace
 DEBUG_LEVELS = []  # [1] #[0]  #[2]
 
 
+
+
+##################
+# batch_wrapper:  make a batch version of a function
+
+def batch_wrapper(fnc): 
+    def wrapped_fnc(batch, *args):
+        if isinstance(batch, (np.ndarray, torch.FloatTensor, torch.DoubleTensor)):  
+            return fnc(batch, *args)
+        elif isinstance(batch, list):
+            return [fnc(b, *args) for b in batch]
+        elif isinstance(batch, (int, np.int64, np.int32)):
+            return [fnc(*args) for _ in range(batch)]
+        else:
+            print(type(batch), batch)
+            error()
+    return wrapped_fnc
+###########################
+
 def set_seed(seed, cudnn=True):
     """
     Seed everything we can!
@@ -51,14 +70,6 @@ def send_to(input, device, DOUBLE_precision):
     else:
         return input.double().float().to(device)    # somehow needed for manual_optim to work.... otherwise get leaf node error. 
 
-###############################
-def get_args(args_dict, level):
-    # return (arg[name][level] for arg, name in args_dict.items())
-    lr = args_dict['lrs'][level] 
-    max_iter = args_dict['max_iters'][level] 
-    for_iter = args_dict['for_iters'][level]
-#     logger = args_dict['loggers'][level] 
-    return lr, max_iter, for_iter, #logger
 
 #################################################################################
 # LOGGING

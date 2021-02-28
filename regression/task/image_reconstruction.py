@@ -9,7 +9,7 @@ import copy
 import IPython
 from pdb import set_trace
 
-from hierarchical_task import batch_wrapper
+from utils import batch_wrapper
 
 dataset_dict = {
     'mnist' : datasets.MNIST,
