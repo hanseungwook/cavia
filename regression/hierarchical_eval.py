@@ -184,7 +184,7 @@ def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
         from multiprocessing import Process
         import multiprocessing
         manager = multiprocessing.Manager()
-        loss = manager.list()
+        losses = manager.list()
         processes = []
         
         def mp_loss_fn(eval_fnc, task, idx):
