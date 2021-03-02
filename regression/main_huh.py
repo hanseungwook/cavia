@@ -34,7 +34,7 @@ def main(hparams, model_loss = None, task_fnc = None):
     loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
 
     logger.save()
-    save_model()  # fix save_model()!  also load_model()
+    # save_model()  # fix save_model()!  also load_model()
     print('Finished training and saving logger')
 
 ###############
@@ -82,6 +82,7 @@ def get_args(*args):
 
     parser.add_argument('--use_higher',    action='store_true', default=False, help='Use Higher optimizer')
     parser.add_argument('--data_parallel', action='store_true', default=False, help='Use data parallel for inner model (decoder)')
+    parser.add_argument('--mp', action='store_true', default=False, help='Use multiprocessing for CPU (only)')
     parser.add_argument('--first_order',   action='store_true', default=False, help='run first-order version (create-graph = False)')
     parser.add_argument('--viz',           action='store_true', default=False, help='Run visualize (with pre-trained model)')
     
