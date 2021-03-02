@@ -207,6 +207,8 @@ def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
         for process in processes:
             process.join()
 
+        losses = list(losses)
+
     return torch.stack(losses).mean() , outputs
 
 
