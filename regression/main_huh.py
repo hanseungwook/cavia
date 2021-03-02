@@ -31,7 +31,7 @@ def main(hparams):
     loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
 
     logger.save()
-    save_model()  # fix save_model()!  also load_model()
+    # save_model()  # fix save_model()!  also load_model()
     print('Finished training and saving logger')
 
 ###############
