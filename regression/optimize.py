@@ -74,6 +74,5 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
 
                 # Run Test-loss (for logging)
                 if not (i % test_interval) and i <= max_iter - test_interval:
-                    test_eval(i)  # test_loss, test_outputs = test_eval(i)  # get test_loss 
-
+                    test_eval(i) 
                 i += 1  

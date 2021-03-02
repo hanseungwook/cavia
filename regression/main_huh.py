@@ -11,23 +11,26 @@ from make_tasks import get_task
 from utils import set_seed #, Logger
 from torch.optim import Adam, SGD
 
+from pdb import set_trace
 
 default_save_path = "/nobackup/users/benhuh/Projects/cavia/shared_results"
 default_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # use the GPU if available
 
 ###################
 
-def main(hparams):
+def main(hparams, model_loss = None, task_fnc = None):
     set_seed(hparams.seed)  
     logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
     logger.log_hyperparams(hparams) 
 
-    evaluator = get_Hierarchical_Eval(hparams, logger)
-    task      = Hierarchical_Task(get_task(hparams.task), batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
+    print('building Hierarchical Meta Environment') 
+    evaluator = get_Hierarchical_Eval(hparams, logger, model_loss)
+ 
+    print('generating Hierarchical Task') 
+    task_fnc  = task_fnc or get_task(hparams.task, hparams.task_args)
+    task      = Hierarchical_Task(task_fnc, batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
 
     print('start evaluation')     # evaluate 'test-loss' on super-task without training.
-    # loss, outputs = evaluator(hparams.top_level, task.load('test'), status= update_status("", sample_type='test', level = hparams.top_level), optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
-    # loss, outputs = evaluator(task.load('test'), level = None, status= "", sample_type='test', optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
     loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False) #True) # grad_clip = hparams.clip ) 
 
     logger.save()
@@ -45,17 +48,19 @@ def get_args(*args):
     parser.add_argument('--log-name',     type=str, help="Logging name", default=None) #'experiment') #'test::')
     
     parser.add_argument('--task',         type=str, help="Supertasks to solve",)
-    parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1], help="Architecture of neural network")
+    parser.add_argument('--task_args',    type=int, nargs='+', default=[],  help="input to task_fnc")
     parser.add_argument('--model-type',   type=str, choices=["CAVIA", "ADDITIVE", "MULTIPLICATIVE", "ADD_MULTIPLICATIVE"], default="CAVIA") 
+    parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1], help="Architecture of neural network")
+    parser.add_argument('--n_contexts',   type=int, nargs='+', default=[], help="number of context variables: phi0, phi1 ") #[2, 1])   
     
     parser.add_argument('--device',    type=str, default=default_device)     # "cuda:0" or "cpu"
     parser.add_argument('--v_num',     type=int, default=None, help='version number for resuming') #type=str)
     parser.add_argument('--seed',      type=int, default=42)
 
     parser.add_argument('--lrs',       type=float, nargs='+', default=None, help="lr for lv0/lv1/lv2..") #[0.05, 0.05, 0.001])     # lr for inner-loop, midloop, outerloop
-    parser.add_argument('--max_iters',   type=int,   nargs='+', default=None, help="max_iter for lv0/lv1/lv2..") #[3, 2, 1000])            # max_iter for inner-loop, midloop, outerloop
+    parser.add_argument('--max_iters', type=int,   nargs='+', default=None, help="max_iter for lv0/lv1/lv2..") #[3, 2, 1000])            # max_iter for inner-loop, midloop, outerloop
     parser.add_argument('--for_iters', type=int,   nargs='+', default=None) #[3, 1, 1])               # number of iterations to use the same data
-    parser.add_argument('--n_contexts',type=int,   nargs='+', default=None, help="number of context variables: phi0, phi1 ") #[2, 1])   
+    
     parser.add_argument('--k_train',   type=int,   nargs='+', default=None, help="total-batch for lv0/lv1/lv2. 'k-shot' learning.") #[100, 25, 2])  
     parser.add_argument('--k_test',    type=int,   nargs='+', default=None, help="total-batch for lv0/lv1/lv2.")
     parser.add_argument('--k_valid',   type=int,   nargs='+', default=None, help="total-batch for lv0/lv1/lv2.")

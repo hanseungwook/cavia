@@ -51,7 +51,6 @@ print_forward_return = False
 class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
     def __init__(self, hparams, decoder_model, encoder_model, base_loss, logger):
         super().__init__()
-        print('building Hierarchical_Environment') 
 
         h_names = ['top_level', 'n_contexts', 'max_iters', 'for_iters', 'lrs', 
                    'log_intervals', 'test_intervals', 'log_loss_levels', 'log_ctx_levels', 'task_separate_levels', 'print_levels', 
@@ -104,8 +103,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         status, status_dict = update_status(status, status_dict, task_idx=task_idx, task_separate_flag=task_separate_flag)
 
         def test_eval(iter_num):       # evaluate on one mini-batch from test-loader
-            l, outputs_ = self.forward(task.load('test'), sample_type='test', level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, iter_num=iter_num) #, current_status = 'test' + current_status)    # test only 1 minibatch
-            return l, outputs_
+            return self.forward(task.load('test'), sample_type='test', level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, iter_num=iter_num) #, current_status = 'test' + current_status)    # test only 1 minibatch
 
         # inner-loop optimization/adaptation
         optimize(self, task.load('train'), level, self.lrs[level], self.max_iters[level], self.for_iters[level], self.test_intervals[level],
@@ -197,8 +195,10 @@ def update_status(status, status_dict, sample_type = None, level = None, task_id
         status += '/lv'+str(level)         # status += '_lv'+str(level)
     if sample_type is not None:
         status += '_' + sample_type
-    # if status is not '' and not task_separate_flag and task_idx is not None:
-    if task_separate_flag and task_idx is not None:
-        status += '/' + str(task_idx)           # status += '/task_' + str(task_idx) 
+    if task_idx is not None:
+        if task_separate_flag:
+            status += '/' + str(task_idx)           # status += '/task_' + str(task_idx) 
+        else:
+            status += '/_'
     # print('status :', status)
     return status, status_dict

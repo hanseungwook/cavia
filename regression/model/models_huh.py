@@ -6,7 +6,6 @@ from torch.nn import Parameter
 from torch.nn import init
 from functools import partial
 
-# from pdb import set_trace
 
 def get_encoder_type(encoder_type):
     if encoder_type == "HSML":
@@ -108,8 +107,9 @@ class Cavia(BaseModel):
 
 
     def _forward(self, x, ctx_list):
-        ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
-        x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
+        if ctx_list != []:
+            ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
+            x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
         for i, module in enumerate(self.module_list):
             x = module(x)
             if i < len(self.module_list) - 1:  

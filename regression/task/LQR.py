@@ -77,23 +77,9 @@ def make_AB(x_dim, kbm): # = (0.,0.,0.)):
 
 class LQR_environment():
 
-#     def __init__(self, x_dim, batch_nums, x_range = 4, kbm = (0.,0.,0.)):
-#         self.x_dim = x_dim
-#         self.batch_nums = batch_nums
-#         batch_lv0, batch_lv1, batch_lv2 = batch_nums
-#         self.batch_all = batch_lv0*batch_lv1*batch_lv2  # Delete this
-#         self.x_range = x_range 
-#         self.kbm = kbm
-#         self.task0 = LQR_tasks(self.x_dim, self.batch_nums, self.x_range, kbm_zero = False)
-    
-#     def make_env(self, task = None):
-
     def __init__(self, task, x_dim=2):
         
-#         if task is None:
-#             task = LQR_tasks(self.x_dim, self.batch_nums, self.x_range, kbm_zero)
         kbm, goal, x0 = task   #      A, B, goal, x0 = task
-
 
         # kbm and goal are collated by dataloader.. all repeated. so just take [0] element
         kbm    = kbm[0].float() # [k[0].float() for k in kbm] #[:x_dim]

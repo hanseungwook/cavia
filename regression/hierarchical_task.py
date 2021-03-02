@@ -73,7 +73,6 @@ class Task_sampler():
         self.params = sample_shuffle_split(param_fnc, k_batches)       # pre-sample k_batches of params  
 
     def get_data(self, sample_type): 
-        assert self.params is not None, "run pre_sample first"
         params = self.params[sample_type]
         return params, batch_wrapper(self.task_fnc)(params) 
 
@@ -94,11 +93,9 @@ def sample_shuffle_split(input, k_batches: dict):
             x_list = [len(input),0,0];    assert  x is None and hasattr(input, '__len__')
         return x_list
 
-    ################
-    # main code
-    k_list = make_list(k_batches); 
+    k_list = make_list(k_batches)
     total_batch = sum(k_list)
-    # set_trace()
+
     if input is None:
         input = list(range(total_batch))
     inputs = input(total_batch) if callable(input) else random.sample(input, total_batch)   #  # inputs = sample(input, sum(k_list))     # list of sampled params
