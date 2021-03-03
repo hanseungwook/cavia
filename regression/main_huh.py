@@ -27,7 +27,7 @@ def main(hparams, model_loss = None, task_fnc = None):
     evaluator = get_Hierarchical_Eval(hparams, logger, model_loss)
  
     print('generating Hierarchical Task') 
-    task_fnc  = task_fnc or get_task(hparams.task, hparams.task_args)
+    task_fnc  = task_fnc or get_task(hparams.task)
     task      = Hierarchical_Task(task_fnc, batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
 
     print('start evaluation')     # evaluate 'test-loss' on super-task without training.
