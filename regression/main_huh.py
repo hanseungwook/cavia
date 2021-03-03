@@ -157,6 +157,8 @@ if __name__ == '__main__':
         profiler.enable()
         main(args)
         profiler.disable()
+        profiler.sort_stats('cumtime')
+        profiler.dump_stats('profile_output.prof')
         stats = pstats.Stats(profiler).sort_stats('cumtime')
         stats.print_stats()
 
