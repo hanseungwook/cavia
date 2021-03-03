@@ -85,6 +85,9 @@ def get_args(*args):
     parser.add_argument('--mp', action='store_true', default=False, help='Use multiprocessing for CPU (only)')
     parser.add_argument('--first_order',   action='store_true', default=False, help='run first-order version (create-graph = False)')
     parser.add_argument('--viz',           action='store_true', default=False, help='Run visualize (with pre-trained model)')
+
+    parser.add_argument('--profile',       action='store_true', default=False, help='Run profiling')
+
     
 #     parser.add_argument('--load_model', type=str,     default='',     help='Path to model weights to load')
     args, unknown = parser.parse_known_args(*args) 
@@ -145,4 +148,18 @@ def check_hparam_default(hparams):
 
 if __name__ == '__main__':
     hparams = get_args()
-    main(hparams)
+
+    if hparams.profile:
+        print('profiling')
+
+        import cProfile, pstats
+        profiler = cProfile.Profile()
+        profiler.enable()
+        main(args)
+        profiler.disable()
+        stats = pstats.Stats(profiler).sort_stats('cumtime')
+        stats.print_stats()
+
+    else:
+        # print('not profiling')
+        main(hparams)
