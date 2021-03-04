@@ -1,11 +1,14 @@
 import os
 import argparse
 import torch
+from pytorch_lightning.core.saving import save_hparams_to_yaml
 from pytorch_lightning.loggers import TensorBoardLogger # https://pytorch-lightning.readthedocs.io/en/latest/_modules/pytorch_lightning/loggers/tensorboard.html
 
 from hierarchical_eval import update_status
-from train_huh import get_batch_dict, save_model, load_model, get_save_dir, get_base_model, get_encoder_model, Hierarchical_Eval, get_latest_ckpt  #get_Hierarchical_Eval
+from train_huh import get_batch_dict, save_model, load_model, get_save_dir, get_base_model, get_encoder_model, get_latest_ckpt  #get_Hierarchical_Eval
 from hierarchical_task import Hierarchical_Task, Task_sampler
+from hierarchical_eval import Hierarchical_Eval
+
 from make_tasks import get_task
 
 from utils import set_seed #, Logger
@@ -23,24 +26,22 @@ def main(hparams, model_loss = None, task = None):
     
     logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
     hparams.save_dir = get_save_dir(hparams, logger.version)
+    save_hparams_to_yaml(os.path.join(hparams.save_dir,'hparams.yaml'), hparams)
     logger.log_hyperparams(hparams) 
 
     base_model, base_loss  = get_base_model(hparams) 
     base_loss = model_loss or base_loss
-
-    if hparams.v_num is not None: 
-        base_model, optimizer_state_dict, epoch0, prev_test_loss = load_model(base_model, hparams.save_dir)  # fix load_model ! 
-    else:
-        optimizer_state_dict, epoch0, prev_test_loss = None, 0, None
         
+    base_model, optimizer_state_dict, epoch0, best_loss = load_model(base_model, hparams.save_dir, hparams.v_num)
     encoder_models  = None # get_encoder_model(hparams.encoders, hparams)                       # adaptation model: None == MAML
     
-    evaluator = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger, prev_test_loss)
+    evaluator = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger, best_loss)
 
 #     print('generating Hierarchical Task') 
     task  = task or get_task(hparams.task, hparams.task_args)
     task_hierarchy = Hierarchical_Task(task, batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
 
+    
     print('start meta-evaluation')     # evaluate 'test-loss' on super-task without training.
     print('tasks:', task[1])    
     loss, outputs = evaluator.evaluate(task_hierarchy, task_idx = hparams.task, optimizer=Adam, reset=False, return_outputs=False, iter0=epoch0, optimizer_state_dict=optimizer_state_dict) #  loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False)
@@ -155,8 +156,7 @@ def check_hparam_default(hparams):
 #     hparams.log_intervals += [1]  # for top+1 super-level
     return hparams
 
-
-
+     
 ###################
 
 if __name__ == '__main__':

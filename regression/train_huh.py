@@ -4,7 +4,7 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
-from hierarchical_eval import Hierarchical_Eval  
+# from hierarchical_eval import Hierarchical_Eval  
 # from utils import get_vis_fn
 
 from pdb import set_trace
@@ -19,16 +19,16 @@ image_flag = False #True
 
 ###############################################################
 
-def get_Hierarchical_Eval(hparams, logger, model_loss = None):
+# def get_Hierarchical_Eval(hparams, logger, model_loss = None):
 
-    base_model, base_loss  = model_loss or get_base_model(hparams) 
-    encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
-    model  = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger)
+#     base_model, base_loss  = model_loss or get_base_model(hparams) 
+#     encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
+#     model  = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger)
     
-    if hparams.v_num is not None: # fix load_model ! 
-        model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
+#     if hparams.v_num is not None: # fix load_model ! 
+#         model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
 
-    return model
+#     return model
 
 
 
@@ -72,10 +72,11 @@ def get_batch_dict(hparams):
 ###################################################
 
 def get_save_dir(hparams, v_num):
-    save_dir = os.path.join(hparams.save_path, 'logs', hparams.log_name, 'version_' + str(v_num), 'checkpoints')
-    if not os.path.isdir(save_dir):
-        os.makedirs(save_dir)
-    return save_dir
+    save_dir = os.path.join(hparams.save_path, 'logs', hparams.log_name, 'version_' + str(v_num))
+    ckpt_dir = os.path.join(save_dir, 'checkpoints')
+    if not os.path.isdir(ckpt_dir):
+        os.makedirs(ckpt_dir)
+    return save_dir #, ckpt_dir
 
 def save_model(model, dir_):
     file_name = 'model.pth'
@@ -83,16 +84,34 @@ def save_model(model, dir_):
     torch.save({'model_state_dict': model.state_dict()}, os.path.join(dir_, file_name))
             
 
-def load_model(model, dir_): 
-    ckpt = torch.load(get_latest_ckpt(dir_))
-    model.load_state_dict(ckpt['model_state_dict'])
-    optimizer_state_dict = ckpt['optimizer_state_dict']
-    epoch = ckpt['epoch']
-    prev_test_loss = ckpt['test_loss']
+# def load_model(model, ckpt_path): 
+#     ckpt = torch.load(ckpt_path)
+#     model.load_state_dict(ckpt['model_state_dict'])
+#     optimizer_state_dict = ckpt['optimizer_state_dict']
+#     epoch = ckpt['epoch']
+#     best_loss = ckpt['test_loss']
 
-    del ckpt      
-    return model, optimizer_state_dict, epoch, prev_test_loss
+#     del ckpt      
+#     return model, optimizer_state_dict, epoch, best_loss
 
+
+######
+def load_model(model, save_dir, v_num):
+
+    ckpt_path = get_latest_ckpt(save_dir)
+    if v_num is not None:
+        if ckpt_path is None: 
+            raise error()
+        else:
+            ckpt = torch.load(ckpt_path)
+            model.load_state_dict(ckpt['model_state_dict'])
+            # optimizer_state_dict = ckpt['optimizer_state_dict']
+            # epoch = ckpt['epoch']
+            # best_loss = ckpt['test_loss']
+            return model, ckpt['optimizer_state_dict'], ckpt['epoch'], ckpt['test_loss']
+            # return load_model(model, ckpt_file)  # fix load_model ! 
+    else:
+        return model, None, 0, None  # model, optimizer_state_dict, epoch0, best_loss
 
 ###############################################
 
@@ -107,14 +126,18 @@ import glob
 #         return get_latest_file(ckpt_path)
 
 
-def get_latest_ckpt(ckpt_path):
-    files_path = os.path.join(ckpt_path, '*')
-    list_of_ckpt = glob.glob(files_path)
+def get_latest_ckpt(save_dir):
+    ckpt_path = os.path.join(save_dir, 'checkpoints', '*')
+    # files_path = os.path.join(ckpt_path, '*')
+    list_of_ckpt = glob.glob(ckpt_path)
     ckpt_sorted = sorted(
         list_of_ckpt, 
         # key = lambda f: (int(f.split('-')[0].split('=')[1])), #, int(f.split('-')[1].split('=')[1].split('.')[0])),
         key = lambda f: int(f.split('-')[0].split('=')[1].split('.')[0]),
         reverse = True
     )
-    return ckpt_sorted[0]
+    if len(ckpt_sorted)==0:
+        return None
+    else:
+        return ckpt_sorted[0]
     
