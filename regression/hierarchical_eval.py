@@ -23,11 +23,11 @@ print_forward_return = False
 # class Hierarchical_Eval(nn.Module):       
 #     def forward(self, task_list):        
 #         if level > 0:          # meta-loss
-#             return get_average_loss(self.meta_eval, task_list, return_outputs) 
+#             return get_average_loss(self.evaluate, task_list) 
 #         else:                  # base-loss
 #             return self.base_eval(*task_list)            # task_list = (inputs, targets)
 
-#     def meta_eval(self, task):
+#     def evaluate(self, task):
 #         optimize(self, dataloader = task.load('train'))   # task.dataloaders['train']
 #         return self.forward(task.load('test'))  # test    # next(iter(task.dataloaders['test']))
 
@@ -35,10 +35,10 @@ print_forward_return = False
 #         outputs = self.decoder_model(inputs)
 #         loss = self.base_loss(outputs, targets)
 
-# def get_average_loss(task_list):
+# def get_average_loss(eval, task_list):
 #     loss =[]
 #     for task in task_list:   # Todo: Parallelize!
-#         loss.append( meta_eval(task, idx) )
+#         loss.append( eval(task, idx) )
 #     return torch.stack(loss).mean()
 
 # def optimize(model, dataloader)
@@ -65,12 +65,8 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         # self.encoder_model = encoder_model
         # self.adaptation = optimize if encoder_model is None else encoder_model 
        
-    def forward(self, task_list,  sample_type: str, level: int,  status: str, status_dict: dict, iter_num: int, return_outputs=False,  viz=None):    #    reset=True
+    def forward(self, task_list,  sample_type: str, level: int,  status: str, status_dict: dict, iter_num: int, return_outputs=False):    #    reset=True
         # To-do: fix / delete return_outputs
-        # '''   Compute average loss over multiple tasks in task_list     '''
-        # if level is None:
-        #     level = self.top_level
-#         else:
         status, status_dict = update_status(status, status_dict, sample_type=sample_type) 
             
         log_loss_flag, log_ctx_flag, print_flag, task_separate_flag = self.get_flags(level)
@@ -82,7 +78,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
             loss, outputs = self.base_eval(task_list)
             
         self.logging(level, loss.item(), status, iter_num, log_loss_flag, log_ctx_flag, self.log_intervals[level], print_flag) 
-        self.visualize(outputs)
+        # self.visualize(outputs)
         return loss, outputs
     
     def base_eval(self, task_list):
@@ -187,39 +183,38 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
 
 ##################################
 # get_average_loss - Parallelize! 
+from multiprocessing import Process, Manager
 
 def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
     losses, outputs = [], []
-    if mp:
-        from multiprocessing import Process
-        import multiprocessing
-        manager = multiprocessing.Manager()
-        losses = manager.list()
-        processes = []
+    if not mp:
+        for (param, task, idx) in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
+            l, outputs_ = eval_fnc(task, idx)
+            losses.append(l)
+            if return_outputs:
+                outputs.append(outputs_)
+
+        return torch.stack(losses).mean() , outputs
+
+    else:
+        manager = Manager()
+        losses = manager.list()   # Strange name: please fix it @Seungwook
+        process_list = []
         
         def mp_loss_fn(eval_fnc, task, idx):
             l, _ = eval_fnc(task, idx)
             losses.append(l)
 
-    for (param, task, idx) in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
-        if mp:
+        for (param, task, idx) in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
             p = Process(target=mp_loss_fn, args=(eval_fnc, task, idx,))
-            processes.append(p)
+            process_list.append(p)
             p.start()
 
-        else:
-            l, outputs_ = eval_fnc(task, idx)
-            losses.append(l)
-            if return_outputs:
-                outputs.append(outputs_)
-    
-    if mp:
-        for process in processes:
-            process.join()
+        for p in process_list:
+            p.join()
 
         losses = list(losses)
-
-    return torch.stack(losses).mean() , outputs
+        return torch.stack(losses).mean() , outputs
 
 
 ###########################
