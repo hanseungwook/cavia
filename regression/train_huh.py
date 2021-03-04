@@ -66,7 +66,7 @@ def get_batch_dict(hparams):
     
     k_dict = make_batch_dict(hparams.k_train, hparams.k_test, hparams.k_valid)  # Total-batch
     n_dict = make_batch_dict(hparams.n_train, hparams.n_test, hparams.n_valid)  # mini-batch
-    return (k_dict, n_dict)
+    return k_dict, n_dict
 
 
 ###################################################

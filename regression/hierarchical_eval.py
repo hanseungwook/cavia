@@ -71,7 +71,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         # self.encoder_model = encoder_model
         # self.adaptation = optimize if encoder_model is None else encoder_model 
        
-    def forward(self, task_list,  sample_type: str, level: int,  status: str, status_dict: dict, iter_num: int, return_outputs=False):    #    reset=True
+    def forward(self, task_list,  sample_type: str, iter_num: int, level: int,  status: str, status_dict: dict, return_outputs=False):    #    reset=True
         # To-do: fix / delete return_outputs
         status, status_dict = update_status(status, status_dict, sample_type=sample_type) 
             
@@ -100,7 +100,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         return loss, outputs
 
 
-    def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 1, task_separate_flag = True, optimizer_state_dict = None): #, print_flag):
+    def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True, optimizer_state_dict = None): #, print_flag):
         # '''  adapt on train-tasks / then test the generalization loss   '''
         if level is None:
             level = self.top_level
@@ -108,8 +108,8 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         status, status_dict = update_status(status, status_dict, level=level, task_idx=task_idx, task_separate_flag=task_separate_flag)
 
         def forward_wrapper(task_list, sample_type, iter_num):       # evaluate on one mini-batch from test-loader
-            return self.forward(task_list, sample_type=sample_type, level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, iter_num=iter_num)
-        
+            return self.forward(task_list, sample_type=sample_type, iter_num=iter_num, level=level, status = status, status_dict = status_dict, return_outputs=return_outputs)
+
         return optimize(self, forward_wrapper, task, self.optim_args(level),
                         optimizer = optimizer, optimizer_state_dict = optimizer_state_dict, 
                         reset = reset, 
@@ -169,7 +169,8 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
                 self.logger.experiment.add_histogram("ctx{}".format(status), ctx, iter_num)
 
     ############
-    def save_cktp(self, train_loss, test_loss, epoch, optimizer):
+    def save_cktp(self, epoch, test_loss, train_loss = None, optimizer = None):
+    # def save_cktp(self, train_loss, test_loss, epoch, optimizer):
         if self.best_loss is None or test_loss < self.best_loss:
             prev_file = get_latest_ckpt(self.save_dir)
             self._del_model(prev_file)
@@ -181,7 +182,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
                         'train_loss': train_loss,
                         'test_loss': test_loss,
                         'model_state_dict': self.decoder_model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict() if optimizer is not None else None,
                         }, os.path.join(self.save_dir,'checkpoints',filename))
 
 

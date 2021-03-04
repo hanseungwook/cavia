@@ -14,7 +14,7 @@ def optimize(model, model_forward, task, optim_args,
             optimizer, optimizer_state_dict, 
             reset, 
             device, 
-            iter0 = 1,
+            iter0 = 0,
             Higher_flag = False, 
             grad_clip = 100): 
 
@@ -64,17 +64,17 @@ def optimize(model, model_forward, task, optim_args,
     param_all, optim = initialize()  
     i = iter0
     loss = None
-    
+
     while True:
         for train_subtasks in task.load('train'):     # task_list = sampled mini-batch
             for _ in range(for_iter):          # Seungwook: for_iter is to replicate cavia’s implementation where they use the same mini-batch for the inner loop steps
-                # Run Test-loss (for logging)
-                if not (i % test_interval) or i >= max_iter:
+                # Run Test-loss
+                if i >= max_iter or (i > 0 and not (i)%test_interval):  # Terminal and intermediate (for logging) runs
                     for test_subtasks in task.load('test'):
                         test_loss, test_output = model_forward(test_subtasks, sample_type = 'test', iter_num = i)
                         break
                     if level == model.top_level:
-                        model.save_cktp(loss, test_loss, i, optim)
+                        model.save_cktp(i, test_loss, loss, optim)
                     if i >= max_iter:         # Terminate! 
                         return test_loss, test_output 
 
