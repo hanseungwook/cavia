@@ -39,7 +39,7 @@ def main(hparams, model_loss = None, task = None):
 
 #     print('generating Hierarchical Task') 
     task  = task or get_task(hparams.task, hparams.task_args)
-    task_hierarchy = Hierarchical_Task(task, batch_dict=get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
+    task_hierarchy = Hierarchical_Task(task, *get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
 
     
     print('start meta-evaluation')     # evaluate 'test-loss' on super-task without training.

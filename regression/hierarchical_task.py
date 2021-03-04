@@ -20,61 +20,53 @@ from pdb import set_trace
 class Hierarchical_Task():   
     # Top-down generation of task hierarchy.
     
-    def __init__(self, task, batch_dict):
-        self.task = task
-        self.dataloaders = get_dataloader_dict(task, batch_dict) 
+    def __init__(self, task_gen, total_batches, mini_batches):
+        total_batch, mini_batch = total_batches[-1], mini_batches[-1]     # for current level  
+        batch_dicts_next = (total_batches[:-1], mini_batches[:-1])        # for next level 
+
+        sampler = Task_sampler(task_gen, total_batch) 
+        self.dataloaders = get_dataloader_dict(sampler, mini_batch, batch_dicts_next) 
 
     def load(self, sample_type):   
-        loader = self.dataloaders[sample_type] or self.dataloaders['train']  # duplicate 'train' loader, if 'test'/'valid' loader == None
-        # if sample_type == 'train':
-        return loader                            # return dataloader
-        # else: 
-        #     return next(iter(loader))                # return one iter from dataloader
+        return self.dataloaders[sample_type] or self.dataloaders['train']  # duplicate 'train' loader, if 'test'/'valid' loader == None
+        
+#####################
+# get_dataloader
 
 
-######################
-# get_dataloader_dict
+def get_dataloader_dict(sampler, mini_batch, batch_dicts_next):
 
-def get_dataloader_dict(task, batch_dict):
-    batch_dict_next = (batch_dict[0][:-1], batch_dict[1][:-1])
-    total_batch, mini_batch = batch_dict[0][-1], batch_dict[1][-1]           # mini_batch: mini batch # of samples
-    sampler = Task_sampler(task, total_batch) 
+    def get_dataloader(sample_type, mini_batch):   
+        param_samples, task_samples = sampler.data(sample_type)
 
-    def get_dataloader(sample_type, mini_batch_):   
-        input_params, task_list_next = sampler.get_data(sample_type)
-
-        if len(input_params) == 0:     # No dataloader for empty dataset sampler
+        if len(param_samples) == 0:     # No dataloader for empty data samples
             return None
         else:
-            if len(batch_dict_next[0]) > 0:  #high-level
-                task_list = [Hierarchical_Task(task_next, batch_dict_next) for task_next in task_list_next]
-                return Meta_DataLoader(get_Dataset(input_params, task_list), batch_size=mini_batch_)
-            else:                           # level == 0: 
-                inputs, targets = input_params, task_list_next
-                return DataLoader(get_Dataset(inputs, targets), batch_size=mini_batch_, shuffle=(sample_type == 'train')) 
+            if len(batch_dicts_next[0]) == 0:    # level0:
+                inputs, targets = param_samples, task_samples  # re-naming
+                return DataLoader(get_Dataset(inputs, targets), batch_size=mini_batch, shuffle=(sample_type == 'train')) 
+            else:                               #high-level
+                subtasks = [Hierarchical_Task(subtask_gen, *batch_dicts_next) for subtask_gen in task_samples]
+                return Meta_DataLoader(get_Dataset(param_samples, subtasks), batch_size=mini_batch)
 
-    loader_dict = {key: get_dataloader(key, mini_batch[key]) for key in ['train', 'test', 'valid']}
-    return loader_dict
-
-
+    return {key: get_dataloader(key, mini_batch[key]) for key in ['train', 'test', 'valid']}
 
 #####################
-# Task_sampler
-
+# Task_sampler: generates tasks sampled from task distribution (param_fnc/task_fnc)
 class Task_sampler():
-    def __init__(self, task, k_batches): 
-        task_fnc, param_fnc = task
+    def __init__(self, task_gen, k_batches): 
+        task_fnc, param_fnc = task_gen
         if isinstance(task_fnc, dict):
             assert param_fnc is None
-            param_fnc = list(task_fnc.keys())
+            param_fnc = list(task_fnc.keys())   # assume uniform distribution on the list elements
             task_fnc = task_fnc.get
-        self.task_fnc  = task_fnc    # function that takes task label and returns actual tasks
-        self.param_fnc = param_fnc  
-        self.params = sample_shuffle_split(param_fnc, k_batches)       # pre-sample k_batches of params  
+        self.task_fnc  = task_fnc                 # function generates tasks from task-params 
+        # self.param_fnc = param_fnc  
+        self.params = sample_shuffle_split(param_fnc, k_batches)       # sample k_batches of params 
 
-    def get_data(self, sample_type): 
+    def data(self, sample_type): 
         params = self.params[sample_type]
-        return params, batch_wrapper(self.task_fnc)(params) 
+        return params, batch_wrapper(self.task_fnc)(params)    # input / output :  task_params / tasks
 
 ########################
 # sample_shuffle_split
