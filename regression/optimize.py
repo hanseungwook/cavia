@@ -69,7 +69,7 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
         for task_list in dataloader:     # task_list = sampled mini-batch
             for _ in range(for_iter):          # Seungwook: for_iter is to replicate cavia’s implementation where they use the same mini-batch for the inner loop steps
                 # Run Test-loss (for logging)
-                if not ((i+1) % test_interval) or i >= max_iter: # and i <= max_iter - test_interval:
+                if not (i % test_interval) or i >= max_iter: # and i <= max_iter - test_interval:
                     test_loss, test_output = test_eval(i) 
                     if level == model.top_level:
                         model.save_cktp(loss, test_loss, i, optim)

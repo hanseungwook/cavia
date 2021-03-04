@@ -100,7 +100,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         return loss, outputs
 
 
-    def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True, optimizer_state_dict = None): #, print_flag):
+    def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 1, task_separate_flag = True, optimizer_state_dict = None): #, print_flag):
         # '''  adapt on train-tasks / then test the generalization loss   '''
         if level is None:
             level = self.top_level
