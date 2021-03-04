@@ -47,9 +47,9 @@ task_dict={
 #         return make_composite_task({name_str:task})  # supertask
 
 
-def get_task(name_str: str):
+def get_task(name_str: str, *args):
     name_list = name_str.split("+")  # split into a list of task names
     if len(name_list) == 1: 
-        return task_dict[name_list[0]]()
+        return task_dict[name_list[0]](*args)
     else:
         return make_composite_task({name:task_dict[name]() for name in name_list})

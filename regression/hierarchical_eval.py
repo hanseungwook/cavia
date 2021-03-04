@@ -198,7 +198,7 @@ def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
 
     else:
         manager = Manager()
-        losses = manager.list()   # Strange name: please fix it @Seungwook
+        losses = manager.list()   # Strange name: please fix  @Seungwook
         process_list = []
         
         def mp_loss_fn(eval_fnc, task, idx):
