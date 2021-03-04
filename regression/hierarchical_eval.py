@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from torch.optim import Adam, SGD
@@ -49,12 +50,13 @@ print_forward_return = False
 ##############################################################################
 
 class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
-    def __init__(self, hparams, decoder_model, encoder_model, base_loss, logger):
+    def __init__(self, hparams, decoder_model, encoder_model, base_loss, logger, prev_test_loss = None):
         super().__init__()
 
         h_names = ['top_level', 'n_contexts', 'max_iters', 'for_iters', 'lrs', 
                    'log_intervals', 'test_intervals', 'log_loss_levels', 'log_ctx_levels', 'task_separate_levels', 'print_levels', 
-                   'use_higher', 'grad_clip', 'mp']
+                   'use_higher', 'grad_clip', 'mp',
+                   'save_dir']
         for name in h_names:
             setattr(self, name, getattr(hparams, name))
 
@@ -62,6 +64,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         self.device        = self.decoder_model.device
         self.base_loss     = base_loss
         self.logger        = logger
+        self.prev_test_loss = prev_test_loss
         # self.encoder_model = encoder_model
         # self.adaptation = optimize if encoder_model is None else encoder_model 
        
@@ -94,7 +97,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         return loss, outputs
 
 
-    def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True): #, print_flag):
+    def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True, optimizer_state_dict = None): #, print_flag):
         # '''  adapt on train-tasks / then test the generalization loss   '''
         if level is None:
             level = self.top_level
@@ -107,7 +110,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         optimize(self, task.load('train'), level, self.lrs[level], self.max_iters[level], self.for_iters[level], self.test_intervals[level],
                         status = status, status_dict = status_dict,
                         test_eval = test_eval, 
-                        optimizer = optimizer, 
+                        optimizer = optimizer, optimizer_state_dict = optimizer_state_dict, 
                         reset = reset, 
                         device = self.device, 
                         iter0 = iter0,
@@ -165,14 +168,17 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
                 self.logger.experiment.add_histogram("ctx{}".format(status), ctx, iter_num)
 
     ############
-    def model_save(self):
-        pass
-        # torch.save({
-        #             'epoch': EPOCH,
-        #             'model_state_dict': net.state_dict(),
-        #             'optimizer_state_dict': optimizer.state_dict(),
-        #             'loss': LOSS,
-        #             }, PATH)
+    def save_cktp(self, train_loss, test_loss, epoch, optimizer):
+        filename = 'epoch='+str(epoch)+'.ckpt'  #  epoch=99-step=70299.ckpt
+        if self.prev_test_loss is None or test_loss < self.prev_test_loss:
+            self.prev_test_loss = test_loss
+            torch.save({
+                        'epoch': epoch,
+                        'train_loss': train_loss,
+                        'test_loss': test_loss,
+                        'model_state_dict': self.decoder_model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        }, os.path.join(self.save_dir,filename))
         
     ###########
     ### visualization

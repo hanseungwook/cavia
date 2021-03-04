@@ -12,7 +12,7 @@ import torch.nn as nn
 def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval, 
             status, status_dict,
             test_eval, 
-            optimizer, 
+            optimizer, optimizer_state_dict, 
             reset, 
             device, 
             iter0=0,
@@ -34,7 +34,8 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
                     # optim = higher.get_diff_optim(optim, [param_all[level]]) #, device=x.device) # differentiable optim for inner-loop:
             else: # use regular optim: for outer-loop
                 optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
-                
+                if optimizer_state_dict is not None:
+                    optim.load_state_dict(optimizer_state_dict)
         return param_all, optim
 
     def update_step():
@@ -75,5 +76,7 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
 
                 # Run Test-loss (for logging)
                 if not (i % test_interval) and i <= max_iter - test_interval:
-                    test_eval(i) 
+                    test_loss, test_output = test_eval(i) 
+                    if level == model.top_level:
+                        model.save_cktp(loss, test_loss, i, optim)
                 i += 1  

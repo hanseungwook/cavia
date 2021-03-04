@@ -71,12 +71,10 @@ def get_batch_dict(hparams):
 
 ###################################################
 
-def get_save_dir(hparams):
-    save_dir = os.path.join(hparams.save_path, 'logs', hparams.log_name)
-    print(hparams.log_name)
-    print(save_dir)
+def get_save_dir(hparams, v_num):
+    save_dir = os.path.join(hparams.save_path, 'logs', hparams.log_name, 'version_' + str(v_num), 'checkpoints')
     if not os.path.isdir(save_dir):
-        os.mkdir(save_dir)
+        os.makedirs(save_dir)
     return save_dir
 
 def save_model(model, dir_):
@@ -86,13 +84,37 @@ def save_model(model, dir_):
             
 
 def load_model(model, dir_): 
-#     dir_ = os.path.join(hparams.save_path, 'model_save', log_name)
-    file_name = 'model.pth'
-    if hparams.load_model:
-        print('Loading model')
-        checkpoint = torch.load(os.path.join(dir_, file_name))   #('./model.pth')
-        model.load_state_dict(checkpoint['model_state_dict'])
-        del checkpoint
-        
-    return model
+    ckpt = torch.load(get_latest_ckpt(dir_))
+    model.load_state_dict(ckpt['model_state_dict'])
+    optimizer_state_dict = ckpt['optimizer_state_dict']
+    epoch = ckpt['epoch']
+    prev_test_loss = ckpt['test_loss']
 
+    del ckpt      
+    return model, optimizer_state_dict, epoch, prev_test_loss
+
+
+###############################################
+
+
+import glob
+
+# def get_ckpt(v_num, save_dir):
+#     if v_num is None:
+#         return None 
+#     else:
+#         ckpt_path = os.path.join(save_dir, 'version_' + str(v_num),'checkpoints') 
+#         return get_latest_file(ckpt_path)
+
+
+def get_latest_ckpt(ckpt_path):
+    files_path = os.path.join(ckpt_path, '*')
+    list_of_ckpt = glob.glob(files_path)
+    ckpt_sorted = sorted(
+        list_of_ckpt, 
+        # key = lambda f: (int(f.split('-')[0].split('=')[1])), #, int(f.split('-')[1].split('=')[1].split('.')[0])),
+        key = lambda f: int(f.split('-')[0].split('=')[1].split('.')[0]),
+        reverse = True
+    )
+    return ckpt_sorted[0]
+    

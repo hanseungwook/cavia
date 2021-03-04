@@ -28,7 +28,7 @@ class Basic_Dataset(Dataset):
     def __init__(self, input, target=None):
         self.input = input
         self.target = target
-        self.str_input = isinstance(self.input[0], str)
+        self.named_input = isinstance(self.input[0], (str,int))
 
         if target is not None:
             assert len(input) == len(target)
@@ -41,7 +41,7 @@ class Basic_Dataset(Dataset):
             pass
             # return self.input[idx]
         else: 
-            idx_output = self.input[idx] if self.str_input else idx
+            idx_output = self.input[idx] if self.named_input else idx
             return self.input[idx], self.target[idx], idx_output
 
 ##############################
