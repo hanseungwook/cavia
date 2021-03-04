@@ -7,6 +7,9 @@ from model.models_huh import get_model_type, get_encoder_type
 # from hierarchical_eval import Hierarchical_Eval  
 # from utils import get_vis_fn
 
+import shutil
+
+
 from pdb import set_trace
 import IPython
 
@@ -26,7 +29,7 @@ image_flag = False #True
 #     model  = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger)
     
 #     if hparams.v_num is not None: # fix load_model ! 
-#         model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
+#         model = load_model(model, ckpt_dir, hparams.log_name, hparams.v_num)
 
 #     return model
 
@@ -71,12 +74,12 @@ def get_batch_dict(hparams):
 
 ###################################################
 
-def get_save_dir(hparams, v_num):
-    save_dir = os.path.join(hparams.save_path, 'logs', hparams.log_name, 'version_' + str(v_num))
-    ckpt_dir = os.path.join(save_dir, 'checkpoints')
-    if not os.path.isdir(ckpt_dir):
-        os.makedirs(ckpt_dir)
-    return save_dir #, ckpt_dir
+# def get_save_dir(hparams, v_num):
+#     save_dir = os.path.join(hparams.save_path, 'logs', hparams.log_name, 'version_' + str(v_num))
+#     ckpt_dir = os.path.join(save_dir, 'checkpoints')
+#     if not os.path.isdir(ckpt_dir):
+#         os.makedirs(ckpt_dir)
+#     return save_dir #, ckpt_dir
 
 def save_model(model, dir_):
     file_name = 'model.pth'
@@ -96,20 +99,16 @@ def save_model(model, dir_):
 
 
 ######
-def load_model(model, save_dir, v_num):
+def load_model(model, ckpt_dir, v_num):
 
-    ckpt_path = get_latest_ckpt(save_dir)
+    ckpt_file = get_latest_ckpt(ckpt_dir)
     if v_num is not None:
-        if ckpt_path is None: 
+        if ckpt_file is None: 
             raise error()
         else:
-            ckpt = torch.load(ckpt_path)
+            ckpt = torch.load(ckpt_file)
             model.load_state_dict(ckpt['model_state_dict'])
-            # optimizer_state_dict = ckpt['optimizer_state_dict']
-            # epoch = ckpt['epoch']
-            # best_loss = ckpt['test_loss']
             return model, ckpt['optimizer_state_dict'], ckpt['epoch'], ckpt['test_loss']
-            # return load_model(model, ckpt_file)  # fix load_model ! 
     else:
         return model, None, 1, None  # model, optimizer_state_dict, epoch0, best_loss
 
@@ -118,26 +117,43 @@ def load_model(model, save_dir, v_num):
 
 import glob
 
-# def get_ckpt(v_num, save_dir):
-#     if v_num is None:
-#         return None 
-#     else:
-#         ckpt_path = os.path.join(save_dir, 'version_' + str(v_num),'checkpoints') 
-#         return get_latest_file(ckpt_path)
+def get_ckpt_dir(log_dir):
+    ckpt_dir = os.path.join(log_dir, 'checkpoints') 
+    if not os.path.isdir(ckpt_dir):
+        os.makedirs(ckpt_dir)            
+    return ckpt_dir
 
-
-def get_latest_ckpt(save_dir):
-    ckpt_path = os.path.join(save_dir, 'checkpoints', '*')
-    # files_path = os.path.join(ckpt_path, '*')
-    list_of_ckpt = glob.glob(ckpt_path)
-    ckpt_sorted = sorted(
-        list_of_ckpt, 
+def get_latest_ckpt(ckpt_path):
+    # ckpt_path = os.path.join(save_dir, 'checkpoints', '*')
+    filename_list = glob.glob(os.path.join(ckpt_path, '*'))
+    name_sorted = sorted(
+        filename_list, 
         # key = lambda f: (int(f.split('-')[0].split('=')[1])), #, int(f.split('-')[1].split('=')[1].split('.')[0])),
         key = lambda f: int(f.split('-')[0].split('=')[1].split('.')[0]),
         reverse = True
     )
-    if len(ckpt_sorted)==0:
-        return None
+    return name_sorted[0] if len(name_sorted)>0 else None
+
+#############################
+
+def save_cktp(ckpt_dir, filename, epoch, test_loss, train_loss = None, model_state_dict = None, optimizer_state_dict = None):
+    torch.save({
+                'epoch': epoch,
+                'train_loss': train_loss,
+                'test_loss': test_loss,
+                'model_state_dict': model_state_dict,
+                'optimizer_state_dict': optimizer_state_dict, #optimizer.state_dict() if optimizer is not None else None,
+                }, os.path.join(ckpt_dir,filename))
+
+
+def _del_file(filepath):
+    if filepath is None:
+        pass
     else:
-        return ckpt_sorted[0]
-    
+        dirpath = os.path.dirname(filepath)
+        # make paths
+        os.makedirs(dirpath, exist_ok=True)
+        try:
+            shutil.rmtree(filepath)
+        except OSError:
+            os.remove(filepath)

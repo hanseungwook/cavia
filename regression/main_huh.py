@@ -5,7 +5,7 @@ from pytorch_lightning.core.saving import save_hparams_to_yaml
 from pytorch_lightning.loggers import TensorBoardLogger # https://pytorch-lightning.readthedocs.io/en/latest/_modules/pytorch_lightning/loggers/tensorboard.html
 
 from hierarchical_eval import update_status
-from train_huh import get_batch_dict, save_model, load_model, get_save_dir, get_base_model, get_encoder_model, get_latest_ckpt  #get_Hierarchical_Eval
+from train_huh import get_batch_dict, save_model, load_model, get_base_model, get_encoder_model, get_latest_ckpt, get_ckpt_dir
 from hierarchical_task import Hierarchical_Task, Task_sampler
 from hierarchical_eval import Hierarchical_Eval
 
@@ -20,35 +20,33 @@ default_save_path = "/nobackup/users/benhuh/Projects/cavia/shared_results"
 default_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # use the GPU if available
 
 ###################
+def get_TensorBoardLogger(hparams):
+    logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
+    logger.log_hyperparams(hparams) 
+    logger.save()     # save_hparams_to_yaml(os.path.join(hparams.save_dir,'hparams.yaml'), hparams)   
+    return logger  
+
+###################
 
 def main(hparams, model_loss = None, task = None):
     set_seed(hparams.seed)  
-    
-    logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
-    hparams.save_dir = get_save_dir(hparams, logger.version)
-    save_hparams_to_yaml(os.path.join(hparams.save_dir,'hparams.yaml'), hparams)
-    logger.log_hyperparams(hparams) 
+    logger = get_TensorBoardLogger(hparams)
+    hparams.ckpt_dir = get_ckpt_dir(logger.log_dir)
 
     base_model, base_loss  = get_base_model(hparams) 
     base_loss = model_loss or base_loss
-        
-    base_model, optimizer_state_dict, epoch0, best_loss = load_model(base_model, hparams.save_dir, hparams.v_num)
-    encoder_models  = None # get_encoder_model(hparams.encoders, hparams)                       # adaptation model: None == MAML
+
+    base_model, optimizer_state_dict, epoch0, best_loss = load_model(base_model, hparams.ckpt_dir, hparams.v_num)
+    encoder_models = None # get_encoder_model(hparams.encoders, hparams)                     # MAML adaptation
     
     evaluator = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger, best_loss)
 
-#     print('generating Hierarchical Task') 
     task  = task or get_task(hparams.task, hparams.task_args)
     task_hierarchy = Hierarchical_Task(task, *get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
 
-    
-    print('start meta-evaluation')     # evaluate 'test-loss' on super-task without training.
-    print('tasks:', task[1])    
+    print('start evaluation for meta-tasks:', task[1])     # evaluate 'test-loss' on super-task without training.
     loss, outputs = evaluator.evaluate(task_hierarchy, task_idx = hparams.task, optimizer=Adam, reset=False, return_outputs=False, iter0=epoch0, optimizer_state_dict=optimizer_state_dict) #  loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False)
 
-    # logger.save()
-    # evaluator.save_cktp()
-    # save_model()  # fix save_model()!  also load_model()
     print('Finished training and saving logger')
 
 ###############

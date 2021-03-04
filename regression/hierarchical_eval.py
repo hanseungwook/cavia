@@ -9,8 +9,8 @@ from torch.nn.utils.clip_grad import clip_grad_value_
 from optimize import optimize
 from utils import move_to_device, check_nan #,  vis_img_recon, send_to, manual_optim
 
-import shutil
-from train_huh import get_latest_ckpt
+from train_huh import get_latest_ckpt, save_cktp, _del_file
+
 
 from pdb import set_trace
 import IPython
@@ -59,7 +59,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         h_names = ['top_level', 'n_contexts', 'max_iters', 'for_iters', 'lrs', 
                    'log_intervals', 'test_intervals', 'log_loss_levels', 'log_ctx_levels', 'task_separate_levels', 'print_levels', 
                    'use_higher', 'grad_clip', 'mp',
-                   'save_dir']
+                   'ckpt_dir']
         for name in h_names:
             setattr(self, name, getattr(hparams, name))
 
@@ -170,33 +170,14 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
 
     ############
     def save_cktp(self, epoch, test_loss, train_loss = None, optimizer = None):
-    # def save_cktp(self, train_loss, test_loss, epoch, optimizer):
         if self.best_loss is None or test_loss < self.best_loss:
-            prev_file = get_latest_ckpt(self.save_dir)
-            self._del_model(prev_file)
+            prev_file = get_latest_ckpt(self.ckpt_dir)
+            _del_file(prev_file)  # replacing prev_file (that has previous best_loss)
 
-            filename = 'epoch='+str(epoch)+'.ckpt'  #  epoch=99-step=70299.ckpt
+            filename = 'epoch='+str(epoch)+'.ckpt'  
             self.best_loss = test_loss
-            torch.save({
-                        'epoch': epoch,
-                        'train_loss': train_loss,
-                        'test_loss': test_loss,
-                        'model_state_dict': self.decoder_model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict() if optimizer is not None else None,
-                        }, os.path.join(self.save_dir,'checkpoints',filename))
 
-
-    def _del_model(self, filepath):
-        if filepath is None:
-            pass
-        else:
-            dirpath = os.path.dirname(filepath)
-            # make paths
-            os.makedirs(dirpath, exist_ok=True)
-            try:
-                shutil.rmtree(filepath)
-            except OSError:
-                os.remove(filepath)
+            save_cktp(self.ckpt_dir, filename, epoch, test_loss, train_loss = train_loss, model_state_dict = self.decoder_model.state_dict(), optimizer_state_dict = optimizer.state_dict())
                 
     ###########
     ### visualization
