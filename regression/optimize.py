@@ -9,17 +9,16 @@ import torch.nn as nn
 ##########################################################################################################################################   
 ## optimize parameter for a given 'task'
 
-def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval, 
-            status, status_dict,
-            test_eval, 
+# def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval, status, status_dict, test_eval, 
+def optimize(model, model_forward, task, optim_args,  
             optimizer, optimizer_state_dict, 
             reset, 
             device, 
-            iter0=0,
+            iter0 = 1,
             Higher_flag = False, 
             grad_clip = 100): 
 
-    
+    level, lr, max_iter, for_iter, test_interval = optim_args
     ################
     def initialize():     ## Initialize param & optim
         param_all = model.decoder_model.module.parameters_all if isinstance(model.decoder_model, nn.DataParallel) else model.decoder_model.parameters_all
@@ -65,18 +64,21 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
     param_all, optim = initialize()  
     i = iter0
     loss = None
+    
     while True:
-        for task_list in dataloader:     # task_list = sampled mini-batch
+        for train_subtasks in task.load('train'):     # task_list = sampled mini-batch
             for _ in range(for_iter):          # Seungwook: for_iter is to replicate cavia’s implementation where they use the same mini-batch for the inner loop steps
                 # Run Test-loss (for logging)
-                if not (i % test_interval) or i >= max_iter: # and i <= max_iter - test_interval:
-                    test_loss, test_output = test_eval(i) 
+                if not (i % test_interval) or i >= max_iter:
+                    for test_subtasks in task.load('test'):
+                        test_loss, test_output = model_forward(test_subtasks, sample_type = 'test', iter_num = i)
+                        break
                     if level == model.top_level:
                         model.save_cktp(loss, test_loss, i, optim)
                     if i >= max_iter:         # Terminate! 
                         return test_loss, test_output 
 
-                loss, output = model.forward(task_list, sample_type = 'train', level=level, status = status, status_dict = status_dict, iter_num = i)    # Loss to be optimized
+                loss, output = model_forward(train_subtasks, sample_type = 'train', iter_num = i)    # Loss to be optimized
                 update_step()
 
                 i += 1  

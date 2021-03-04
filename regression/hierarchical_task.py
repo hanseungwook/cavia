@@ -26,10 +26,10 @@ class Hierarchical_Task():
 
     def load(self, sample_type):   
         loader = self.dataloaders[sample_type] or self.dataloaders['train']  # duplicate 'train' loader, if 'test'/'valid' loader == None
-        if sample_type == 'train':
-            return loader                            # return dataloader
-        else: 
-            return next(iter(loader))                # return one iter from dataloader
+        # if sample_type == 'train':
+        return loader                            # return dataloader
+        # else: 
+        #     return next(iter(loader))                # return one iter from dataloader
 
 
 ######################

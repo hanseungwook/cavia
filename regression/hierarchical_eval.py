@@ -107,12 +107,10 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
 
         status, status_dict = update_status(status, status_dict, level=level, task_idx=task_idx, task_separate_flag=task_separate_flag)
 
-        def test_eval(iter_num):       # evaluate on one mini-batch from test-loader
-            return self.forward(task.load('test'), sample_type='test', level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, iter_num=iter_num)
+        def forward_wrapper(task_list, sample_type, iter_num):       # evaluate on one mini-batch from test-loader
+            return self.forward(task_list, sample_type=sample_type, level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, iter_num=iter_num)
         
-        return optimize(self, task.load('train'), level, self.lrs[level], self.max_iters[level], self.for_iters[level], self.test_intervals[level],
-                        status = status, status_dict = status_dict,
-                        test_eval = test_eval, 
+        return optimize(self, forward_wrapper, task, self.optim_args(level),
                         optimizer = optimizer, optimizer_state_dict = optimizer_state_dict, 
                         reset = reset, 
                         device = self.device, 
@@ -120,10 +118,10 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
                         Higher_flag     = self.use_higher,
                         grad_clip       = self.grad_clip)
 
-        # return test_eval(iter_num=self.max_iters[level]) # return  test-loss after adaptation
-
     #################
     ####  flags 
+    def optim_args(self, level):
+        return level, self.lrs[level], self.max_iters[level], self.for_iters[level], self.test_intervals[level]
 
     def get_flags(self, level):
         log_loss_flag   = level in self.log_loss_levels
