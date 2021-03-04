@@ -121,10 +121,10 @@ def check_hparam_default(hparams):
 
     # hparams.grad_clip = grad_clip or [100]*hparams.top_level
     
-    hparams.log_loss_levels      = hparams.log_loss_levels or [] # [False]*hparams.top_level #*(hparams.top_level+1)
-    hparams.log_ctx_levels       = hparams.log_ctx_levels or [] #[False]*hparams.top_level
-    hparams.task_separate_levels = hparams.task_separate_levels or [] # [False]*hparams.top_level
-    hparams.print_levels         = hparams.print_levels or []
+    hparams.log_loss_levels      = hparams.log_loss_levels or [hparams.top_level-1] # [False]*hparams.top_level #*(hparams.top_level+1)
+    hparams.log_ctx_levels       = hparams.log_ctx_levels or [hparams.top_level-1] #[False]*hparams.top_level
+    hparams.task_separate_levels = hparams.task_separate_levels or [hparams.top_level-1] # [False]*hparams.top_level
+    hparams.print_levels         = hparams.print_levels or [hparams.top_level, hparams.top_level-1]
 
     hparams.k_train = hparams.k_train or [None]*hparams.top_level # ## maybe duplicate k_train/n_train 
     hparams.k_test  = hparams.k_test  or [None]*hparams.top_level # hparams.k_train
