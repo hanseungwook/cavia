@@ -15,6 +15,7 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
             optimizer, 
             reset, 
             device, 
+            iter0=0,
             Higher_flag = False, 
             grad_clip = 100): 
 
@@ -61,7 +62,7 @@ def optimize(model, dataloader, level, lr, max_iter, for_iter, test_interval,
     # main code
 
     param_all, optim = initialize()  
-    i = 0
+    i = iter0
 
     while True:
         for task_list in dataloader:     # task_list = sampled mini-batch

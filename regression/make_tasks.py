@@ -15,13 +15,13 @@ from pdb import set_trace
 
 def make_composite_task(task_dict):
     names = list(task_dict.keys())
-    def high_level_params():
-        return random.choice(names)
+#     def high_level_params(batch):
+#         return random.sample(names, batch) #random.choice(names)
 
     def high_level_fnc(name):
         return task_dict[name]  
 
-    return (high_level_fnc, batch_wrapper(high_level_params))
+    return (high_level_fnc, names) #batch_wrapper(high_level_params))
 
 ###########################################
 
@@ -38,11 +38,18 @@ task_dict={
 }
 
 
+# def get_task(name_str: str):
+#     name_list = name_str.split("+")  # split into a list of task names
+#     task = make_composite_task({name:task_dict[name]() for name in name_list})
+#     if len(name_list) == 1: 
+#         return task
+#     else: 
+#         return make_composite_task({name_str:task})  # supertask
+
+
 def get_task(name_str: str):
     name_list = name_str.split("+")  # split into a list of task names
-    task = make_composite_task({name:task_dict[name]() for name in name_list})
     if len(name_list) == 1: 
-        return task
-    else: 
-        return make_composite_task({name_str:task})  # supertask
-
+        return task_dict[name_list[0]]()
+    else:
+        return make_composite_task({name:task_dict[name]() for name in name_list})

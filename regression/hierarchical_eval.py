@@ -65,19 +65,18 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         # self.encoder_model = encoder_model
         # self.adaptation = optimize if encoder_model is None else encoder_model 
        
-    def forward(self, task_list,  sample_type: str, level: int = None,  status: str = "", status_dict: dict = {}, 
-                      optimizer=SGD, reset=True, return_outputs=False,  viz=None, iter_num = 0):        
+    def forward(self, task_list,  sample_type: str, level: int,  status: str, status_dict: dict, iter_num: int, return_outputs=False,  viz=None):    #    reset=True
         # To-do: fix / delete return_outputs
         # '''   Compute average loss over multiple tasks in task_list     '''
-        if level is None:
-            level = self.top_level
-        else:
-            status, status_dict = update_status(status, status_dict, sample_type=sample_type, level = level) 
+        # if level is None:
+        #     level = self.top_level
+#         else:
+        status, status_dict = update_status(status, status_dict, sample_type=sample_type, level = level) 
             
         log_loss_flag, log_ctx_flag, print_flag, task_separate_flag = self.get_flags(level)
  
         if level > 0:          # meta-level evaluation
-            eval_fnc = partial(self.evaluate, level = level-1, status =  status, status_dict = status_dict, optimizer=optimizer, reset=reset, return_outputs=return_outputs, iter_num=iter_num, task_separate_flag=task_separate_flag) #, print_flag=print_flag)
+            eval_fnc = partial(self.evaluate, level = level-1, status =  status, status_dict = status_dict, return_outputs=return_outputs, task_separate_flag=task_separate_flag)
             loss, outputs = get_average_loss(eval_fnc, task_list, return_outputs, mp=self.mp) 
         else:                  # base-level evaluation (level 0)
             loss, outputs = self.base_eval(task_list)
@@ -99,20 +98,23 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         return loss, outputs
 
 
-    def evaluate(self, task, task_idx, level, status, status_dict, optimizer, reset, return_outputs, iter_num, task_separate_flag): #, print_flag):
+    def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True): #, print_flag):
         # '''  adapt on train-tasks / then test the generalization loss   '''
         status, status_dict = update_status(status, status_dict, task_idx=task_idx, task_separate_flag=task_separate_flag)
+        
+        if level is None:
+            level = self.top_level
 
         def test_eval(iter_num):       # evaluate on one mini-batch from test-loader
-            return self.forward(task.load('test'), sample_type='test', level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, iter_num=iter_num) #, current_status = 'test' + current_status)    # test only 1 minibatch
-
-        # inner-loop optimization/adaptation
+            return self.forward(task.load('test'), sample_type='test', level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, iter_num=iter_num)
+        
         optimize(self, task.load('train'), level, self.lrs[level], self.max_iters[level], self.for_iters[level], self.test_intervals[level],
                         status = status, status_dict = status_dict,
                         test_eval = test_eval, 
                         optimizer = optimizer, 
                         reset = reset, 
                         device = self.device, 
+                        iter0 = iter0,
                         Higher_flag     = self.use_higher,
                         grad_clip       = self.grad_clip)
 
@@ -166,7 +168,16 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
             else:                  # Log histogram of ctx
                 self.logger.experiment.add_histogram("ctx{}".format(status), ctx, iter_num)
 
-
+    ############
+    def model_save(self):
+        pass
+        # torch.save({
+        #             'epoch': EPOCH,
+        #             'model_state_dict': net.state_dict(),
+        #             'optimizer_state_dict': optimizer.state_dict(),
+        #             'loss': LOSS,
+        #             }, PATH)
+        
     ###########
     ### visualization
     def visualize(self, outputs):

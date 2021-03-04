@@ -38,8 +38,7 @@ class Hierarchical_Task():
 def get_dataloader_dict(task, batch_dict):
     batch_dict_next = (batch_dict[0][:-1], batch_dict[1][:-1])
     total_batch, mini_batch = batch_dict[0][-1], batch_dict[1][-1]           # mini_batch: mini batch # of samples
-
-    sampler = Task_sampler(*task, total_batch) 
+    sampler = Task_sampler(task, total_batch) 
 
     def get_dataloader(sample_type, mini_batch_):   
         input_params, task_list_next = sampler.get_data(sample_type)
@@ -63,7 +62,8 @@ def get_dataloader_dict(task, batch_dict):
 # Task_sampler
 
 class Task_sampler():
-    def __init__(self, task_fnc, param_fnc, k_batches): 
+    def __init__(self, task, k_batches): 
+        task_fnc, param_fnc = task
         if isinstance(task_fnc, dict):
             assert param_fnc is None
             param_fnc = list(task_fnc.keys())

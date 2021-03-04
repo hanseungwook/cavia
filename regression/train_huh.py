@@ -60,7 +60,7 @@ def get_encoder_model(encoder_types, hparams):
 
 def get_batch_dict(hparams):
     def make_batch_dict(n_trains, n_tests, n_valids): 
-        n_trains, n_tests, n_valids = n_trains+[1], n_tests+[0], n_valids+[0]  # add super-task level
+        # n_trains, n_tests, n_valids = n_trains+[1], n_tests+[0], n_valids+[0]  # add super-task level
         return [   {'train': n_train, 'test': n_test, 'valid': n_valid} 
                 for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids) ]
     
