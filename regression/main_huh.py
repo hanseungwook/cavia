@@ -40,7 +40,7 @@ def main(hparams, model_loss = None, task = None):
 
     print('start meta-evaluation')     # evaluate 'test-loss' on super-task without training.
     print('tasks:', task[1])    
-    loss, outputs = evaluator.evaluate(task_hierarchy, task_idx = None, optimizer=Adam, reset=False, return_outputs=False) #  loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False)
+    loss, outputs = evaluator.evaluate(task_hierarchy, task_idx = hparams.task, optimizer=Adam, reset=False, return_outputs=False) #  loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False)
 
     logger.save()
     save_model()  # fix save_model()!  also load_model()

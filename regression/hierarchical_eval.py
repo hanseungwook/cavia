@@ -71,7 +71,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         # if level is None:
         #     level = self.top_level
 #         else:
-        status, status_dict = update_status(status, status_dict, sample_type=sample_type, level = level) 
+        status, status_dict = update_status(status, status_dict, sample_type=sample_type) 
             
         log_loss_flag, log_ctx_flag, print_flag, task_separate_flag = self.get_flags(level)
  
@@ -100,10 +100,10 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
 
     def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True): #, print_flag):
         # '''  adapt on train-tasks / then test the generalization loss   '''
-        status, status_dict = update_status(status, status_dict, task_idx=task_idx, task_separate_flag=task_separate_flag)
-        
         if level is None:
             level = self.top_level
+
+        status, status_dict = update_status(status, status_dict, level=level, task_idx=task_idx, task_separate_flag=task_separate_flag)
 
         def test_eval(iter_num):       # evaluate on one mini-batch from test-loader
             return self.forward(task.load('test'), sample_type='test', level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, iter_num=iter_num)
@@ -227,12 +227,11 @@ def update_status(status, status_dict, sample_type = None, level = None, task_id
     # if status is not '' and level is not None:
     if level is not None:
         status += '/lv'+str(level)         # status += '_lv'+str(level)
-    if sample_type is not None:
-        status += '_' + sample_type
     if task_idx is not None:
         if task_separate_flag:
-            status += '/' + str(task_idx)           # status += '/task_' + str(task_idx) 
-        else:
-            status += '/_'
-    # print('status :', status)
+            status +=  '_'+str(task_idx)           # status += '/task_' + str(task_idx) 
+        # else:
+        #     status += '/_'
+    if sample_type is not None:
+        status += '/' + sample_type
     return status, status_dict
