@@ -71,8 +71,9 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         # '''   Compute average loss over multiple tasks in task_list     '''
         if level is None:
             level = self.top_level
-
-        status, status_dict = update_status(status, status_dict, sample_type=sample_type, level = level) 
+        else:
+            status, status_dict = update_status(status, status_dict, sample_type=sample_type, level = level) 
+            
         log_loss_flag, log_ctx_flag, print_flag, task_separate_flag = self.get_flags(level)
  
         if level > 0:          # meta-level evaluation
