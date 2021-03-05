@@ -43,7 +43,7 @@ def get_dataloader_dict(sampler, mini_batch, batch_dicts_next):
             return None
         else:
             if len(batch_dicts_next[0]) == 0:    # level0:
-                inputs, targets = param_samples, task_samples  # re-naming
+                inputs, targets = param_samples, task_samples  # re-name into inputs/targets
                 return DataLoader(get_Dataset(inputs, targets), batch_size=mini_batch, shuffle=(sample_type == 'train')) 
             else:                               #high-level
                 subtasks = [Hierarchical_Task(subtask_gen, *batch_dicts_next) for subtask_gen in task_samples]
