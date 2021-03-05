@@ -41,12 +41,13 @@ def get_base_model(hparams):
     task_name = hparams.task
     LQR_flag = (task_name in ['LQR']) #, 'LQR_lv2','LQR_lv1','LQR_lv0'])
     if LQR_flag: 
+        model = Combine_NN_ENV(x_dim=2, levels = 2) 
         base_loss = None
-        return Combine_NN_ENV(x_dim=2, levels = 2) , base_loss
     else:
-        base_loss =  torch.nn.MSELoss()                    # loss function
         MODEL_TYPE = get_model_type(hparams.model_type)
-        return MODEL_TYPE(n_arch=hparams.architecture, n_contexts=hparams.n_contexts, device=hparams.device).to(hparams.device) ,  base_loss
+        model = MODEL_TYPE(n_arch=hparams.architecture, n_contexts=hparams.n_contexts, device=hparams.device).to(hparams.device)
+        base_loss =  torch.nn.MSELoss()                    # loss function
+    return  model,  base_loss
 
 def get_encoder_model(encoder_types, hparams):
     encoders = []
