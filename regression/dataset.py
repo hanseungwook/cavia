@@ -1,4 +1,3 @@
-import random
 from torch.utils.data import Dataset, DataLoader #, Subset
 from torch.utils.data.sampler import RandomSampler, BatchSampler
 
@@ -84,9 +83,8 @@ class Meta_DataLoader(DataLoader):
         return len(self.dataset)
 
     def __iter__(self):
-        # print('iter!')
-        mini_dataset = self.create_mini_batches()  # create different set of mini-batch each time __iter__ is called. 
-        return iter(mini_dataset)
+        return iter(self.create_mini_batches())  # create different set of mini-batch each time __iter__ is called. 
+         
 
 ########################
 # testing code 
