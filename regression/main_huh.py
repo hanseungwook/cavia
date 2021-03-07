@@ -19,39 +19,32 @@ from pdb import set_trace
 default_save_path = "/nobackup/users/benhuh/Projects/cavia/shared_results"
 default_device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")  # use the GPU if available
 
-###################
-def get_TensorBoardLogger(hparams):
-    logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) 
-    logger.log_hyperparams(hparams) 
-    logger.save()     # save_hparams_to_yaml(os.path.join(hparams.save_dir,'hparams.yaml'), hparams)   
-    return logger  
 
 ###################
 
-def main(hparams, model_loss = None, task = None):
+def main(hparams, model_baseloss = None, task_gen = None):
     set_seed(hparams.seed)  
-    logger = get_TensorBoardLogger(hparams)
+    logger = get_Logger(hparams)
     hparams.ckpt_dir = get_ckpt_dir(logger.log_dir)
 
-    base_model, base_loss  = get_base_model(hparams) 
-    base_loss = model_loss or base_loss
+    base_model, base_loss  = get_base_model(hparams) if model_baseloss is None else model_baseloss
 
     base_model, optimizer_state_dict, epoch0, best_loss = load_model(base_model, hparams.ckpt_dir, hparams.v_num)
     encoder_models = None # get_encoder_model(hparams.encoders, hparams)                     # MAML adaptation
     
     evaluator = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger, best_loss)
 
-    task  = task or get_task(hparams.task, hparams.task_args)
-    task_hierarchy = Hierarchical_Task(task, *get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
-
-    print('start evaluation for meta-tasks:', task[1])     # evaluate 'test-loss' on super-task without training.
-    loss, outputs = evaluator.evaluate(task_hierarchy, task_idx = hparams.task, optimizer=Adam, reset=False, return_outputs=False, iter0=epoch0, optimizer_state_dict=optimizer_state_dict) #  loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False)
+    task_gen  = task_gen or get_task(hparams.task, hparams.task_args)
+    task = Hierarchical_Task(task_gen, *get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
+    task_pkg = (None, task, 0, hparams.task)  # (input_param, task, idx, name)
+    print('start evaluation') # for meta-tasks:', task[1])     # evaluate 'test-loss' on super-task without training.
+    loss, outputs = evaluator.evaluate(task_pkg, optimizer=Adam, reset=False, return_outputs=False, iter0=epoch0, optimizer_state_dict=optimizer_state_dict) #  loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False)
 
     print('Finished training and saving logger')
 
 ###############
 
-def get_args(*args):
+def get_hparams(*args):
     parser = argparse.ArgumentParser(description='Regression experiments')
 
     parser.add_argument('--save-path', type=str, default=default_save_path)
@@ -87,10 +80,10 @@ def get_args(*args):
     parser.add_argument('--log_intervals', type=int, nargs='+', default=None)
     parser.add_argument('--test_intervals',type=int, nargs='+', default=None)
 
-    parser.add_argument('--log_loss_levels',      type=int, nargs='+', default=None) 
-    parser.add_argument('--log_ctx_levels',       type=int, nargs='+', default=None) 
-    parser.add_argument('--task_separate_levels', type=int, nargs='+', default=None) 
-    parser.add_argument('--print_levels',    type=int, nargs='+', default=None) 
+    parser.add_argument('--log_loss_levels',      type=int, nargs='+', default=[]) 
+    parser.add_argument('--log_ctx_levels',       type=int, nargs='+', default=[]) 
+    parser.add_argument('--task_separate_levels', type=int, nargs='+', default=[]) 
+    parser.add_argument('--print_levels',    type=int, nargs='+', default=[]) 
 
     parser.add_argument('--use_higher',    action='store_true', default=False, help='Use Higher optimizer')
     parser.add_argument('--data_parallel', action='store_true', default=False, help='Use data parallel for inner model (decoder)')
@@ -100,12 +93,9 @@ def get_args(*args):
 
     parser.add_argument('--profile',       action='store_true', default=False, help='Run profiling')
 
-    
-#     parser.add_argument('--load_model', type=str,     default='',     help='Path to model weights to load')
-    args, unknown = parser.parse_known_args(*args) 
-    
-    args = check_hparam_default(args)
-    return args
+    hparams, unknown = parser.parse_known_args(*args) 
+    hparams = check_hparam_default(hparams)
+    return hparams
 
 
 ###################
@@ -128,14 +118,14 @@ def check_hparam_default(hparams):
     
     hparams.for_iters     = hparams.for_iters or [1]*(hparams.top_level+1)
     hparams.lrs           = hparams.lrs       or [0.01]*(hparams.top_level+1)
-    hparams.log_intervals = hparams.log_intervals or [1]*(hparams.top_level+1)
-    hparams.test_intervals= hparams.test_intervals or [100]*(hparams.top_level+1)
+    hparams.log_intervals = hparams.log_intervals or hparams.max_iters[:-1]+[10] #[1]*(hparams.top_level+1)
+    hparams.test_intervals= hparams.test_intervals or hparams.max_iters[:-1]+[10] #[100]*(hparams.top_level+1)
 
     # hparams.grad_clip = grad_clip or [100]*hparams.top_level
     
-    hparams.log_loss_levels      = hparams.log_loss_levels or [hparams.top_level] # [False]*hparams.top_level #*((hparams.top_level+1))
-    hparams.log_ctx_levels       = hparams.log_ctx_levels or [hparams.top_level] #[False]*hparams.top_level
-    hparams.task_separate_levels = hparams.task_separate_levels or [hparams.top_level, hparams.top_level-1] # [False]*hparams.top_level
+    hparams.log_loss_levels      = hparams.log_loss_levels or [i>0 for i in hparams.log_intervals] #[hparams.top_level] # [False]*hparams.top_level #*((hparams.top_level+1))
+    # hparams.log_ctx_levels       = hparams.log_ctx_levels or [hparams.top_level-1] #[False]*hparams.top_level
+    # hparams.task_separate_levels = hparams.task_separate_levels or [hparams.top_level] #, hparams.top_level-1] # [False]*hparams.top_level
     hparams.print_levels         = hparams.print_levels or [hparams.top_level]
 
     hparams.k_train = hparams.k_train or [None]*(hparams.top_level+1) # ## maybe duplicate k_train/n_train 
@@ -154,24 +144,37 @@ def check_hparam_default(hparams):
 #     hparams.log_intervals += [1]  # for top+1 super-level
     return hparams
 
-     
+
+###################
+def get_Logger(hparams):
+    logger = TensorBoardLogger(hparams.log_save_path, name=hparams.log_name, version=hparams.v_num) #, default_hp_metric = False) 
+    logger.log_hyperparams(hparams) 
+    logger.save()     # save_hparams_to_yaml(os.path.join(hparams.save_dir,'hparams.yaml'), hparams)   
+    return logger  
+
+
+###################
+
+def run_profile(hparams):
+    print('profiling')
+
+    import cProfile, pstats
+    profiler = cProfile.Profile()
+    profiler.enable()
+    main(hparams)
+    profiler.disable()
+    profiler.sort_stats('cumtime')
+    profiler.dump_stats('profile_output.prof')
+    stats = pstats.Stats(profiler).sort_stats('cumtime')
+    stats.print_stats()
+
 ###################
 
 if __name__ == '__main__':
-    hparams = get_args()
+    hparams = get_hparams()
 
     if hparams.profile:
-        print('profiling')
-
-        import cProfile, pstats
-        profiler = cProfile.Profile()
-        profiler.enable()
-        main(args)
-        profiler.disable()
-        profiler.sort_stats('cumtime')
-        profiler.dump_stats('profile_output.prof')
-        stats = pstats.Stats(profiler).sort_stats('cumtime')
-        stats.print_stats()
+        run_profile(hparams)
 
     else:
         # print('not profiling')

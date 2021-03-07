@@ -87,30 +87,37 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         # self.visualize(outputs)
         return loss, outputs
     
-    def base_eval(self, task_list):
-        if self.base_loss is None: # base_loss included in decoder_model
-            inputs = task_list
-            loss, outputs = self.decoder_model(inputs)
+    def base_eval(self, data):
+        inputs, targets, _, _ = move_to_device(data, self.device)   # data = inputs, targets, indices, (names = indices)
+        # assert isinstance(data[0], (torch.FloatTensor, torch.DoubleTensor)) #, torch.cuda.FloatTensor, torch.cuda.DoubleTensor)):
+
+        if self.base_loss is None: # base_loss is included in decoder_model (e.g. LQR)
+            loss, outputs = self.decoder_model(inputs, targets)
         else:
-            assert isinstance(task_list[0], (torch.FloatTensor, torch.DoubleTensor)) #, torch.cuda.FloatTensor, torch.cuda.DoubleTensor)):
-            inputs, targets, task_idx = move_to_device(task_list, self.device)
             outputs = self.decoder_model(inputs)
             loss = self.base_loss(outputs, targets)
         check_nan(loss)  
         return loss, outputs
 
 
-    def evaluate(self, task, task_idx, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True, optimizer_state_dict = None): #, print_flag):
+    def evaluate(self, task_pkg, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True, optimizer_state_dict = None): #, print_flag):
         # '''  adapt on train-tasks / then test the generalization loss   '''
+
+        task_param, task, idx, name = task_pkg
+
         if level is None:
             level = self.top_level
 
-        status, status_dict = update_status(status, status_dict, level=level, task_idx=task_idx, task_separate_flag=task_separate_flag)
+        status, status_dict = update_status(status, status_dict, level=level, task_name=name, task_separate_flag=task_separate_flag)
 
         def forward_wrapper(task_list, sample_type, iter_num):       # evaluate on one mini-batch from test-loader
             return self.forward(task_list, sample_type=sample_type, iter_num=iter_num, level=level, status = status, status_dict = status_dict, return_outputs=return_outputs)
 
-        return optimize(self, forward_wrapper, task, self.optim_args(level),
+
+        param_all = self.decoder_model.module.parameters_all if isinstance(self.decoder_model, nn.DataParallel) else self.decoder_model.parameters_all
+
+        return optimize(param_all, forward_wrapper, self.save_cktp, 
+                        task, self.optim_args(level),
                         optimizer = optimizer, optimizer_state_dict = optimizer_state_dict, 
                         reset = reset, 
                         device = self.device, 
@@ -134,8 +141,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
     ####  Logging 
 
     def logging(self, level, loss, status, iter_num, log_loss_flag, log_ctx_flag, log_interval = 1, print_flag=False):
-        if not (iter_num % log_interval):
-
+        if not log_interval or (not (iter_num % log_interval) and iter_num>0):        # if not ((iter_num+1) % log_interval): # and iter_num>0:
             if log_loss_flag:
                 self.log_loss(loss, status, iter_num)
 
@@ -169,15 +175,19 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
                 self.logger.experiment.add_histogram("ctx{}".format(status), ctx, iter_num)
 
     ############
-    def save_cktp(self, epoch, test_loss, train_loss = None, optimizer = None):
-        if self.best_loss is None or test_loss < self.best_loss:
-            prev_file = get_latest_ckpt(self.ckpt_dir)
-            _del_file(prev_file)  # replacing prev_file (that has previous best_loss)
+    def save_cktp(self, level, epoch, test_loss, train_loss = None, optimizer = None):
+        if level == self.top_level: 
+            if self.best_loss is None or test_loss < self.best_loss:
+                prev_file = get_latest_ckpt(self.ckpt_dir)
+                _del_file(prev_file)  # replacing prev_file (that has previous best_loss)
 
-            filename = 'epoch='+str(epoch)+'.ckpt'  
-            self.best_loss = test_loss
+                filename = 'epoch='+str(epoch)+'.ckpt'  
+                self.best_loss = test_loss
 
-            save_cktp(self.ckpt_dir, filename, epoch, test_loss, train_loss = train_loss, model_state_dict = self.decoder_model.state_dict(), optimizer_state_dict = optimizer.state_dict())
+                save_cktp(  self.ckpt_dir, filename, 
+                            epoch, test_loss, train_loss, 
+                            self.decoder_model.state_dict(), 
+                            optimizer.state_dict() if optimizer is not None else None)
                 
     ###########
     ### visualization
@@ -193,8 +203,8 @@ from multiprocessing import Process, Manager
 def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
     losses, outputs = [], []
     if not mp:
-        for (param, task, idx) in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
-            l, outputs_ = eval_fnc(task, idx)
+        for task_pkg in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
+            l, outputs_ = eval_fnc(task_pkg)
             losses.append(l)
             if return_outputs:
                 outputs.append(outputs_)
@@ -206,12 +216,12 @@ def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
         losses = manager.list()   # Strange name: please fix  @Seungwook
         process_list = []
         
-        def mp_loss_fn(eval_fnc, task, idx):
-            l, _ = eval_fnc(task, idx)
+        def mp_loss_fn(eval_fnc, task_pkg):
+            l, _ = eval_fnc(task_pkg)
             losses.append(l)
 
-        for (param, task, idx) in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
-            p = Process(target=mp_loss_fn, args=(eval_fnc, task, idx,))
+        for task_pkg in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
+            p = Process(target=mp_loss_fn, args=(eval_fnc, task_pkg))
             process_list.append(p)
             p.start()
 
@@ -219,17 +229,19 @@ def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
             p.join()
 
         losses = list(losses)
-        return torch.stack(losses).mean() , outputs
+        return torch.stack(losses).mean() , [] # outputs # fix this
 
 
 ###########################
-def update_status(status, status_dict, sample_type = None, level = None, task_idx = None, task_separate_flag = None):
+def update_status(status, status_dict, sample_type = None, level = None, task_name = None, task_separate_flag = None):
     # if status is not '' and level is not None:
     if level is not None:
         status += '/lv'+str(level)         # status += '_lv'+str(level)
-    if task_idx is not None:
+    if task_name is not None:
+        # print(status, task_name)
+        # set_trace()
         if task_separate_flag:
-            status +=  '_'+str(task_idx)           # status += '/task_' + str(task_idx) 
+            status +=  '_'+str(task_name)  
         # else:
         #     status += '/_'
     if sample_type is not None:

@@ -36,11 +36,10 @@ class Basic_Dataset(Dataset):
         return len(self.input)
     
     def __getitem__(self, idx):
-        if self.target is None:
-            return self.input[idx]
-        else: 
-            idx_output = self.input[idx] if self.named_input else idx
-            return self.input[idx], self.target[idx], idx_output
+        input = self.input[idx]
+        target = [] if self.target is None else self.target[idx]
+        name = input if self.named_input else idx
+        return input, target, idx, name
 
 ##############################
 # Basic_Dataset_LQR
@@ -59,7 +58,7 @@ class Basic_Dataset_LQR(Dataset):  # Temporary code. to be properly written
         return len(self.x0)
     
     def __getitem__(self, idx):
-        return self.kbm, self.goal, self.x0[idx]
+        return (self.kbm, self.goal, self.x0[idx]), [], idx, idx
     
 
 ##################################
