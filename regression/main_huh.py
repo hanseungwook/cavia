@@ -155,7 +155,7 @@ if __name__ == '__main__':
         import cProfile, pstats
         profiler = cProfile.Profile()
         profiler.enable()
-        main(args)
+        main(hparams)
         profiler.disable()
         profiler.sort_stats('cumtime')
         profiler.dump_stats('profile_output.prof')
