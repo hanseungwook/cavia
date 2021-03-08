@@ -13,7 +13,6 @@ from train_huh import get_latest_ckpt, save_cktp, _del_file
 
 
 from pdb import set_trace
-import IPython
 
 print_forward_test = False
 print_forward_return = False

@@ -11,7 +11,6 @@ import shutil
 
 
 from pdb import set_trace
-import IPython
 
 from task.LQR import Combine_NN_ENV        
 
