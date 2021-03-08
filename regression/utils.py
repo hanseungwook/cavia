@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 
 
 
-import IPython
 from pdb import set_trace
 
 DEBUG_LEVELS = []  # [1] #[0]  #[2]
