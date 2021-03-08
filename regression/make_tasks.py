@@ -25,7 +25,7 @@ def make_composite_task(task_dict):
 
 ###########################################
 
-from task.multi_regression import linear_lv1_fnc, linear_lv2_fnc, linear_lv3_fnc
+# from task.multi_regression import linear_lv1_fnc, linear_lv2_fnc, linear_lv3_fnc
 
 
 task_dict={
@@ -39,9 +39,9 @@ task_dict={
     # 
     'LQR': LQR_gen,
     #
-    'linear1': linear_lv1_fnc,
-    'linear2': linear_lv2_fnc,
-    'linear3': linear_lv3_fnc,
+    # 'linear1': linear_lv1_fnc,
+    # 'linear2': linear_lv2_fnc,
+    # 'linear3': linear_lv3_fnc,
 }
 
 
