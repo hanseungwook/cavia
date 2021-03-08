@@ -6,7 +6,6 @@ import torchvision.datasets as datasets
 from PIL import Image
 import copy
 
-import IPython
 from pdb import set_trace
 
 from utils import batch_wrapper
