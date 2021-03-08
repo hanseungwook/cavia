@@ -174,21 +174,7 @@ if __name__ == '__main__':
     hparams = get_hparams()
 
     if hparams.profile:
-<<<<<<< HEAD
-        print('profiling')
-
-        import cProfile, pstats
-        profiler = cProfile.Profile()
-        profiler.enable()
-        main(hparams)
-        profiler.disable()
-        profiler.sort_stats('cumtime')
-        profiler.dump_stats('profile_output.prof')
-        stats = pstats.Stats(profiler).sort_stats('cumtime')
-        stats.print_stats()
-=======
         run_profile(hparams)
->>>>>>> f2483db8321bac24403649033ae34c879203c7de
 
     else:
         # print('not profiling')
