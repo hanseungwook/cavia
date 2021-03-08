@@ -194,7 +194,8 @@ class Combine_NN_ENV(nn.Module):
 
 #         self.obs0 = None if random_task else self.env.make_env(self.env.task0)            
 
-    def forward(self, task, record = True): #:
+    def forward(self, task, target_data, record = True): #:
+        assert target_data == []
         
         ctx_all = self.parameters_all[:-1]
         

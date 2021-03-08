@@ -15,19 +15,13 @@ def get_encoder_type(encoder_type):
     return ENCODER
 
 def get_model_type(model_type):
-
-    if model_type == "CAVIA":
-        MODEL = Cavia
-    elif model_type == "ADDITIVE":
-        MODEL = Model_Additive
-    elif model_type == "MULTIPLICATIVE":
-        MODEL = Model_Multiplicative
-    elif model_type == "ADD_MULTIPLICATIVE":
-        MODEL = Model_Add_Multiplicative
-    else:
-        raise ValueError()
-
-    return MODEL
+    model_dict = {
+                "CAVIA": Cavia,
+                "ADDITIVE": Model_Additive,
+                "MULTIPLICATIVE": Model_Multiplicative,
+                "ADD_MULTIPLICATIVE":Model_Add_Multiplicative,
+                }
+    return model_dict[model_type]
 
 
 # def const_ctx(n):
@@ -110,6 +104,7 @@ class Cavia(BaseModel):
         if ctx_list != []:
             ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
             x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
+
         for i, module in enumerate(self.module_list):
             x = module(x)
             if i < len(self.module_list) - 1:  

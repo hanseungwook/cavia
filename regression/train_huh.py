@@ -4,8 +4,11 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import numpy as np
 from model.models_huh import get_model_type, get_encoder_type
-from hierarchical_eval import Hierarchical_Eval  
+# from hierarchical_eval import Hierarchical_Eval  
 # from utils import get_vis_fn
+
+import shutil
+
 
 from pdb import set_trace
 import IPython
@@ -19,16 +22,16 @@ image_flag = False #True
 
 ###############################################################
 
-def get_Hierarchical_Eval(hparams, logger, model_loss = None):
+# def get_Hierarchical_Eval(hparams, logger, model_loss = None):
 
-    base_model, base_loss  = model_loss or get_base_model(hparams) 
-    encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
-    model  = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger)
+#     base_model, base_loss  = model_loss or get_base_model(hparams) 
+#     encoder_models  = get_encoder_model(hparams.encoders, hparams)                   # adaptation model: None == MAML
+#     model  = Hierarchical_Eval(hparams, base_model, encoder_models, base_loss, logger)
     
-    if hparams.v_num is not None: # fix load_model ! 
-        model = load_model(model, save_dir, hparams.log_name, hparams.v_num)
+#     if hparams.v_num is not None: # fix load_model ! 
+#         model = load_model(model, ckpt_dir, hparams.log_name, hparams.v_num)
 
-    return model
+#     return model
 
 
 
@@ -38,12 +41,13 @@ def get_base_model(hparams):
     task_name = hparams.task
     LQR_flag = (task_name in ['LQR']) #, 'LQR_lv2','LQR_lv1','LQR_lv0'])
     if LQR_flag: 
+        model = Combine_NN_ENV(x_dim=2, levels = 2) 
         base_loss = None
-        return Combine_NN_ENV(x_dim=2, levels = 2) , base_loss
     else:
-        base_loss =  torch.nn.MSELoss()                    # loss function
         MODEL_TYPE = get_model_type(hparams.model_type)
-        return MODEL_TYPE(n_arch=hparams.architecture, n_contexts=hparams.n_contexts, device=hparams.device).to(hparams.device) ,  base_loss
+        model = MODEL_TYPE(n_arch=hparams.architecture, n_contexts=hparams.n_contexts, device=hparams.device).to(hparams.device)
+        base_loss =  torch.nn.MSELoss()                    # loss function
+    return  model,  base_loss
 
 def get_encoder_model(encoder_types, hparams):
     encoders = []
@@ -60,24 +64,23 @@ def get_encoder_model(encoder_types, hparams):
 
 def get_batch_dict(hparams):
     def make_batch_dict(n_trains, n_tests, n_valids): 
-        n_trains, n_tests, n_valids = n_trains+[1], n_tests+[0], n_valids+[0]  # add super-task level
+        # n_trains, n_tests, n_valids = n_trains+[1], n_tests+[0], n_valids+[0]  # add super-task level
         return [   {'train': n_train, 'test': n_test, 'valid': n_valid} 
                 for n_train, n_test, n_valid in zip(n_trains, n_tests, n_valids) ]
     
     k_dict = make_batch_dict(hparams.k_train, hparams.k_test, hparams.k_valid)  # Total-batch
     n_dict = make_batch_dict(hparams.n_train, hparams.n_test, hparams.n_valid)  # mini-batch
-    return (k_dict, n_dict)
+    return k_dict, n_dict
 
 
 ###################################################
 
-def get_save_dir(hparams):
-    save_dir = os.path.join(hparams.save_path, 'logs', hparams.log_name)
-    print(hparams.log_name)
-    print(save_dir)
-    if not os.path.isdir(save_dir):
-        os.mkdir(save_dir)
-    return save_dir
+# def get_save_dir(hparams, v_num):
+#     save_dir = os.path.join(hparams.save_path, 'logs', hparams.log_name, 'version_' + str(v_num))
+#     ckpt_dir = os.path.join(save_dir, 'checkpoints')
+#     if not os.path.isdir(ckpt_dir):
+#         os.makedirs(ckpt_dir)
+#     return save_dir #, ckpt_dir
 
 def save_model(model, dir_):
     file_name = 'model.pth'
@@ -85,14 +88,73 @@ def save_model(model, dir_):
     torch.save({'model_state_dict': model.state_dict()}, os.path.join(dir_, file_name))
             
 
-def load_model(model, dir_): 
-#     dir_ = os.path.join(hparams.save_path, 'model_save', log_name)
-    file_name = 'model.pth'
-    if hparams.load_model:
-        print('Loading model')
-        checkpoint = torch.load(os.path.join(dir_, file_name))   #('./model.pth')
-        model.load_state_dict(checkpoint['model_state_dict'])
-        del checkpoint
-        
-    return model
+# def load_model(model, ckpt_path): 
+#     ckpt = torch.load(ckpt_path)
+#     model.load_state_dict(ckpt['model_state_dict'])
+#     optimizer_state_dict = ckpt['optimizer_state_dict']
+#     epoch = ckpt['epoch']
+#     best_loss = ckpt['test_loss']
 
+#     del ckpt      
+#     return model, optimizer_state_dict, epoch, best_loss
+
+
+######
+def load_model(model, ckpt_dir, v_num):
+
+    ckpt_file = get_latest_ckpt(ckpt_dir)
+    if v_num is not None:
+        if ckpt_file is None: 
+            raise error()
+        else:
+            ckpt = torch.load(ckpt_file)
+            model.load_state_dict(ckpt['model_state_dict'])
+            return model, ckpt['optimizer_state_dict'], ckpt['epoch'], ckpt['test_loss']
+    else:
+        return model, None, 1, None  # model, optimizer_state_dict, epoch0, best_loss
+
+###############################################
+
+
+import glob
+
+def get_ckpt_dir(log_dir):
+    ckpt_dir = os.path.join(log_dir, 'checkpoints') 
+    if not os.path.isdir(ckpt_dir):
+        os.makedirs(ckpt_dir)            
+    return ckpt_dir
+
+def get_latest_ckpt(ckpt_path):
+    # ckpt_path = os.path.join(save_dir, 'checkpoints', '*')
+    filename_list = glob.glob(os.path.join(ckpt_path, '*'))
+    name_sorted = sorted(
+        filename_list, 
+        # key = lambda f: (int(f.split('-')[0].split('=')[1])), #, int(f.split('-')[1].split('=')[1].split('.')[0])),
+        key = lambda f: int(f.split('-')[0].split('=')[1].split('.')[0]),
+        reverse = True
+    )
+    return name_sorted[0] if len(name_sorted)>0 else None
+
+#############################
+
+def save_cktp(ckpt_dir, filename, epoch, test_loss, train_loss = None, model_state_dict = None, optimizer_state_dict = None):
+    torch.save({
+                'epoch': epoch,
+                'train_loss': train_loss,
+                'test_loss': test_loss,
+                'model_state_dict': model_state_dict,
+                'optimizer_state_dict': optimizer_state_dict, #optimizer.state_dict() if optimizer is not None else None,
+                }, os.path.join(ckpt_dir,filename))
+
+
+def _del_file(filepath):
+    if filepath is None:
+        pass
+    else:
+        dirpath = os.path.dirname(filepath)
+        # make paths
+        os.makedirs(dirpath, exist_ok=True)
+        try:
+            shutil.rmtree(filepath)
+        except OSError:
+            os.remove(filepath)
