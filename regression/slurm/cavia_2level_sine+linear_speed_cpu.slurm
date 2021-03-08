@@ -67,15 +67,15 @@ for i in "${n_train_0[@]}"; do
     for j in "${n_train_1[@]}"; do
         for k in "${n_train_2[@]}"; do
             for t in {1..10..1}; do
-                start=`date +%s`
+                start_time=`date +%s`
                 CUDA_VISIBLE_DEVICES="" python3 main_huh.py \
                 --task sine+line --n_contexts 2 2 --max_iters 3 3 20 --for_iters 3 3 1 \
                 --architecture 1 40 40 1 --lrs 0.03 0.03 0.001 --test_intervals 4 4 2 \
                 --k_train 400 10000 2 --n_train "$i" "$j" "$k" \
                 --log-name sine+line_lv2_cpu_100_10_2 --log_loss_levels 0 1 2 --task_separate_levels 0 1 2 \
                 --print_levels 2 --private \
-                end=`date +%s`
-                runtime=$((end-start))
+                end_time=`date +%s`
+                runtime=$((end_time-start_time))
                 echo "[$i $j $k] Time: $runtime"
             done
         done
