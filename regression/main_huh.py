@@ -54,7 +54,7 @@ def get_hparams(*args):
     
     parser.add_argument('--task',         type=str, help="Supertasks to solve",)
     parser.add_argument('--task_args',    type=int, nargs='+', default=[],  help="input to task_fnc")
-    parser.add_argument('--model-type',   type=str, choices=["CAVIA", "ADDITIVE", "MULTIPLICATIVE", "ADD_MULTIPLICATIVE"], default="CAVIA") 
+    parser.add_argument('--model-type',   type=str, default="CAVIA") #, choices=["CAVIA", "ADDITIVE", "MULTIPLICATIVE", "ADD_MULTIPLICATIVE","Multi_Linear"]
     parser.add_argument('--architecture', type=int, nargs='+', default=[1, 40, 40, 1], help="Architecture of neural network")
     parser.add_argument('--n_contexts',   type=int, nargs='+', default=[], help="number of context variables: phi0, phi1 ") #[2, 1])   
     
