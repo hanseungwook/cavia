@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import random
 
-from dataset import Meta_DataLoader, get_Dataset
+from dataset import Meta_DataLoader, get_Dataset, continuous_loader
 from torch.utils.data import DataLoader #, Dataset, Subset
 from utils import batch_wrapper
 
@@ -44,10 +44,10 @@ def get_dataloader_dict(sampler, mini_batch, batch_dicts_next):
         else:
             if len(batch_dicts_next[0]) == 0:    # level0:
                 inputs, targets = param_samples, task_samples  # re-name into inputs/targets
-                return DataLoader(get_Dataset(inputs, targets), batch_size=mini_batch, shuffle=(sample_type == 'train')) 
+                return continuous_loader(DataLoader(get_Dataset(inputs, targets), batch_size=mini_batch, shuffle=(sample_type == 'train')) )
             else:                               #high-level
                 subtasks = [Hierarchical_Task(subtask_gen, *batch_dicts_next) for subtask_gen in task_samples]
-                return Meta_DataLoader(get_Dataset(param_samples, subtasks), batch_size=mini_batch)
+                return continuous_loader(Meta_DataLoader(get_Dataset(param_samples, subtasks), batch_size=mini_batch) )
 
     return {key: get_dataloader(key, mini_batch[key]) for key in ['train', 'test', 'valid']}
 

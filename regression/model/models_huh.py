@@ -6,6 +6,9 @@ from torch.nn import Parameter
 from torch.nn import init
 from functools import partial
 
+# from task.multi_regression import Multi_Linear_Model
+
+from pdb import set_trace
 
 def get_encoder_type(encoder_type):
     if encoder_type == "HSML":
@@ -20,6 +23,7 @@ def get_model_type(model_type):
                 "ADDITIVE": Model_Additive,
                 "MULTIPLICATIVE": Model_Multiplicative,
                 "ADD_MULTIPLICATIVE":Model_Add_Multiplicative,
+                # "Multi_Linear": Multi_Linear_Model,
                 }
     return model_dict[model_type]
 
@@ -102,8 +106,11 @@ class Cavia(BaseModel):
 
     def _forward(self, x, ctx_list):
         if ctx_list != []:
-            ctx = torch.cat(ctx_list, dim=1)                  # combine ctx with higher-level ctx
-            x = torch.cat((x, ctx.expand(x.shape[0], -1)), dim=1)   # Concatenate input with context
+            ctx = torch.cat(ctx_list, dim=0)                  # combine ctx with higher-level ctx
+            ctx = ctx.unsqueeze(-2).expand(x.shape[0], -1)
+
+            x = torch.cat((x, ctx), dim=1)   # Concatenate input with context
+            # x = torch.cat((x, ctx.unsqueeze(0).expand(x.shape[0]+list(ctx.shape))), dim=1)   # Concatenate input with context
 
         for i, module in enumerate(self.module_list):
             x = module(x)

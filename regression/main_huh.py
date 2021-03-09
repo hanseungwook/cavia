@@ -36,9 +36,9 @@ def main(hparams, model_baseloss = None, task_gen = None):
 
     task_gen  = task_gen or get_task(hparams.task, hparams.task_args)
     task = Hierarchical_Task(task_gen, *get_batch_dict(hparams))  # get_Hierarchical_Task(hparams)
-    task_pkg = (None, task, 0, hparams.task)  # (input_param, task, idx, name)
+    task_pkg = (None, task, hparams.task)  # (input_param, task, name) #, idx
     print('start evaluation') # for meta-tasks:', task[1])     # evaluate 'test-loss' on super-task without training.
-    loss, outputs = evaluator.evaluate(task_pkg, optimizer=Adam, reset=False, return_outputs=False, iter0=epoch0, optimizer_state_dict=optimizer_state_dict) #  loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False)
+    loss, outputs = evaluator.evaluate(task_pkg, optimizer=Adam, reset=False, return_outputs=False, iter0=epoch0, optimizer_state_dict=optimizer_state_dict, collate_tasks = hparams.collate_tasks) #  loss, outputs = evaluator(task.load('test'), sample_type='test', optimizer=Adam, reset=False, return_outputs=False)
 
     print('Finished training and saving logger')
 
@@ -85,6 +85,7 @@ def get_hparams(*args):
     parser.add_argument('--task_separate_levels', type=int, nargs='+', default=[]) 
     parser.add_argument('--print_levels',    type=int, nargs='+', default=[]) 
 
+    parser.add_argument('--collate_tasks', action='store_true', default=False, help='')
     parser.add_argument('--use_higher',    action='store_true', default=False, help='Use Higher optimizer')
     parser.add_argument('--data_parallel', action='store_true', default=False, help='Use data parallel for inner model (decoder)')
     parser.add_argument('--mp', action='store_true', default=False, help='Use multiprocessing for CPU (only)')

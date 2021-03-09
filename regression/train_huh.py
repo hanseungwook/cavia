@@ -110,7 +110,7 @@ def load_model(model, ckpt_dir, v_num):
             model.load_state_dict(ckpt['model_state_dict'])
             return model, ckpt['optimizer_state_dict'], ckpt['epoch'], ckpt['test_loss']
     else:
-        return model, None, 1, None  # model, optimizer_state_dict, epoch0, best_loss
+        return model, None, 0, None  # model, optimizer_state_dict, epoch0, best_loss
 
 ###############################################
 

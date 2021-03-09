@@ -58,6 +58,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         h_names = ['top_level', 'n_contexts', 'max_iters', 'for_iters', 'lrs', 
                    'log_intervals', 'test_intervals', 'log_loss_levels', 'log_ctx_levels', 'task_separate_levels', 'print_levels', 
                    'use_higher', 'grad_clip', 'mp',
+                   'n_contexts',
                    'ckpt_dir']
         for name in h_names:
             setattr(self, name, getattr(hparams, name))
@@ -70,15 +71,19 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         # self.encoder_model = encoder_model
         # self.adaptation = optimize if encoder_model is None else encoder_model 
        
-    def forward(self, task_list,  sample_type: str, iter_num: int, level: int,  status: str, status_dict: dict, return_outputs=False):    #    reset=True
+    def forward(self, task_list,  sample_type: str, iter_num: int, level: int,  status: str, status_dict: dict, return_outputs=False, collate_tasks = False):    #    reset=True
         # To-do: fix / delete return_outputs
         status, status_dict = update_status(status, status_dict, sample_type=sample_type) 
-            
+
         log_loss_flag, log_ctx_flag, print_flag, task_separate_flag = self.get_flags(level)
- 
+
         if level > 0:          # meta-level evaluation
-            eval_fnc = partial(self.evaluate, level = level-1, status =  status, status_dict = status_dict, return_outputs=return_outputs, task_separate_flag=task_separate_flag)
-            loss, outputs = get_average_loss(eval_fnc, task_list, return_outputs, mp=self.mp) 
+
+            def eval_wrapper(task_list):       # evaluate on one mini-batch from test-loader
+                return self.evaluate(task_list, level = level-1, status =  status, status_dict = status_dict, return_outputs=return_outputs, task_separate_flag=task_separate_flag, collate_tasks = collate_tasks)
+            # eval_wrapper = partial(self.evaluate, level = level-1, status =  status, status_dict = status_dict, return_outputs=return_outputs, task_separate_flag=task_separate_flag, collate_tasks = collate_tasks)
+
+            loss, outputs = eval_wrapper(task_list) if collate_tasks else get_average_loss(eval_wrapper, task_list, return_outputs, mp=self.mp) 
         else:                  # base-level evaluation (level 0)
             loss, outputs = self.base_eval(task_list)
             
@@ -87,22 +92,22 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         return loss, outputs
     
     def base_eval(self, data):
-        inputs, targets, _, _ = move_to_device(data, self.device)   # data = inputs, targets, indices, (names = indices)
+        inputs, targets, _ = move_to_device(data, self.device)   # data = inputs, targets, indices, (names = indices)
         # assert isinstance(data[0], (torch.FloatTensor, torch.DoubleTensor)) #, torch.cuda.FloatTensor, torch.cuda.DoubleTensor)):
 
         if self.base_loss is None: # base_loss is included in decoder_model (e.g. LQR)
             loss, outputs = self.decoder_model(inputs, targets)
         else:
             outputs = self.decoder_model(inputs)
-            loss = self.base_loss(outputs, targets)
+            loss = self.base_loss(outputs, targets)  # Todo: remove unsqueeze
         check_nan(loss)  
         return loss, outputs
 
 
-    def evaluate(self, task_pkg, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True, optimizer_state_dict = None): #, print_flag):
+    def evaluate(self, task_pkg, level = None, status="", status_dict={}, optimizer = SGD,  reset=True, return_outputs = False, iter0 = 0, task_separate_flag = True, optimizer_state_dict = None, collate_tasks = False): #, print_flag):
         # '''  adapt on train-tasks / then test the generalization loss   '''
-
-        task_param, task, idx, name = task_pkg
+    
+        par, task, name = task_pkg  #, idx
 
         if level is None:
             level = self.top_level
@@ -110,7 +115,7 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         status, status_dict = update_status(status, status_dict, level=level, task_name=name, task_separate_flag=task_separate_flag)
 
         def forward_wrapper(task_list, sample_type, iter_num):       # evaluate on one mini-batch from test-loader
-            return self.forward(task_list, sample_type=sample_type, iter_num=iter_num, level=level, status = status, status_dict = status_dict, return_outputs=return_outputs)
+            return self.forward(task_list, sample_type=sample_type, iter_num=iter_num, level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, collate_tasks = collate_tasks)
 
 
         param_all = self.decoder_model.module.parameters_all if isinstance(self.decoder_model, nn.DataParallel) else self.decoder_model.parameters_all
@@ -120,6 +125,8 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
                         optimizer = optimizer, optimizer_state_dict = optimizer_state_dict, 
                         reset = reset, 
                         device = self.device, 
+                        n_contexts = self.n_contexts,
+                        collate_tasks = collate_tasks,
                         iter0 = iter0,
                         Higher_flag     = self.use_higher,
                         grad_clip       = self.grad_clip)
@@ -237,12 +244,8 @@ def update_status(status, status_dict, sample_type = None, level = None, task_na
     if level is not None:
         status += '/lv'+str(level)         # status += '_lv'+str(level)
     if task_name is not None:
-        # print(status, task_name)
-        # set_trace()
         if task_separate_flag:
             status +=  '_'+str(task_name)  
-        # else:
-        #     status += '/_'
     if sample_type is not None:
         status += '/' + sample_type
     return status, status_dict

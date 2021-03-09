@@ -39,7 +39,7 @@ class Basic_Dataset(Dataset):
         input = self.input[idx]
         target = [] if self.target is None else self.target[idx]
         name = input if self.named_input else idx
-        return input, target, idx, name
+        return input, target, name #, idx
 
 ##############################
 # Basic_Dataset_LQR
@@ -83,16 +83,36 @@ class Meta_DataLoader(DataLoader):
 
     def __iter__(self):
         return iter(self.create_mini_batches())  # create different set of mini-batch each time __iter__ is called. 
-         
+
+########################
+#  continuous_loader    
+class continuous_loader():  # wrapper
+    def __init__(self, loader):
+        self.loader = loader
+        self.iterator = self.get_iter()
+
+    def get_iter(self):
+        # if isinstance(self.loader, list):
+        #     return [iter(l) for l in self.loader]
+        # else:
+            return iter(self.loader)
+
+    def get_next(self):
+        try:
+            data = next(self.iterator)
+        except StopIteration:
+            self.iterator = self.get_iter()
+            data = next(self.iterator)
+        return data
 
 ########################
 # testing code 
 
-def test_dataloader():
-    dataset = Basic_Dataset(list(range(6)), list(range(6)))
-    dataloader = Meta_DataLoader(dataset, batch_size=2)  # dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
+# def test_dataloader():
+#     dataset = Basic_Dataset(list(range(6)), list(range(6)))
+#     dataloader = Meta_DataLoader(dataset, batch_size=2)  # dataloader = DataLoader(dataset, batch_size=2, shuffle=True)
 
-    for i in range(4):
-        print('new iter!')
-        for data in dataloader:
-            print(data)
+#     for i in range(4):
+#         print('new iter!')
+#         for data in dataloader:
+#             print(data)

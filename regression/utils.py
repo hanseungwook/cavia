@@ -55,7 +55,10 @@ def move_to_device(input_tuple, device):
     if device in (None, 'cpu') :
         return input_tuple
     else:
-        return [k.to(device) for k in input_tuple]
+        if isinstance(input_tuple[0], torch.FloatTensor):
+            return [k.to(device) for k in input_tuple]
+        else:
+            return [move_to_device(k,device) for k in input_tuple]
     
 def check_nan(loss):
     if torch.isnan(loss):
