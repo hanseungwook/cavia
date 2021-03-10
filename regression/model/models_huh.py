@@ -109,15 +109,14 @@ class Cavia(BaseModel):
             ctx_list = match_tensor_dim0(ctx_list)
             ctx = torch.cat(ctx_list, dim=-1)
             if len(x.shape)>2:
-            # x.shape = torch.Size([b1*b2, b0, nx])
-            # ctx0.shape = [b1*b2, nc0] -> [b1*b2, 1, nc0]
-            # ctx1.shape = [b2, nc1] -> [b2, 1, nc1] -> [b1*b2, 1, nc1]
+                # x.shape = torch.Size([b1*b2, b0, nx])
+                # ctx0.shape = [b1*b2, nc0] -> [b1*b2, 1, nc0]
+                # ctx1.shape = [b2, nc1] -> [b2, 1, nc1] -> [b1*b2, 1, nc1]
                 ctx = ctx.expand(ctx.shape[0], x.shape[1], *ctx.shape[2:])
             else:
-            # x.shape = torch.Size([ b0, nx])
-            # ctx0.shape = [1, nc0] -> [1, 1, nc0]
-            # ctx1.shape = [1, nc1] -> [1, 1, nc1] -> [1, 1, nc1]
-
+                # x.shape = torch.Size([ b0, nx])
+                # ctx0.shape = [1, nc0] -> [1, 1, nc0]
+                # ctx1.shape = [1, nc1] -> [1, 1, nc1] -> [1, 1, nc1]
                 assert ctx.shape[0] == 1
                 ctx = ctx.squeeze(0).expand(x.shape[0], *ctx.shape[2:])
             x = torch.cat((x, ctx), dim=-1)   # Concatenate input with context
