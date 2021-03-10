@@ -2,6 +2,8 @@ import torch
 from torch.nn.utils import clip_grad_value_
 import torch.nn as nn
 
+from hierarchical_task import custom_collate
+
 from pdb import set_trace
 # import higher 
 
@@ -11,7 +13,7 @@ from pdb import set_trace
 ## optimize parameter for a given 'task'
 
 def optimize(param_all, model_forward, save_cktp_fnc, 
-            task, optim_args,  
+            task_pkg, optim_args,  
             optimizer, optimizer_state_dict, 
             reset, 
             device, 
@@ -24,19 +26,22 @@ def optimize(param_all, model_forward, save_cktp_fnc,
     level, lr, max_iter, for_iter, test_interval = optim_args
 
     ################
-    def initialize():     ## Initialize param & optim
-        if param_all[level] is None:
-            return None, None
+    def initialize(len_task):     ## Initialize param & optim
+        param = param_all[level]
+        if param is None:
+            return  None
         else:
-            if reset:    # use manual optim
-                # param_all[level] = torch.zeros_like(param_all[level], requires_grad=True, device=device)   # Reset
-                param_all[level] = make_zero_ctx(n_contexts[level])
-                optim = None
-            else:         # use regular optim: for outer-loop
-                optim = optimizer(param_all[level](), lr=lr)   # outer-loop: regular optim
+            if callable(param): #      # use regular optim: for outer-loop
+                assert not reset #level == top_level
+                optim = optimizer(param(), lr=lr)   # outer-loop: regular optim
                 if optimizer_state_dict is not None:
                     optim.load_state_dict(optimizer_state_dict)
-            return param_all, optim
+                return optim
+            else:  # use manual optim
+                assert reset
+                n_ctx = n_contexts[level]
+                param_all[level] = make_zero_ctx(n_ctx, len_task)   #  torch.zeros_like(param_all[level], requires_grad=True, device=device) 
+                return  None 
 
     def expand_ctx(batch):     ## Initialize param & optim
         param_all[level] = param_all[level].squeeze(0).expand([batch] + list(param_all[level].shape))
@@ -63,25 +68,31 @@ def optimize(param_all, model_forward, save_cktp_fnc,
     ######################################
     # main code
 
-    param_all, optim = initialize()  
+    pars, tasks, names = task_pkg
+
+    if collate_tasks: 
+        if not isinstance(tasks, list):
+            pars = [pars]
+            tasks = [tasks]
+            names = [names]
+        len_task = len(tasks)
+
+        train_loader = [t.load('train') for t in tasks]
+        test_loader  = [t.load('test') for t in tasks]
+    else:
+        len_task = 1 #None
+
+    optim = initialize(len_task)  
     i = iter0
     loss = None
 
-    if collate_tasks: 
-        if isinstance(task, list):
-            expand_ctx(len(task))
-        else:
-            task = [task]
-
-        train_loader = [t.load('train') for t in task]
-        test_loader = [t.load('test') for t in task]
 
     while True:
         if collate_tasks:
-            train_subtasks = collect_subtasks(train_loader, level)
+            train_subtasks, train_batch = collect_subtasks(train_loader, names)
             if i >= max_iter or (i > 0 and not i%test_interval):  # Terminal or intermediate (for logging every test_interval) 
-                test_subtasks = collect_subtasks(test_loader, level)
-                test_loss, test_output = model_forward(test_subtasks, sample_type = 'test', iter_num = i)
+                test_subtasks, test_batch = collect_subtasks(test_loader, names)
+                test_loss, test_output = model_forward(test_subtasks, sample_type = 'test', iter_num = i, batch = test_batch)
             
                 save_cktp_fnc(level, i, test_loss, loss, optim)
 
@@ -89,17 +100,18 @@ def optimize(param_all, model_forward, save_cktp_fnc,
                     return test_loss, test_output 
 
             i += 1  
-
-            loss, output = model_forward(train_subtasks, sample_type = 'train', iter_num = i)    # Loss to be optimized
+            loss, output = model_forward(train_subtasks, sample_type = 'train', iter_num = i, batch = train_batch)    # Loss to be optimized
             update_step()
 
+            # if level<2:
+            #     print(param_all[level]*1e4)
         else:
     # while True:
-            for train_subtasks in task.load('train').loader:     # task_list = sampled mini-batch
-                for _ in range(for_iter):          # Seungwook: for_iter replicates cavia’s implementation where they use the same mini-batch for the inner loop steps
+            for train_subtasks in tasks.load('train').loader:     # task_list = sampled mini-batch
+                # for _ in range(for_iter):          # Seungwook: for_iter replicates cavia’s implementation where they use the same mini-batch for the inner loop steps
                     
                     if i >= max_iter or (i > 0 and not i%test_interval):  # Terminal or intermediate (for logging every test_interval) 
-                        for test_subtasks in task.load('test').loader:           # Run Test-loss
+                        for test_subtasks in tasks.load('test').loader:           # Run Test-loss
                             test_loss, test_output = model_forward(test_subtasks, sample_type = 'test', iter_num = i)
                             break
                         
@@ -109,9 +121,11 @@ def optimize(param_all, model_forward, save_cktp_fnc,
                             return test_loss, test_output 
 
                     i += 1  
-
                     loss, output = model_forward(train_subtasks, sample_type = 'train', iter_num = i)    # Loss to be optimized
                     update_step()
+
+                    # if level<2:
+                    #     print(param_all[level]*1e4)
 
 
 ############
@@ -120,32 +134,33 @@ def clip_grad_value_fnc(grad, grad_clip):
     for g in grad: #filter(lambda p: p.grad is not None, parameters):
         g.data.clamp_(min=-grad_clip, max=grad_clip)
 
-###
+#################
+# collect_subtasks
+def collect_subtasks(loader_list, names_prev):
 
-def collect_subtasks(loader_list, level):
-    # subtask = []
+    args_all = [ [], [], [] ] # pars, tasks, names
+    
+    for (loader, name_prev) in zip(loader_list, names_prev):
+        for arg_all, arg in zip(args_all, loader.get_next()):
+            if isinstance(arg, tuple):   # tuples of tasks / names
+                if isinstance(arg[0],str):  # names
+                    arg= [name_prev + '_' + a for a in arg]
+                arg_all += list(arg)
+            else:
+                arg_all.append(arg)  # list of input/param tensors
 
-    pars, tasks, names = [], [], []
+    for i, arg_ in enumerate(args_all):
+        if isinstance(arg_[0], torch.Tensor):
+            args_all[i] = torch.stack(arg_,dim=0)
 
-    for loader in loader_list:
-        batch = loader.get_next()
-        if level>0:
-            for par_, task_, name_ in batch:
-                pars.append(par_); tasks.append(task_); names.append(name_); 
-        else:
-            par_, task_, name_ = batch
-            pars.append(par_); tasks.append(task_); names.append(name_); 
-
-    if isinstance(task_ ,torch.FloatTensor):
-        pars = torch.stack(pars, dim=0)
-        tasks = torch.stack(tasks, dim=0)        
-    return pars, tasks, names
+    return args_all, len(arg)   #pars, tasks, names
 
 
 
-def make_zero_ctx(n, device = 'cpu'):
+def make_zero_ctx(n, len_task = None, device = 'cpu'):
     # if DOUBLE_precision:
     #     return torch.zeros(1,n, requires_grad=True).double()
-    # else:
-        # return torch.zeros(1,n, requires_grad=True, device=device)
+    if len_task is None:
         return torch.zeros(n, requires_grad=True, device=device)
+    else:
+        return torch.zeros(len_task, n, requires_grad=True, device=device)            

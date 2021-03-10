@@ -39,7 +39,7 @@ class Basic_Dataset(Dataset):
         input = self.input[idx]
         target = [] if self.target is None else self.target[idx]
         name = input if self.named_input else idx
-        return input, target, name #, idx
+        return input, target, str(name) 
 
 ##############################
 # Basic_Dataset_LQR
@@ -58,52 +58,10 @@ class Basic_Dataset_LQR(Dataset):  # Temporary code. to be properly written
         return len(self.x0)
     
     def __getitem__(self, idx):
-        return (self.kbm, self.goal, self.x0[idx]), [], idx, idx
+        return (self.kbm, self.goal, self.x0[idx]), [], str(idx)
     
 
-##################################
-# Meta_DataLoader
-class Meta_DataLoader(DataLoader):
-    def __init__(self, dataset, batch_size):
-        batch_size  = max(1, min(batch_size, len(dataset)))          # assert  1<=batch_size<=len(dataset)
-        super().__init__(dataset, batch_size)
 
-    def create_mini_batches(self):                      # Create list of minibatch indices
-        batch_idx = list(BatchSampler(RandomSampler(self.dataset), self.batch_size, drop_last=True))
-        
-        # since collate does not work for tasks (only works for torch.tensors / arrays ...)
-        # Create dataset of minibatches of the form [mini-batch of (hierarchical tasks), ...]
-        mini_dataset = []
-        for mini_batch_idx in batch_idx:  
-            mini_dataset.append( [self.dataset[idx_] for idx_ in mini_batch_idx] )
-        return mini_dataset
-
-    def __len__(self):
-        return len(self.dataset)
-
-    def __iter__(self):
-        return iter(self.create_mini_batches())  # create different set of mini-batch each time __iter__ is called. 
-
-########################
-#  continuous_loader    
-class continuous_loader():  # wrapper
-    def __init__(self, loader):
-        self.loader = loader
-        self.iterator = self.get_iter()
-
-    def get_iter(self):
-        # if isinstance(self.loader, list):
-        #     return [iter(l) for l in self.loader]
-        # else:
-            return iter(self.loader)
-
-    def get_next(self):
-        try:
-            data = next(self.iterator)
-        except StopIteration:
-            self.iterator = self.get_iter()
-            data = next(self.iterator)
-        return data
 
 ########################
 # testing code 
@@ -116,3 +74,5 @@ class continuous_loader():  # wrapper
 #         print('new iter!')
 #         for data in dataloader:
 #             print(data)
+
+

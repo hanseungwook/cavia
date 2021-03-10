@@ -23,7 +23,7 @@ DEBUG_LEVELS = []  # [1] #[0]  #[2]
 
 def batch_wrapper(fnc): 
     def wrapped_fnc(batch, *args):
-        if isinstance(batch, (np.ndarray, torch.FloatTensor, torch.DoubleTensor)):  
+        if isinstance(batch, (np.ndarray, torch.Tensor)):  
             return fnc(batch, *args)
         elif isinstance(batch, list):
             return [fnc(b, *args) for b in batch]
@@ -37,28 +37,30 @@ def batch_wrapper(fnc):
 
 def set_seed(seed, cudnn=True):
     """
-    Seed everything we can!
     Note that gym environments might need additional seeding (env.seed(seed)),
-    and num_workers needs to be set to 1.
+    and num_workers needs to be set to 1. # Huh ??
     """
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.random.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    # note: the below slows down the code but makes it reproducible
-    if (seed is not None) and cudnn:
-        torch.backends.cudnn.deterministic = True
+    if seed != 0: # is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.random.manual_seed(seed)
+        torch.cuda.manual_seed(seed)
+        # note: the below slows down the code but makes it reproducible
+        if cudnn:
+            torch.backends.cudnn.deterministic = True
 
 ##################################
-def move_to_device(input_tuple, device):
+def move_to_device(input, device):
     if device in (None, 'cpu') :
-        return input_tuple
+        return input
     else:
-        if isinstance(input_tuple[0], torch.FloatTensor):
-            return [k.to(device) for k in input_tuple]
+        if isinstance(input, (tuple, list)):
+            return [move_to_device(inp_, device) for inp_ in input]
+        elif isinstance(input, torch.Tensor):
+            return input.to(device)
         else:
-            return [move_to_device(k,device) for k in input_tuple]
+            return input
     
 def check_nan(loss):
     if torch.isnan(loss):

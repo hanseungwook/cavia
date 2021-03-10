@@ -25,7 +25,7 @@ def sine1_fnc(params):
 def sine1_params():       # Sample n_batch number of parameters
     amplitude = np.random.uniform(0.1, 5.)
     phase = np.random.uniform(0., np.pi)
-    return amplitude, phase
+    return torch.tensor([amplitude, phase])
 
 def sine_gen():
     return (sine1_fnc, batch_wrapper(sine1_params))  # sine1_task
@@ -41,7 +41,7 @@ def line1_fnc(params):
 def line1_params():
     slope = np.random.uniform(-3., 3.)
     bias = np.random.uniform(-3., 3.)
-    return slope, bias
+    return torch.tensor([slope, bias])
 
 def line_gen():
     return (line1_fnc, batch_wrapper(line1_params))  #line1_task

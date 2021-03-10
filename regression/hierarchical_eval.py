@@ -76,12 +76,10 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
         status, status_dict = update_status(status, status_dict, sample_type=sample_type) 
 
         log_loss_flag, log_ctx_flag, print_flag, task_separate_flag = self.get_flags(level)
-
+        
         if level > 0:          # meta-level evaluation
-
             def eval_wrapper(task_list):       # evaluate on one mini-batch from test-loader
                 return self.evaluate(task_list, level = level-1, status =  status, status_dict = status_dict, return_outputs=return_outputs, task_separate_flag=task_separate_flag, collate_tasks = collate_tasks)
-            # eval_wrapper = partial(self.evaluate, level = level-1, status =  status, status_dict = status_dict, return_outputs=return_outputs, task_separate_flag=task_separate_flag, collate_tasks = collate_tasks)
 
             loss, outputs = eval_wrapper(task_list) if collate_tasks else get_average_loss(eval_wrapper, task_list, return_outputs, mp=self.mp) 
         else:                  # base-level evaluation (level 0)
@@ -93,8 +91,8 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
     
     def base_eval(self, data):
         inputs, targets, _ = move_to_device(data, self.device)   # data = inputs, targets, indices, (names = indices)
-        # assert isinstance(data[0], (torch.FloatTensor, torch.DoubleTensor)) #, torch.cuda.FloatTensor, torch.cuda.DoubleTensor)):
-
+        # assert isinstance(data[0], (torch.Tensor)) #, torch.cuda.Tensor)):
+        # print(inputs.view(-1))
         if self.base_loss is None: # base_loss is included in decoder_model (e.g. LQR)
             loss, outputs = self.decoder_model(inputs, targets)
         else:
@@ -114,14 +112,14 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
 
         status, status_dict = update_status(status, status_dict, level=level, task_name=name, task_separate_flag=task_separate_flag)
 
-        def forward_wrapper(task_list, sample_type, iter_num):       # evaluate on one mini-batch from test-loader
+        def forward_wrapper(task_list, sample_type, iter_num, batch = None):       # evaluate on one mini-batch from test-loader
             return self.forward(task_list, sample_type=sample_type, iter_num=iter_num, level=level, status = status, status_dict = status_dict, return_outputs=return_outputs, collate_tasks = collate_tasks)
 
 
         param_all = self.decoder_model.module.parameters_all if isinstance(self.decoder_model, nn.DataParallel) else self.decoder_model.parameters_all
 
         return optimize(param_all, forward_wrapper, self.save_cktp, 
-                        task, self.optim_args(level),
+                        task_pkg, self.optim_args(level),
                         optimizer = optimizer, optimizer_state_dict = optimizer_state_dict, 
                         reset = reset, 
                         device = self.device, 
@@ -206,10 +204,10 @@ class Hierarchical_Eval(nn.Module):            # Bottom-up hierarchy
 # get_average_loss - Parallelize! 
 from multiprocessing import Process, Manager
 
-def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
+def get_average_loss(eval_fnc, task_pkgs, return_outputs, mp=False):
     losses, outputs = [], []
     if not mp:
-        for task_pkg in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
+        for task_pkg in zip(*task_pkgs):   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
             l, outputs_ = eval_fnc(task_pkg)
             losses.append(l)
             if return_outputs:
@@ -226,7 +224,7 @@ def get_average_loss(eval_fnc, task_list, return_outputs, mp=False):
             l, _ = eval_fnc(task_pkg)
             losses.append(l)
 
-        for task_pkg in task_list:   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
+        for task_pkg in zip(*task_pkgs):   # Todo: Parallelize! see SubprocVecEnv: https://stable-baselines.readthedocs.io/en/master/guide/vec_envs.html
             p = Process(target=mp_loss_fn, args=(eval_fnc, task_pkg))
             process_list.append(p)
             p.start()

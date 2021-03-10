@@ -77,8 +77,8 @@ class BaseModel(nn.Module):
 
         self.parameters_all = [make_ctx(n, device) for n in n_contexts] + [self.module_list.parameters]   # [ctx0, ctx1, outer_loop_parameters]
 
-        self.device = device if device is not None else 'cpu'
-        self.n_contexts = n_contexts #sum(n_context)  # Concatenate all high-level ctx into one. 
+        self.device = device or 'cpu'
+        self.n_contexts = n_contexts
         self.nonlin = nonlin
         self.n_arch = n_arch
         # self.loss_fnc = loss_fnc
@@ -106,17 +106,36 @@ class Cavia(BaseModel):
 
     def _forward(self, x, ctx_list):
         if ctx_list != []:
-            ctx = torch.cat(ctx_list, dim=0)                  # combine ctx with higher-level ctx
-            ctx = ctx.unsqueeze(-2).expand(x.shape[0], -1)
+            ctx_list = match_tensor_dim0(ctx_list)
+            ctx = torch.cat(ctx_list, dim=-1)
+            if len(x.shape)>2:
+            # x.shape = torch.Size([b1*b2, b0, nx])
+            # ctx0.shape = [b1*b2, nc0] -> [b1*b2, 1, nc0]
+            # ctx1.shape = [b2, nc1] -> [b2, 1, nc1] -> [b1*b2, 1, nc1]
+                ctx = ctx.expand(ctx.shape[0], x.shape[1], *ctx.shape[2:])
+            else:
+            # x.shape = torch.Size([ b0, nx])
+            # ctx0.shape = [1, nc0] -> [1, 1, nc0]
+            # ctx1.shape = [1, nc1] -> [1, 1, nc1] -> [1, 1, nc1]
 
-            x = torch.cat((x, ctx), dim=1)   # Concatenate input with context
-            # x = torch.cat((x, ctx.unsqueeze(0).expand(x.shape[0]+list(ctx.shape))), dim=1)   # Concatenate input with context
+                assert ctx.shape[0] == 1
+                ctx = ctx.squeeze(0).expand(x.shape[0], *ctx.shape[2:])
+            x = torch.cat((x, ctx), dim=-1)   # Concatenate input with context
 
         for i, module in enumerate(self.module_list):
             x = module(x)
             if i < len(self.module_list) - 1:  
                 x = self.nonlin(x)
         return x
+
+def match_tensor_dim0(tensor_list):
+    max0 = max([t.shape[0] for t in tensor_list])
+    for i, t in enumerate(tensor_list):
+        dim0 = t.shape[0]
+        t = t.unsqueeze(1).repeat([1, max0//dim0]+[1]*len(t.shape[1:])).view(max0,1,*t.shape[1:])
+        tensor_list[i] = t
+    return tensor_list
+    # a.view(*a.shape[:2], -1, *a.shape[5:]) collapse tensor dimensions
 
 ######################################
 

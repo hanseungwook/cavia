@@ -60,7 +60,7 @@ def get_hparams(*args):
     
     parser.add_argument('--device',    type=str, default=default_device)     # "cuda:0" or "cpu"
     parser.add_argument('--v_num',     type=int, default=None, help='version number for resuming') #type=str)
-    parser.add_argument('--seed',      type=int, default=42)
+    parser.add_argument('--seed',      type=int, default=42) # None
 
     parser.add_argument('--lrs',       type=float, nargs='+', default=None, help="lr for lv0/lv1/lv2..") #[0.05, 0.05, 0.001])     # lr for inner-loop, midloop, outerloop
     parser.add_argument('--max_iters', type=int,   nargs='+', default=None, help="max_iter for lv0/lv1/lv2..") #[3, 2, 1000])            # max_iter for inner-loop, midloop, outerloop
